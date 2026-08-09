@@ -1,6 +1,6 @@
 ![Artboard][NuggetLogo]
 
-# Nugget
+# GoldenNugget
 Unlock your device's full potential!
 
 Customize your device with animated wallpapers, disable pesky daemons, and more!
@@ -11,7 +11,7 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
 > This fork implements a three-phase backup→tweak→restore workflow to prevent data loss on iOS 27. Apple has patched the partial restore method that Nugget uses, so applying tweaks directly now triggers a security response that wipes AppleID, Keychain, Photos and settings. This fork preserves your data by backing it up first, then restoring it after the tweak is applied. **THIS WORKAROUND IS UNSTABLE NOW, I AM NOT RESPONSIBLE FOR ANY DATA LOSS/BOOTLOOP CAUSED BY NUGGET.**
 
 > [!NOTE]
-> Please back up your data before using this Project! Nugget may cause unforeseen problems, so it is better to be safe than sorry. We are not responsible for any damage done to your device.
+> Please back up your data before using this Project! GoldenNugget may cause unforeseen problems, so it is better to be safe than sorry. We are not responsible for any damage done to your device.
 
 ## Features
 <details>
@@ -216,6 +216,7 @@ If you would like to read more about the inner workings of the exploit and iOS r
 ## Credits
 - Translations crowdsourced using [POEditor][POEditorJoin]. Thank you everyone who assisted in the translation effort!
 - [JJTech][JJTechGitHub] for Sparserestore/[TrollRestore][TrollStoreGitHub]
+- [Wind0ws11Aero] for IOS 27 Support and PosterBoard on IOS 26.5+
 - [Duy Tran][DuyGitHub] and [Huy Nguyen][HuyTwitter] for BookRestore/[bl_sbx][bl_sbxGitHub]
 - [PosterRestore][PosterRestoreDiscord] for their help with PosterBoard
   - Special thanks to [dootskyre][dootskyreX], [Middo][MiddoX], [dulark][dularkGitHub], forcequitOS, and pingubow for their work on this. It would not have been possible without them!
@@ -239,7 +240,7 @@ If you would like to read more about the inner workings of the exploit and iOS r
 [ShortcutsApp]: https://apps.apple.com/us/app/shortcuts/id915249334
 [MobilegestaltShortcut]: https://www.icloud.com/shortcuts/66bd3c822a0145b98d46cd1c9077e6e5
 [ReadMoreGist]: https://gist.github.com/leminlimez/c602c067349140fe979410ef69d39c28
-
+[Wind0ws11Aero]: https://github.com/Wind0ws11Aero
 [POEditorJoin]: https://poeditor.com/join/project/UTqpVSE2UD
 [JJTechGitHub]: https://github.com/JJTech0130
 [TrollStoreGitHub]: https://github.com/JJTech0130/TrollRestore
