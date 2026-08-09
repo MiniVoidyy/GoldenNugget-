@@ -204,15 +204,6 @@ BookRestore works on all versions iOS 18.2-26.1.
 ## Read More
 If you would like to read more about the inner workings of the exploit and iOS restore system, I made a write up which you can read [here][ReadMoreGist].
 
-## Arbitrary Star Graph
-<a href="https://www.star-history.com/#leminlimez/Nugget&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=leminlimez/Nugget&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=leminlimez/Nugget&type=Date" />
-    <img alt="Star History" src="https://api.star-history.com/svg?repos=leminlimez/Nugget&type=Date" />
-  </picture>
-</a>
-
 ## Credits
 - Translations crowdsourced using [POEditor][POEditorJoin]. Thank you everyone who assisted in the translation effort!
 - [JJTech][JJTechGitHub] for Sparserestore/[TrollRestore][TrollStoreGitHub]
