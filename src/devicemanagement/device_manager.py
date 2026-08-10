@@ -20,8 +20,6 @@ from pymobiledevice3.ca import create_keybag_file
 from pymobiledevice3.services.mobile_config import MobileConfigService
 from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.exceptions import MuxException, PasswordRequiredError, ConnectionTerminatedError, AccessDeniedError, InvalidServiceError
-from pymobiledevice3.services.installation_proxy import InstallationProxyService
-from pymobiledevice3.services.house_arrest import HouseArrestService
 from pymobiledevice3.services.afc import AfcService
 import pymobiledevice3.service_connection as _sc
 
@@ -47,6 +45,7 @@ from src.tweaks.basic_plist_locations import FileLocation
 
 from src.restore import reboot_device
 from src.restore.restore import restore_files, FileToRestore
+from src.restore.original_plist import capture_original_plists, materialize_plist
 from src.restore.bookrestore import perform_bookrestore, create_server_folder, create_local_server, cleanup_server_folder, close_dl_connection, generate_bldbmanager, br_files
 from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreApplyMethod
 from src.restore.mbdb import _FileMode
@@ -269,16 +268,11 @@ class DeviceManager:
         else:
             return self.data_singleton.current_device.is_exploit_fully_patched()
         
-    def get_current_device_supports_descriptors(self) -> bool:
+    def get_current_device_is_supported_by_fork(self) -> bool:
         if self.data_singleton.current_device == None:
             return False
-        device_build = self.get_current_device_build()
-        device_model = self.get_current_device_model()
-        if (device_model.startswith("iPhone18,")
-            or Version(self.get_current_device_version()) < Version("26.4")
-            or device_build == "23E5207q" or device_build == "23E5218e"):
-            return True
-        return False
+        else:
+            return self.data_singleton.current_device.is_supported_by_fork()
         
     def current_device_books_container_uuid_callback(self, uuid: Optional[str]=None) -> Optional[Optional[str]]:
         # if there is no argument, return the existing uuid
@@ -288,46 +282,6 @@ class DeviceManager:
         # save it to settings
         self.pref_manager.settings.setValue(self.data_singleton.current_device.udid + "_books_container_uuid", uuid)
         
-    def get_app_hashes(self, bundle_ids: list[str]) -> dict:
-        return asyncio.run(self._get_app_hashes(bundle_ids))
-    async def _get_app_hashes(self, bundle_ids: list[str]) -> dict:
-        ld = await create_using_usbmux(serial=self.data_singleton.current_device.udid)
-        apps = await ld.get_apps(application_type="Any", calculate_sizes=False)
-        await ld.close()
-        results = {}
-        for bundle_id in bundle_ids:
-            app_info = apps[bundle_id]
-            results[bundle_id] = app_info["Container"].removeprefix("/private/var/mobile/Containers/Data/Application/")
-        return results
-    
-    def send_app_hashes_afc(self, hashes: dict) -> str:
-        return asyncio.run(self._send_app_hashes_afc(hashes))
-    async def _send_app_hashes_afc(self, hashes: dict) -> str:
-        # create a temporary file to send it as
-        with TemporaryDirectory() as tmpdir:
-            # get the bundle id of Pocket Poster
-            bundle_id = "com.leemin.Pocket-Poster"
-            ld = await create_using_usbmux(serial=self.data_singleton.current_device.udid)
-            async with InstallationProxyService(ld) as ips:
-                apps = await ips.get_apps(application_type="User", calculate_sizes=False)
-            for app in apps.values():
-                if app["CFBundleExecutable"] == "Pocket Poster":
-                    bundle_id = app["CFBundleIdentifier"]
-                    break
-                elif app["CFBundleExecutable"] == "LiveContainer":
-                    # fallback for live container
-                    bundle_id = app["CFBundleIdentifier"]
-            async with HouseArrestService(lockdown=ld, bundle_id=bundle_id, documents_only=True) as afc:
-                # send each hash over
-                for key in hashes.keys():
-                    fname = "Nugget" + key.replace("com.apple.", "") + "Hash"
-                    tmpf = os.path.join(tmpdir, fname)
-                    with open(tmpf, "w", encoding='UTF-8') as in_file:
-                        in_file.write(hashes[key])
-                    await afc.push(tmpf, f"/Documents/{fname}")
-            await ld.close()
-        
-
     def reset_device_pairing(self):
         asyncio.run(self._reset_device_pairing())
     async def _reset_device_pairing(self):
@@ -633,31 +587,276 @@ class DeviceManager:
     def apply_changes(self, update_label=lambda x: None, show_alert=lambda x: None):
         asyncio.run(self._apply_changes(update_label, show_alert))
     async def _apply_changes(self, update_label=lambda x: None, show_alert=lambda x: None):
+        files_to_restore: list[FileToRestore] = []
+        final_alert = None
+        pb = tweaks[TweakID.PosterBoard]
+        original_tendies = list(pb.tendies)
         try:
-            # set the tweaks and apply
-            # first open the file in read mode
+            if not self.get_current_device_is_supported_by_fork():
+                raise NuggetException(QCoreApplication.tr(
+                    "This version of iOS is not supported by this fork.\n\n"
+                    "GoldenNugget only supports iOS 26.2 and newer. "
+                    "Please use the original Nugget for iOS 26.1 and earlier."))
             update_label(QCoreApplication.tr("Applying changes to files..."))
-            gestalt_plist = None
-            if self.data_singleton.gestalt_path != None:
-                if self.data_singleton.gestalt_path == self.data_singleton.SAVED_GESTALT_STRING:
-                    gestalt_plist = self.pref_manager.get_mga_data(self.get_current_device_udid())
-                else:
-                    with open(self.data_singleton.gestalt_path, 'rb') as in_fp:
-                        gestalt_plist = plistlib.load(in_fp)
-            # create the other plists
-            flag_plist: dict = {}
-            eligibility_files = None
-            ai_file = None
-            basic_plists: dict = {}
-            basic_plists_ownership: dict = {}
-            files_data: dict = {}
-            uses_domains: bool = False
-            use_bookrestore: bool = False
-            # create the restore file list
-            files_to_restore: list[FileToRestore] = [
-            ]
-            tmp_dirs = [] # temporary directory for unzipping pb and template files
+            if not os.environ.get("GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE"):
+                await self._maybe_capture_originals(update_label)
+            device_values = await self._get_lockdown_values()
 
+            # Applying several tendies in a single restore corrupts the
+            # PosterBoard sqlite database (and PosterBoard itself), so split
+            # them up: with N tendies loaded, run N separate restores, one
+            # tendie per restore.
+            if len(original_tendies) > 1:
+                passes = [[tendie] for tendie in original_tendies]
+            else:
+                passes = [original_tendies]
+
+            for pass_idx, tendie_subset in enumerate(passes):
+                if pass_idx > 0:
+                    # the device rebooted after the previous restore — wait for it to return
+                    update_label(QCoreApplication.tr("Waiting for device to reconnect..."))
+                    if not await self._wait_for_device_reconnect():
+                        raise NuggetException(QCoreApplication.tr(
+                            "Failed to reconnect to the device after the previous restore. "
+                            "Please reboot it manually and re-apply the remaining wallpapers."))
+                # fetch a fresh copy of the PosterBoard database before each
+                # tendie so the config manager always builds on the current
+                # state. GOLDENNUGGET_SKIP_PB_BACKUP=1 skips the full
+                # mobilebackup2 backup before the restore.
+                if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
+                    await self._backup_posterboard_database(update_label, force=True)
+                pb.tendies = tendie_subset
+                # PosterBoard templates are only applied with the first
+                # tendie — re-applying them in every split pass would
+                # duplicate them.
+                final_alert, files_to_restore = await self._apply_tweak_pass(
+                    update_label,
+                    templates=tweaks[TweakID.Templates].templates if pass_idx == 0 else [],
+                    device_values=device_values,
+                )
+                update_label(QCoreApplication.tr("Success!"))
+        except Exception as e:
+            final_alert = show_apply_error(e, update_label, files_list=files_to_restore)
+        finally:
+            pb.tendies = original_tendies
+            close_dl_connection()
+            show_alert(final_alert)
+
+    async def _wait_for_device_reconnect(self, timeout: float = 300) -> bool:
+        """Wait for the device to come back after a reboot (between split applies)."""
+        udid = self.get_current_device_udid()
+        if not udid:
+            return False
+        max_timeout = time.time() + timeout
+        connected = False
+        while not connected and time.time() < max_timeout:
+            try:
+                ld = await create_using_usbmux(serial=udid, pair_timeout=timeout)
+                try:
+                    await ld.close()
+                except Exception:
+                    pass
+                connected = True
+            except Exception:
+                await asyncio.sleep(1)
+        return connected
+
+    async def _backup_posterboard_database(self, update_label=lambda x: None, force: bool = False):
+        """Fetch the device's PosterBoard sqlite database before applying wallpapers.
+
+        The database (PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3) holds the
+        user's current wallpapers. A fresh copy is pulled from the device every
+        time a tendie is about to be applied (``force=True``) so the config
+        manager always builds on top of the current on-device state. Previously
+        fetched copies are only reused when the database is genuinely needed and
+        a fresh one isn't required (``force=False``).
+
+        Uses the same mechanism as the "Fetch Database File" wizard (full
+        mobilebackup2 backup + Manifest.db lookup). The backup runs in the
+        idevicebackup2 child process when available so a crash in a C extension
+        cannot kill the GUI. Failure is non-fatal: the apply continues and the
+        config mode surfaces its own clear error later.
+        """
+        udid = self.get_current_device_udid()
+        if not udid:
+            return
+        # already backed up for this device and no fresh copy required -> reuse it
+        if not force and PreferenceManager.has_pbconfig_data(udid):
+            return
+        pb = tweaks[TweakID.PosterBoard]
+        if (len(pb.tendies) == 0 and pb.videoFile is None
+                and len(tweaks[TweakID.Templates].templates) == 0):
+            # no wallpapers being added, nothing to back up
+            return
+
+        update_label(QCoreApplication.tr("Fetching PosterBoard database..."))
+        from src.gui.dialogs.pb_dialog import backup_posterboard_database
+        try:
+            db_file_path = await backup_posterboard_database(udid, update_label)
+            if not db_file_path or not os.path.exists(db_file_path):
+                raise NuggetException("The PosterBoard database file doesn't exist!")
+            update_label(QCoreApplication.tr("Saving PosterBoard database..."))
+            if not pb.config_manager.update_database_file(db_file_path, udid):
+                raise NuggetException("The PosterBoard database is not of the correct format!")
+            pb.config_manager.update_for_saved_database(udid)
+            update_label(QCoreApplication.tr("PosterBoard database backed up successfully."))
+        except Exception as e:
+            print(f"Failed to back up PosterBoard database: {e}")
+            print(traceback.format_exc())
+            update_label(QCoreApplication.tr("Warning: could not back up the PosterBoard database automatically."))
+
+    ## ORIGINAL PLIST SAVING
+    async def _get_lockdown_values(self) -> dict:
+        udid = self.get_current_device_udid()
+        if not udid:
+            return {}
+        ld = await create_using_usbmux(serial=udid)
+        try:
+            return dict(ld.all_values)
+        finally:
+            try:
+                await ld.close()
+            except Exception:
+                pass
+
+    def _get_original_plist_paths(self) -> list[str]:
+        return [loc.value for loc in FileLocation if loc != FileLocation.mga]
+
+    async def _maybe_capture_originals(self, update_label=lambda x: None):
+        """Capture original plists on the first apply for this model/build.
+
+        Skipped when GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE=1 is set. Failure is
+        non-fatal: applying tweaks does not need the originals.
+        """
+        if os.environ.get("GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE"):
+            return
+        udid = self.get_current_device_udid()
+        if not udid:
+            return
+        try:
+            all_values = await self._get_lockdown_values()
+            model = all_values.get("ProductType", "")
+            build = all_values.get("BuildVersion", "")
+            if not model or not build:
+                return
+            if self.pref_manager.has_any_original_plists(model, build):
+                return
+            update_label(QCoreApplication.tr("Capturing original plists for the first time..."))
+            templated = await capture_original_plists(
+                udid, self._get_original_plist_paths(), update_label, self.progress_callback)
+            for path, data in templated.items():
+                self.pref_manager.save_original_plist(model, build, path, data)
+            update_label(QCoreApplication.tr("Original plists saved."))
+        except Exception as e:
+            print(f"Failed to capture original plists: {e}")
+            print(traceback.format_exc())
+            update_label(QCoreApplication.tr("Warning: could not capture original plists automatically."))
+
+    def capture_originals(self, update_label=lambda x: None, show_alert=lambda x: None):
+        asyncio.run(self._capture_originals(update_label, show_alert))
+
+    async def _capture_originals(self, update_label=lambda x: None, show_alert=lambda x: None):
+        try:
+            udid = self.get_current_device_udid()
+            if not udid:
+                raise NuggetException(QCoreApplication.tr("No device connected."))
+            all_values = await self._get_lockdown_values()
+            model = all_values.get("ProductType", "")
+            build = all_values.get("BuildVersion", "")
+            if not model or not build:
+                raise NuggetException(QCoreApplication.tr(
+                    "Could not read the device model and iOS build."))
+            update_label(QCoreApplication.tr("Capturing original plists..."))
+            templated = await capture_original_plists(
+                udid, self._get_original_plist_paths(), update_label, self.progress_callback)
+            if not templated:
+                raise NuggetException(QCoreApplication.tr(
+                    "No original plists were found on the device."))
+            for path, data in templated.items():
+                self.pref_manager.save_original_plist(model, build, path, data)
+            show_alert(ApplyAlertMessage(
+                txt=QCoreApplication.tr(
+                    "Saved {0} original plists for {1} ({2}).\n\n"
+                    "Reset will now restore your original files instead of empty plists."
+                ).format(len(templated), model, build),
+                title=QCoreApplication.tr("Success!"),
+                icon=QMessageBox.Information))
+        except Exception as e:
+            show_alert(show_apply_error(e, update_label))
+
+    def _load_original_plists(self, model: str, build: str) -> dict:
+        original_plists = {}
+        if not model or not build:
+            return original_plists
+        for path, data in self.pref_manager.get_original_plists(model, build).items():
+            try:
+                original_plists[path] = plistlib.loads(data)
+            except Exception:
+                continue
+        return original_plists
+
+    def _original_plists_required(self, reset_pages: list[Page]) -> bool:
+        for page in reset_pages:
+            if page == Page.FeatureFlags and not self.get_current_device_uses_bookrestore():
+                return True
+            if page == Page.InternalOptions:
+                return True
+        return False
+
+    def get_missing_original_plists(self, reset_pages: list[Page]) -> list[str]:
+        """Return the nulled plist paths lacking a saved original (for pre-reset warnings)."""
+        if not self._original_plists_required(reset_pages):
+            return []
+        model = self.get_current_device_model()
+        build = self.get_current_device_build()
+        if not model or not build:
+            return []
+        if self.pref_manager.has_any_original_plists(model, build):
+            return []
+        paths = []
+        if Page.FeatureFlags in reset_pages and not self.get_current_device_uses_bookrestore():
+            paths.append(FileLocation.featureflags.value)
+        if Page.InternalOptions in reset_pages:
+            paths.extend([
+                FileLocation.globalPreferences.value,
+                FileLocation.appStore.value,
+                FileLocation.backboardd.value,
+                FileLocation.coreMotion.value,
+                FileLocation.pasteboard.value,
+                FileLocation.notes.value,
+            ])
+        return paths
+
+    async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None, device_values: dict = None):
+        """Generate all tweak files and restore them to the device in one pass.
+
+        Returns (alert, files_to_restore) so the caller can surface the result
+        and keep the file list for error reporting.
+        """
+        if templates is None:
+            templates = tweaks[TweakID.Templates].templates
+        gestalt_plist = None
+        if self.data_singleton.gestalt_path != None:
+            if self.data_singleton.gestalt_path == self.data_singleton.SAVED_GESTALT_STRING:
+                gestalt_plist = self.pref_manager.get_mga_data(self.get_current_device_udid())
+            else:
+                with open(self.data_singleton.gestalt_path, 'rb') as in_fp:
+                    gestalt_plist = plistlib.load(in_fp)
+        # create the other plists
+        flag_plist: dict = {}
+        eligibility_files = None
+        ai_file = None
+        basic_plists: dict = {}
+        basic_plists_ownership: dict = {}
+        files_data: dict = {}
+        uses_domains: bool = False
+        use_bookrestore: bool = False
+        # create the restore file list
+        files_to_restore: list[FileToRestore] = [
+        ]
+        tmp_dirs = [] # temporary directory for unzipping pb and template files
+
+        try:
             # set the plist keys
             for tweak_name in tweaks:
                 tweak = tweaks[tweak_name]
@@ -680,7 +879,7 @@ class DeviceManager:
                     if tweak.enabled:
                         use_bookrestore = True
                 elif isinstance(tweak, BasicPlistTweak) or isinstance(tweak, RdarFixTweak) or isinstance(tweak, AdvancedPlistTweak):
-                    basic_plists = tweak.apply_tweak(basic_plists, self.pref_manager.allow_risky_tweaks)
+                    basic_plists = tweak.apply_tweak(basic_plists)
                     basic_plists_ownership[tweak.file_location] = tweak.owner
                     if tweak.enabled and isinstance(tweak, RdarFixTweak) and Version(self.get_current_device_version()) >= Version("26.0"):
                         use_bookrestore = True
@@ -693,7 +892,7 @@ class DeviceManager:
                     tweak.apply_tweak(
                         files_to_restore=files_to_restore,
                         output_dir=fix_windows_path(tmp_dirs[len(tmp_dirs)-1].name),
-                        templates=tweaks[TweakID.Templates].templates,
+                        templates=templates,
                         version=self.get_current_device_version(),
                         force_pb_refresh=self.pref_manager.auto_refresh_posterboard,
                         update_label=update_label
@@ -726,7 +925,24 @@ class DeviceManager:
             gestalt_data = None
             if gestalt_plist != None:
                 gestalt_data = plistlib.dumps(gestalt_plist)
-            
+
+            # Merge the saved original plists into the files being applied so
+            # untouched user settings survive the tweak, and device-specific
+            # placeholders (<DeviceName>, ...) get the current device's values.
+            if device_values is not None:
+                original_plists = self._load_original_plists(
+                    device_values.get("ProductType", ""), device_values.get("BuildVersion", ""))
+                if len(flag_plist) > 0 and FileLocation.featureflags.value in original_plists:
+                    merged = materialize_plist(original_plists[FileLocation.featureflags.value], device_values)
+                    merged.update(flag_plist)
+                    flag_plist = merged
+                for location, plist in list(basic_plists.items()):
+                    original = original_plists.get(location.value)
+                    if original is not None:
+                        merged = materialize_plist(original, device_values)
+                        merged.update(plist)
+                        basic_plists[location] = merged
+
             # Generate backup
             update_label(QCoreApplication.tr("Generating backup..."))
             if len(flag_plist) > 0:
@@ -835,11 +1051,8 @@ class DeviceManager:
 
             # restore to the device
             final_alert = await self.start_restore(files_to_restore, use_bookrestore, update_label, skips_br_for_folders=tweaks[TweakID.CreateBRFolders].enabled, reboot_for_br=(len(flag_plist) > 0))
-            update_label(QCoreApplication.tr("Success!"))
-        except Exception as e:
-            final_alert = show_apply_error(e, update_label, files_list=files_to_restore)
+            return final_alert, files_to_restore
         finally:
-            close_dl_connection()
             if len(tmp_dirs) > 0:
                 for tmp_dir in tmp_dirs:
                     try:
@@ -847,17 +1060,24 @@ class DeviceManager:
                     except Exception as e:
                         # ignore clean up errors
                         print(str(e))
-            show_alert(final_alert)
 
     ## RESETTING TWEAKS
     def reset_tweaks(self, reset_pages: list[Page], settings: QSettings, update_label=lambda x: None, show_alert=lambda x: None):
         asyncio.run(self._reset_tweaks(reset_pages, settings, update_label, show_alert))
     async def _reset_tweaks(self, reset_pages: list[Page], settings: QSettings, update_label=lambda x: None, show_alert=lambda x: None):
         try:
+            if not self.get_current_device_is_supported_by_fork():
+                raise NuggetException(QCoreApplication.tr(
+                    "This version of iOS is not supported by this fork.\n\n"
+                    "GoldenNugget only supports iOS 26.2 and newer. "
+                    "Please use the original Nugget for iOS 26.1 and earlier."))
             # create the restore file list
             files_to_restore: list[FileToRestore] = []
             # Generate backup
             update_label(QCoreApplication.tr("Generating backup..."))
+            all_values = await self._get_lockdown_values()
+            original_plists = self._load_original_plists(
+                all_values.get("ProductType", ""), all_values.get("BuildVersion", ""))
             files_to_null: list[str] = []
             uses_domains = False
             use_bookrestore = False
@@ -914,15 +1134,6 @@ class DeviceManager:
                         owner=0, group=0
                     )
                     uses_domains = True
-                elif page == Page.RiskyTweaks:
-                    ## RESOLUTION MODIFICATIONS
-                    files_to_null.append(FileLocation.resolution.value)
-                    if Version(self.get_current_device_version()) >= Version("26.0"):
-                        use_bookrestore = True
-                elif page == Page.Springboard:
-                    ## SPRINGBOARD
-                    files_to_null.append(FileLocation.springboard.value)
-                    files_to_null.append(FileLocation.uikit.value)
                 elif page == Page.InternalOptions:
                     ## INTERNAL OPTIONS
                     files_to_null.append(FileLocation.globalPreferences.value)
@@ -933,9 +1144,30 @@ class DeviceManager:
                     files_to_null.append(FileLocation.notes.value)
             
             # add the files to null from the list
+            if self._original_plists_required(reset_pages) and not original_plists:
+                raise NuggetException(QCoreApplication.tr(
+                    "Cannot reset: no original plists have been saved for this device.\n\n"
+                    "Open Settings and tap \"Save Originals\" (with this device connected) "
+                    "so the reset can restore your original files instead of empty ones."))
             for file_path in files_to_null:
+                if file_path == FileLocation.mga.value:
+                    # MobileGestalt is nulled on purpose to clear spoofed values;
+                    # the system recreates it from its cache on next boot.
+                    contents = plistlib.dumps({})
+                else:
+                    original = original_plists.get(file_path)
+                    if original is not None:
+                        contents = plistlib.dumps(materialize_plist(original, all_values))
+                    else:
+                        # Restore a valid empty plist instead of a zero-byte
+                        # file: on iOS 26.2+ a truncated plist (e.g. an empty
+                        # com.apple.springboard.plist) makes SpringBoard crash
+                        # at boot, which sends the device into a boot loop. An
+                        # empty dict parses fine and makes the system fall back
+                        # to its default values.
+                        contents = plistlib.dumps({})
                 self.concat_file(
-                    contents=b"",
+                    contents=contents,
                     path=file_path,
                     files_to_restore=files_to_restore,
                     use_bookrestore=use_bookrestore

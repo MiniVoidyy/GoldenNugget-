@@ -1,16 +1,21 @@
 import os
+import sys
 
 from ..page import Page
 from ..pages_list import Page as PageItem
 from src.qt.mainwindow_ui import Ui_Nugget
 
-from PySide6.QtWidgets import QMessageBox
-from PySide6.QtCore import QCoreApplication, QLocale
+from PySide6.QtCore import QCoreApplication, QLocale, QSize, Qt
+from PySide6.QtWidgets import (
+    QFrame, QHBoxLayout, QInputDialog, QLabel,
+    QLineEdit, QListWidget, QMessageBox, QSizePolicy, QSpacerItem,
+    QToolButton, QVBoxLayout, QWidget,
+)
 
 from src.tweaks.tweak_loader import load_rdar_fix
 from src.tweaks.tweaks import tweaks
 from src.controllers.video_handler import set_ignore_frame_limit
-from src.devicemanagement.constants import Version
+from src.controllers.preset_manager import PresetManager
 from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreApplyMethod
 
 available_languages = {
@@ -51,12 +56,169 @@ class SettingsPage(Page):
         self.window = window
         self.ui = ui
         self.lang_indexes = []
+        self.preset_manager = PresetManager()
+        self.presetList = None
+        self.presetNameTxt = None
         self.toggle_UAC_btn(self.window.device_manager.pref_manager.bookrestore_apply_mode == BookRestoreApplyMethod.AFC)
+        self.setup_presets_ui()
+        self.setup_pb_database_ui()
+        self.setup_originals_ui()
+
+    def setup_presets_ui(self):
+        # Presets section, inserted between the PosterBoard settings and the
+        # BookRestore options
+        presets_widget = QWidget(self.ui.settingsPageContent)
+        presets_widget.setObjectName("presetsWidget")
+        presets_layout = QVBoxLayout(presets_widget)
+        presets_layout.setObjectName("presetsLayout")
+        presets_layout.setContentsMargins(0, 0, 0, 0)
+        presets_layout.setSpacing(6)
+
+        # divider
+        presets_divider = QFrame(presets_widget)
+        presets_divider.setObjectName("presetsDivider")
+        presets_divider.setStyleSheet("QFrame {\n\tcolor: #414141;\n}")
+        presets_divider.setFrameShadow(QFrame.Plain)
+        presets_divider.setFrameShape(QFrame.Shape.HLine)
+        presets_layout.addWidget(presets_divider)
+
+        # title + save row
+        title_layout = QHBoxLayout()
+        title_layout.setContentsMargins(-1, -1, -1, 0)
+        presets_title = QLabel(presets_widget)
+        presets_title.setObjectName("presetsTitle")
+        presets_title.setText(QCoreApplication.tr("Presets"))
+        title_layout.addWidget(presets_title)
+        title_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+        presets_layout.addLayout(title_layout)
+
+        # name input + save button
+        save_layout = QHBoxLayout()
+        save_layout.setContentsMargins(-1, -1, -1, 0)
+        self.presetNameTxt = QLineEdit(presets_widget)
+        self.presetNameTxt.setObjectName("presetNameTxt")
+        self.presetNameTxt.setPlaceholderText(QCoreApplication.tr("Preset name"))
+        save_layout.addWidget(self.presetNameTxt)
+        self.presetSaveBtn = QToolButton(presets_widget)
+        self.presetSaveBtn.setObjectName("presetSaveBtn")
+        self.presetSaveBtn.setText(QCoreApplication.tr("Save Preset"))
+        save_layout.addWidget(self.presetSaveBtn)
+        presets_layout.addLayout(save_layout)
+
+        # saved presets list
+        self.presetList = QListWidget(presets_widget)
+        self.presetList.setObjectName("presetList")
+        self.presetList.setMinimumSize(0, 100)
+        self.presetList.setStyleSheet("QListWidget {\n"
+                                      "\tbackground-color: #3b3b3b;\n"
+                                      "\tborder: none;\n"
+                                      "\tborder-radius: 8px;\n"
+                                      "\tcolor: #e8e8e8;\n"
+                                      "\tfont-size: 14px;\n"
+                                      "\tpadding: 4px;\n"
+                                      "}\n"
+                                      "QListWidget::item {\n"
+                                      "\tpadding: 4px;\n"
+                                      "}\n"
+                                      "QListWidget::item:selected {\n"
+                                      "\tbackground-color: #535353;\n"
+                                      "\tcolor: #ffffff;\n"
+                                      "}")
+        presets_layout.addWidget(self.presetList)
+
+        # load / delete / refresh row
+        btns_layout = QHBoxLayout()
+        btns_layout.setContentsMargins(-1, -1, -1, 0)
+        self.presetLoadBtn = QToolButton(presets_widget)
+        self.presetLoadBtn.setObjectName("presetLoadBtn")
+        self.presetLoadBtn.setText(QCoreApplication.tr("Load Preset"))
+        btns_layout.addWidget(self.presetLoadBtn)
+        self.presetDeleteBtn = QToolButton(presets_widget)
+        self.presetDeleteBtn.setObjectName("presetDeleteBtn")
+        self.presetDeleteBtn.setText(QCoreApplication.tr("Delete Preset"))
+        btns_layout.addWidget(self.presetDeleteBtn)
+        self.presetRefreshBtn = QToolButton(presets_widget)
+        self.presetRefreshBtn.setObjectName("presetRefreshBtn")
+        self.presetRefreshBtn.setText(QCoreApplication.tr("Refresh"))
+        btns_layout.addWidget(self.presetRefreshBtn)
+        presets_layout.addLayout(btns_layout)
+
+        # insert the section after the PosterBoard checkboxes, before BookRestore
+        layout = self.ui._21
+        idx = layout.indexOf(self.ui.rebuildSBApplicationStateDBChk)
+        layout.insertWidget(idx + 1, presets_widget)
+
+    def setup_pb_database_ui(self):
+        # The PosterBoard "Setup" page (apply method / database / saved ids)
+        # used to be the first tab of the PosterBoard page. It moved here into
+        # Settings: the widgets are the ones from the generated UI, just
+        # reparented, and the handlers stay in posterboard.py untouched.
+        pb_setup = self.ui.pbSetupPage
+        pb_setup.setParent(self.ui.settingsPageContent)
+
+        # drop the expanding spacer so the section stays tight inside Settings
+        self.ui.descriptorsSpacer.changeSize(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+
+        layout = self.ui._21
+        idx = layout.indexOf(self.ui.bookrestoreWidget)
+        layout.insertWidget(idx, pb_setup)
+
+    def setup_originals_ui(self):
+        # Original Plists section: back up the system plists Nugget overwrites
+        # so Reset can restore the user's original settings. Placed before the
+        # BookRestore options.
+        originals_widget = QWidget(self.ui.settingsPageContent)
+        originals_widget.setObjectName("originalsWidget")
+        originals_layout = QVBoxLayout(originals_widget)
+        originals_layout.setObjectName("originalsLayout")
+        originals_layout.setContentsMargins(0, 0, 0, 0)
+        originals_layout.setSpacing(6)
+
+        originals_divider = QFrame(originals_widget)
+        originals_divider.setObjectName("originalsDivider")
+        originals_divider.setStyleSheet("QFrame {\n\tcolor: #414141;\n}")
+        originals_divider.setFrameShadow(QFrame.Plain)
+        originals_divider.setFrameShape(QFrame.Shape.HLine)
+        originals_layout.addWidget(originals_divider)
+
+        originals_title = QLabel(originals_widget)
+        originals_title.setObjectName("originalsTitle")
+        originals_title.setText(QCoreApplication.tr("Original Plists"))
+        originals_layout.addWidget(originals_title)
+
+        originals_desc = QLabel(originals_widget)
+        originals_desc.setObjectName("originalsDesc")
+        originals_desc.setWordWrap(True)
+        originals_desc.setText(QCoreApplication.tr(
+            "Back up the system plists Nugget overwrites so Reset can restore your "
+            "original settings instead of empty ones. Save from a clean (just "
+            "restored) device for the best result. Saved files only apply to "
+            "devices of the same model and iOS build."))
+        originals_layout.addWidget(originals_desc)
+
+        self.originalsStatusLbl = QLabel(originals_widget)
+        self.originalsStatusLbl.setObjectName("originalsStatusLbl")
+        originals_layout.addWidget(self.originalsStatusLbl)
+
+        originals_btns = QHBoxLayout()
+        originals_btns.setContentsMargins(-1, -1, -1, 0)
+        self.originalsSaveBtn = QToolButton(originals_widget)
+        self.originalsSaveBtn.setObjectName("originalsSaveBtn")
+        self.originalsSaveBtn.setText(QCoreApplication.tr("Save Originals"))
+        originals_btns.addWidget(self.originalsSaveBtn)
+        self.originalsDeleteBtn = QToolButton(originals_widget)
+        self.originalsDeleteBtn.setObjectName("originalsDeleteBtn")
+        self.originalsDeleteBtn.setText(QCoreApplication.tr("Delete Originals"))
+        originals_btns.addWidget(self.originalsDeleteBtn)
+        originals_layout.addLayout(originals_btns)
+
+        layout = self.ui._21
+        idx = layout.indexOf(self.ui.bookrestoreWidget)
+        layout.insertWidget(idx, originals_widget)
 
     def load_page(self):
         self.ui.allowWifiApplyingChk.toggled.connect(self.on_allowWifiApplyingChk_toggled)
         self.ui.autoRebootChk.toggled.connect(self.on_autoRebootChk_toggled)
-        self.ui.showRiskyChk.toggled.connect(self.on_showRiskyChk_toggled)
         self.ui.showAllSpoofableChk.toggled.connect(self.on_showAllSpoofableChk_toggled)
 
         self.ui.ignorePBFrameLimitChk.toggled.connect(self.on_ignorePBFrameLimitChk_toggled)
@@ -73,10 +235,29 @@ class SettingsPage(Page):
         self.ui.supervisionChk.toggled.connect(self.on_supervisionChk_toggled)
         self.ui.supervisionOrganization.textEdited.connect(self.on_supervisionOrgTxt_textEdited)
         self.ui.resetPairBtn.clicked.connect(self.on_resetPairBtn_clicked)
-        self.ui.pocketPosterHelperBtn.clicked.connect(self.on_pocketPosterHelperBtn_clicked)
+
+        # the PosterBoard Setup section now lives in Settings, so wire its
+        # controls to the PosterBoard page handlers here (the page object is
+        # only reachable via self.window.pages, which isn't built yet when
+        # this page is constructed)
+        posterboard_page = self.window.pages[PageItem.Posterboard]
+        self.ui.pbGetDBBtn.clicked.connect(posterboard_page.on_pbGetDBBtn_clicked)
+        self.ui.pbDBBtn.clicked.connect(posterboard_page.on_pbDBBtn_clicked)
+        self.ui.clearSavedIdsBtn.clicked.connect(posterboard_page.on_clearSavedIdsBtn_clicked)
+        self.ui.removeSelectedIdBtn.clicked.connect(posterboard_page.on_removeSelectedIdBtn_clicked)
+
+        self.presetSaveBtn.clicked.connect(self.on_presetSaveBtn_clicked)
+        self.presetLoadBtn.clicked.connect(self.on_presetLoadBtn_clicked)
+        self.presetDeleteBtn.clicked.connect(self.on_presetDeleteBtn_clicked)
+        self.presetRefreshBtn.clicked.connect(self.on_presetRefreshBtn_clicked)
+
+        self.originalsSaveBtn.clicked.connect(self.on_originalsSaveBtn_clicked)
+        self.originalsDeleteBtn.clicked.connect(self.on_originalsDeleteBtn_clicked)
 
         self.load_available_languages()
         self.ui.langDrp.activated.connect(self.on_langDrp_activated)
+        self.refresh_presets()
+        self.update_originals_status()
 
     # Load available languages
     def load_available_languages(self):
@@ -101,35 +282,6 @@ class SettingsPage(Page):
         self.ui.restartUACLbl.setVisible(show_btn)
         self.ui.restartUACBtn.setVisible(show_btn)
 
-    # Toggle the risky options visibility
-    def set_risky_options_visible(self, visible: bool, device_connected: bool=True):
-        if device_connected:
-            self.ui.advancedPageBtn.setVisible(visible)
-        self.ui.ignorePBFrameLimitChk.setVisible(visible)
-        self.ui.disableTendiesLimitChk.setVisible(visible)
-        self.ui.atwakeupChk.setVisible(visible)
-        if device_connected:
-            show_ipados = visible and self.window.device_manager.get_current_device_model().startswith("iPhone")
-            # eligibility page button
-            patched: bool = self.window.device_manager.get_current_device_patched()
-            device_ver = Version(self.window.device_manager.data_singleton.current_device.version)
-            if not patched and device_ver >= Version("17.4") and (device_ver <= Version("17.7") or device_ver >= Version("18.1")):
-                show_eu = device_ver < Version("18.3") or visible
-            else:
-                show_eu = False
-        else:
-            show_ipados = False
-            show_eu = False
-        self.ui.enableiPadOSChk.setVisible(show_ipados)
-        self.ui.ipadOSAlphaWarningLbl.setVisible(show_ipados)
-        self.ui.euEnablerPageBtn.setVisible(show_eu)
-        try:
-            self.ui.resetPBDrp.removeItem(4)
-        except Exception:
-            pass
-        if visible:
-            self.ui.resetPBDrp.addItem("PB Extensions")
-
     ## ACTIONS
     def on_langDrp_activated(self, index: int):
         new_lang = self.lang_indexes[index]
@@ -140,11 +292,12 @@ class SettingsPage(Page):
         self.window.device_manager.pref_manager.apply_over_wifi = checked
         # save the setting
         self.window.settings.setValue("apply_over_wifi", checked)
-    def on_showRiskyChk_toggled(self, checked: bool):
-        self.window.device_manager.pref_manager.allow_risky_tweaks = checked
+    def on_showAllSpoofableChk_toggled(self, checked: bool):
+        self.window.device_manager.pref_manager.show_all_spoofable_models = checked
         # save the setting
-        self.window.settings.setValue("show_risky_tweaks", checked)
-        self.set_risky_options_visible(checked)
+        self.window.settings.setValue("show_all_spoofable_models", checked)
+        # refresh the list of spoofable models
+        self.window.pages[PageItem.Gestalt].setup_spoofedModelDrp_models()
     def on_ignorePBFrameLimitChk_toggled(self, checked: bool):
         set_ignore_frame_limit(checked)
         # save the setting
@@ -158,17 +311,10 @@ class SettingsPage(Page):
         self.window.settings.setValue("auto_refresh_posterboard", checked)
     def on_rebuildSBApplicationStateDBChk_toggled(self, checked: bool):
         self.window.device_manager.pref_manager.rebuild_sb_application_state_db = checked
-    def on_showAllSpoofableChk_toggled(self, checked: bool):
-        self.window.device_manager.pref_manager.show_all_spoofable_models = checked
-        # save the setting
-        self.window.settings.setValue("show_all_spoofable_models", checked)
-        # refresh the list of spoofable models
-        self.window.pages[PageItem.Gestalt].setup_spoofedModelDrp_models()
     def on_autoRebootChk_toggled(self, checked: bool):
         self.window.device_manager.pref_manager.auto_reboot = checked
         # save the setting
         self.window.settings.setValue("auto_reboot", checked)
-
     def on_trustStoreChk_toggled(self, checked: bool):
         self.window.device_manager.pref_manager.restore_truststore = checked
         # save the setting
@@ -210,23 +356,136 @@ class SettingsPage(Page):
     # Device Options
     def on_resetPairBtn_clicked(self):
         self.window.device_manager.reset_device_pairing()
-    def on_pocketPosterHelperBtn_clicked(self):
-        # get app hash for posterboard
-        bundle_ids = ["com.apple.PosterBoard"]
-        if self.window.device_manager.get_current_device_model().startswith("iPhone"):
-            bundle_ids.append("com.apple.CarPlayWallpaper")
-        hashes = self.window.device_manager.get_app_hashes(bundle_ids)
-        print(hashes)
-        try:
-            self.window.device_manager.send_app_hashes_afc(hashes)
-            QMessageBox.information(None, QCoreApplication.tr("PosterBoard App Hash"), QCoreApplication.tr("Your hash has been transferred to the Pocket Poster app.\n\nOpen up its settings and tap \"Detect\"."))
-        except Exception:
-            # fall back to copy and paste
-            copytxt = QCoreApplication.tr("Copy it and paste it")
-            try:
-                import pyperclip
-                pyperclip.copy(hashes["com.apple.PosterBoard"])
-                copytxt = QCoreApplication.tr("It has been copied. Paste it")
-            except Exception:
-                print("pyperclip not found, not copying to clipboard")
-            QMessageBox.information(None, QCoreApplication.tr("PosterBoard App Hash"), QCoreApplication.tr("Your hash is:\n{0}\n\n{1} into the Nugget app where it says \"App Hash\".").format(hashes["com.apple.PosterBoard"], copytxt))
+
+    ## PRESETS
+    def refresh_presets(self):
+        self.presetList.clear()
+        for name in self.preset_manager.list_presets():
+            self.presetList.addItem(name)
+
+    def on_presetSaveBtn_clicked(self):
+        default_name = self.presetNameTxt.text().strip()
+        name, ok = QInputDialog.getText(
+            self.window, QCoreApplication.tr("Save Preset"),
+            QCoreApplication.tr("Enter a name for this preset:"),
+            text=default_name
+        )
+        if not ok or name.strip() == "":
+            return
+        if self.preset_manager.save_preset(name.strip()):
+            self.presetNameTxt.clear()
+            self.refresh_presets()
+            QMessageBox.information(
+                self.window, QCoreApplication.tr("Save Preset"),
+                QCoreApplication.tr("Preset \"{0}\" saved successfully.").format(name.strip())
+            )
+        else:
+            QMessageBox.critical(
+                self.window, QCoreApplication.tr("Save Preset"),
+                QCoreApplication.tr("Failed to save the preset.")
+            )
+
+    def on_presetLoadBtn_clicked(self):
+        if self.presetList.currentRow() < 0:
+            QMessageBox.warning(
+                self.window, QCoreApplication.tr("Load Preset"),
+                QCoreApplication.tr("Select a preset to load first.")
+            )
+            return
+        name = self.presetList.currentItem().text()
+        confirm = QMessageBox.question(
+            self.window, QCoreApplication.tr("Load Preset"),
+            QCoreApplication.tr("Load preset \"{0}\"?\n\nThis will replace your current configuration.").format(name)
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        if not self.preset_manager.load_preset(name):
+            QMessageBox.critical(
+                self.window, QCoreApplication.tr("Load Preset"),
+                QCoreApplication.tr("Failed to load the preset.")
+            )
+            return
+        # remember which preset was loaded so it can be restored after the app
+        # restarts (the pages read the tweak state only once on startup)
+        self.window.settings.setValue("last_loaded_preset", name)
+        self.window.settings.sync()
+        QMessageBox.information(
+            self.window, QCoreApplication.tr("Load Preset"),
+            QCoreApplication.tr("Preset \"{0}\" loaded.\n\nGoldenNugget will now restart to apply the changes.").format(name)
+        )
+        self.restart_app()
+
+    def on_presetDeleteBtn_clicked(self):
+        if self.presetList.currentRow() < 0:
+            QMessageBox.warning(
+                self.window, QCoreApplication.tr("Delete Preset"),
+                QCoreApplication.tr("Select a preset to delete first.")
+            )
+            return
+        name = self.presetList.currentItem().text()
+        confirm = QMessageBox.question(
+            self.window, QCoreApplication.tr("Delete Preset"),
+            QCoreApplication.tr("Delete preset \"{0}\"?").format(name)
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        if self.preset_manager.delete_preset(name):
+            self.refresh_presets()
+        else:
+            QMessageBox.critical(
+                self.window, QCoreApplication.tr("Delete Preset"),
+                QCoreApplication.tr("Failed to delete the preset.")
+            )
+
+    def on_presetRefreshBtn_clicked(self):
+        self.refresh_presets()
+
+    ## ORIGINAL PLISTS
+    def update_originals_status(self):
+        model = self.window.device_manager.get_current_device_model()
+        build = self.window.device_manager.get_current_device_build()
+        originals = {}
+        if model and build:
+            originals = self.window.device_manager.pref_manager.get_original_plists(model, build)
+        if originals:
+            self.originalsStatusLbl.setText(QCoreApplication.tr(
+                "Saved: {0} files for {1} ({2})").format(len(originals), model, build))
+            self.originalsStatusLbl.setStyleSheet("color: #7ed67e;")
+        else:
+            self.originalsStatusLbl.setText(QCoreApplication.tr(
+                "Not saved yet. Connect a clean device and tap \"Save Originals\"."))
+            self.originalsStatusLbl.setStyleSheet("color: #e8a33d;")
+
+    def on_originalsSaveBtn_clicked(self):
+        if not self.window.device_manager.get_current_device_udid():
+            QMessageBox.warning(
+                self.window, QCoreApplication.tr("Save Originals"),
+                QCoreApplication.tr("No device connected."))
+            return
+        confirm = QMessageBox.question(
+            self.window, QCoreApplication.tr("Save Originals"),
+            QCoreApplication.tr(
+                "Back up the current device's original plists?\n\n"
+                "This may take a few minutes and the device may ask for its passcode. "
+                "Save from a clean (just restored) device for the best result."))
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        self.window.capture_originals()
+
+    def on_originalsDeleteBtn_clicked(self):
+        model = self.window.device_manager.get_current_device_model()
+        build = self.window.device_manager.get_current_device_build()
+        if not model or not build:
+            return
+        confirm = QMessageBox.question(
+            self.window, QCoreApplication.tr("Delete Originals"),
+            QCoreApplication.tr(
+                "Delete the saved original plists for {0} ({1})?\n\n"
+                "Reset will fall back to writing empty plists.").format(model, build))
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        self.window.device_manager.pref_manager.remove_original_plists(model, build)
+        self.update_originals_status()
+
+    def restart_app(self):
+        os.execl(sys.executable, sys.executable, *sys.argv)

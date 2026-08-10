@@ -214,83 +214,6 @@ def load_featureflags():
     }
     tweaks.update(additional_tweaks)
 
-def load_springboard():
-    if TweakID.LockScreenFootnote in tweaks:
-        return
-    additional_tweaks = {
-        TweakID.LockScreenFootnote: BasicPlistTweak(
-            FileLocation.footnote,
-            key="LockScreenFootnote", value=""
-        ),
-        TweakID.WatchOSCompatibility: AdvancedPlistTweak(
-            file_location=FileLocation.nanoregistry,
-            keyValues={
-                "IOS_PAIRING_EOL_MIN_PAIRING_COMPATIBILITY_VERSION_CHIPIDS": "",
-                "maxPairingCompatibilityVersion": 37,
-                "lastRestoreIdentifier": "CD97EEB8-BCD2-486B-BC13-C384E6B916C4", # not sure if this is needed
-                "minPairingCompatibilityVersionWithChipID": 1,
-                "lastRestoreIdentifier_state": 0,
-                "AdvertisingIdentifierSeed": "85E70251-1960-4DA0-A321-B68AC118FAB5", # this prolly isn't needed either
-                "minPairingCompatibilityVersion": 1
-            }
-        ),
-        TweakID.AirDropDisableTimeLimit: BasicPlistTweak(
-            FileLocation.airdrop,
-            "OverrideTimeLimitEveryoneMode"
-        ),
-        TweakID.SBDontLockAfterCrash: BasicPlistTweak(
-            FileLocation.springboard,
-            "SBDontLockAfterCrash"
-        ),
-        TweakID.SBDontDimOrLockOnAC: BasicPlistTweak(
-            FileLocation.springboard,
-            "SBDontDimOrLockOnAC"
-        ),
-        TweakID.SBHideLowPowerAlerts: BasicPlistTweak(
-            FileLocation.springboard,
-            "SBHideLowPowerAlerts"
-        ),
-        TweakID.SBHideACPower: BasicPlistTweak(
-            FileLocation.springboard,
-            "SBHideACPower"
-        ),
-        TweakID.SBNeverBreadcrumb: BasicPlistTweak(
-            FileLocation.springboard,
-            "SBNeverBreadcrumb"
-        ),
-        TweakID.SBShowSupervisionTextOnLockScreen: BasicPlistTweak(
-            FileLocation.springboard,
-            "SBShowSupervisionTextOnLockScreen"
-        ),
-        TweakID.AirplaySupport: BasicPlistTweak(
-            FileLocation.springboard,
-            "SBExtendedDisplayOverrideSupportForAirPlayAndDontFileRadars"
-        ),
-        TweakID.SBMinimumLockscreenIdleTime: BasicPlistTweak(
-            FileLocation.springboard,
-            key="SBMinimumLockscreenIdleTime",
-            value=5
-        ),
-        TweakID.SBAlwaysShowSystemApertureInSnapshots: BasicPlistTweak(
-            FileLocation.springboard,
-            "SBAlwaysShowSystemApertureInSnapshots"
-        ),
-        TweakID.HideDICompletely: BasicPlistTweak(
-            FileLocation.springboard,
-            "SBSuppressDynamicIslandCompletely"
-        ),
-        TweakID.SBShowAuthenticationEngineeringUI: BasicPlistTweak(
-            FileLocation.springboard,
-            "SBShowAuthenticationEngineeringUI"
-        ),
-        TweakID.UseFloatingTabBar: BasicPlistTweak(
-            FileLocation.uikit,
-            key="UseFloatingTabBar",
-            value=False
-        )
-    }
-    tweaks.update(additional_tweaks)
-
 def load_internal():
     if TweakID.RTL in tweaks:
         return
@@ -451,30 +374,6 @@ def load_liquidglass():
     }
     tweaks.update(additional_tweaks)
 
-def load_risky():
-    if TweakID.CustomResolution in tweaks:
-        return
-    additional_tweaks = {
-        TweakID.DisableOTAFile: AdvancedPlistTweak(
-            FileLocation.ota,
-            {
-                "MobileAssetServerURL-com.apple.MobileAsset.MobileSoftwareUpdate.UpdateBrain": "https://mesu.apple.com/assets/tvOS16DeveloperSeed",
-                "MobileAssetSUAllowOSVersionChange": False,
-                "MobileAssetSUAllowSameVersionFullReplacement": False,
-                "MobileAssetServerURL-com.apple.MobileAsset.RecoveryOSUpdate": "https://mesu.apple.com/assets/tvOS16DeveloperSeed",
-                "MobileAssetServerURL-com.apple.MobileAsset.RecoveryOSUpdateBrain": "https://mesu.apple.com/assets/tvOS16DeveloperSeed",
-                "MobileAssetServerURL-com.apple.MobileAsset.SoftwareUpdate": "https://mesu.apple.com/assets/tvOS16DeveloperSeed",
-                "MobileAssetAssetAudience": "65254ac3-f331-4c19-8559-cbe22f5bc1a6"
-            }, is_risky=True
-        ),
-        TweakID.CustomResolution: AdvancedPlistTweak(
-            FileLocation.resolution,
-            {}, # empty as to not cause issues when only 1 value is inputted
-            is_risky=True
-        )
-    }
-    tweaks.update(additional_tweaks)
-
 def load_daemons():
     if TweakID.Daemons in tweaks:
         return
@@ -504,7 +403,5 @@ def load_all_tweaks(version: str):
     if parsed_ver < Version("18.1"):
         # load feature flags
         load_featureflags()
-    load_springboard()
     load_internal()
     load_daemons()
-    load_risky()

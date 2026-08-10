@@ -21,8 +21,8 @@ from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreAp
 
 from src.tweaks.tweaks import tweaks, TweakID
 
-App_Version = "7.4"
-App_Build = 5
+App_Version = "8.0"
+App_Build = 1
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, device_manager: DeviceManager, translator: Translator):
@@ -44,14 +44,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.templatePageBtn.hide()
         self.ui.gestaltPageBtn.hide()
         self.ui.euEnablerPageBtn.hide()
+        self.ui.enableiPadOSChk.hide()
+        self.ui.ipadOSAlphaWarningLbl.hide()
         self.ui.featureFlagsPageBtn.hide()
         self.ui.statusBarPageBtn.hide()
-        self.ui.springboardOptionsPageBtn.hide()
         self.ui.internalOptionsPageBtn.hide()
         self.ui.daemonsPageBtn.hide()
         self.ui.templatesPageBtn.hide()
         self.ui.passcodePageBtn.hide()
-        self.ui.advancedPageBtn.hide()
         self.ui.miscOptionsBtn.hide()
         self.ui.applyPageBtn.hide()
         self.ui.sidebarDiv1.hide()
@@ -65,13 +65,11 @@ class MainWindow(QtWidgets.QMainWindow):
             Page.EUEnabler: Pages.Eligibility(window=self, ui=self.ui),
             Page.FeatureFlags: Pages.FeatureFlags(ui=self.ui),
             Page.StatusBar: Pages.StatusBar(ui=self.ui),
-            Page.Springboard: Pages.Springboard(ui=self.ui),
             Page.InternalOptions: Pages.Internal(ui=self.ui),
             Page.LiquidGlass: Pages.LiquidGlass(ui=self.ui),
             Page.Daemons: Pages.Daemons(ui=self.ui),
             Page.Templates: Pages.Templates(window=self, ui=self.ui),
             Page.Passcode: Pages.Passcode(window=self, ui=self.ui),
-            Page.RiskyTweaks: Pages.Risky(ui=self.ui),
             Page.Settings: Pages.Settings(window=self, ui=self.ui)
         }
 
@@ -99,13 +97,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.featureFlagsPageBtn.clicked.connect(self.on_featureFlagsPageBtn_clicked)
         self.ui.euEnablerPageBtn.clicked.connect(self.on_euEnablerPageBtn_clicked)
         self.ui.statusBarPageBtn.clicked.connect(self.on_statusBarPageBtn_clicked)
-        self.ui.springboardOptionsPageBtn.clicked.connect(self.on_springboardOptionsPageBtn_clicked)
         self.ui.internalOptionsPageBtn.clicked.connect(self.on_internalOptionsPageBtn_clicked)
         self.ui.liquidGlassPageBtn.clicked.connect(self.on_liquidGlassPageBtn_clicked)
         self.ui.daemonsPageBtn.clicked.connect(self.on_daemonsPageBtn_clicked)
         self.ui.posterboardPageBtn.clicked.connect(self.on_posterboardPageBtn_clicked)
         self.ui.templatesPageBtn.clicked.connect(self.on_templatesPageBtn_clicked)
-        self.ui.advancedPageBtn.clicked.connect(self.on_advancedPageBtn_clicked)
         self.ui.miscOptionsBtn.clicked.connect(self.on_miscOptionsBtn_clicked)
         self.ui.applyPageBtn.clicked.connect(self.on_applyPageBtn_clicked)
         self.ui.settingsPageBtn.clicked.connect(self.on_settingsPageBtn_clicked)
@@ -183,15 +179,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
             self.ui.gestaltPageBtn.hide()
             self.ui.featureFlagsPageBtn.hide()
-            self.ui.euEnablerPageBtn.hide()
             self.ui.statusBarPageBtn.hide()
-            self.ui.springboardOptionsPageBtn.hide()
             self.ui.internalOptionsPageBtn.hide()
             self.ui.daemonsPageBtn.hide()
             self.ui.templatesPageBtn.hide()
             self.ui.passcodePageBtn.hide()
             self.ui.posterboardPageBtn.hide()
-            self.ui.advancedPageBtn.hide()
             self.ui.miscOptionsBtn.hide()
 
             self.ui.sidebarDiv2.hide()
@@ -200,8 +193,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.duyBtn.show()
 
             self.ui.resetPairBtn.hide()
-            self.ui.pocketPosterHelperBtn.hide()
-            self.ui.showRiskyChk.hide()
         else:
             self.ui.devicePicker.setEnabled(True)
             # populate the ComboBox with device names
@@ -217,7 +208,6 @@ class MainWindow(QtWidgets.QMainWindow):
             # show all pages
             self.ui.sidebarDiv1.show()
             self.ui.statusBarPageBtn.show()
-            self.ui.springboardOptionsPageBtn.show()
             self.ui.internalOptionsPageBtn.show()
             self.ui.daemonsPageBtn.show()
             self.ui.templatesPageBtn.show()
@@ -238,8 +228,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.pbPages.setDisabled(False)
 
             self.ui.resetPairBtn.show()
-            self.ui.pocketPosterHelperBtn.show()
-            self.ui.showRiskyChk.show()
         
         # update the selected device
         self.ui.devicePicker.setCurrentIndex(0)
@@ -252,11 +240,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.gestaltLocationLbl.setText(selected_file)
 
     def change_selected_device(self, index):
-        self.ui.showAllSpoofableChk.hide()
-        self.pages[Page.Settings].set_risky_options_visible(
-            visible=self.device_manager.pref_manager.allow_risky_tweaks,
-            device_connected=(len(self.device_manager.devices) > 0)
-        )
         self.pages[Page.Settings].toggle_UAC_btn(self.device_manager.pref_manager.bookrestore_apply_mode == BookRestoreApplyMethod.AFC and self.device_manager.get_current_device_uses_bookrestore())
         if len(self.device_manager.devices) > 0:
             self.device_manager.set_current_device(index=index)
@@ -327,12 +310,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.ui.dynamicIslandDrp.addItem("2868 (iPhone 16 Pro Max Dynamic Island)")
                 if device_ver >= Version("26.0"):
                     self.ui.dynamicIslandDrp.addItem("2736 (iPhone Air Dynamic Island)")
-            # hide risky/advanced page on iOS 26
-            if self.device_manager.pref_manager.allow_risky_tweaks and device_ver < Version("19.0"):
-                self.ui.advancedPageBtn.show()
-            else:
-                self.ui.advancedPageBtn.hide()
-            
             # hide the ai content if not on
             if device_ver >= Version("18.1") and (not TweakID.AIGestalt in tweaks or not tweaks[TweakID.AIGestalt].enabled):
                 self.ui.aiEnablerContent.hide()
@@ -385,13 +362,10 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 self.ui.pbDBLbl.setText("sqlite: None")
             self.update_pb_saved_ids_list()
-            # set for the preferred PosterBoard method
-            if self.device_manager.get_current_device_supports_descriptors():
-                self.ui.pbApplyMethods.setVisible(True)
-                self.pages[Page.Posterboard].set_use_configs(False)
-            else:
-                self.ui.pbApplyMethods.setVisible(False)
-                self.pages[Page.Posterboard].set_use_configs(True)
+            # wallpapers are always applied as configurations (iOS 26+ data
+            # store layout); the descriptors method is gone, so hide the toggle
+            self.ui.pbApplyMethods.setVisible(False)
+            tweaks[TweakID.PosterBoard].use_configs = True
 
             # show the PB if initial load is true
             if self.initial_load:
@@ -420,7 +394,6 @@ class MainWindow(QtWidgets.QMainWindow):
             # load the settings
             apply_over_wifi = self.settings.value("apply_over_wifi", False, type=bool)
             auto_reboot = self.settings.value("auto_reboot", True, type=bool)
-            risky_tweaks = self.settings.value("show_risky_tweaks", False, type=bool)
             ignore_frame_limit = self.settings.value("ignore_pb_frame_limit", False, type=bool)
             disable_tendies_limit = self.settings.value("disable_tendies_limit", False, type=bool)
             auto_refresh_posterboard = self.settings.value("auto_refresh_posterboard", True, type=bool)
@@ -436,7 +409,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
             self.ui.allowWifiApplyingChk.setChecked(apply_over_wifi)
             self.ui.autoRebootChk.setChecked(auto_reboot)
-            self.ui.showRiskyChk.setChecked(risky_tweaks)
             self.ui.ignorePBFrameLimitChk.setChecked(ignore_frame_limit)
             self.ui.disableTendiesLimitChk.setChecked(disable_tendies_limit)
             self.ui.forcePBRefreshChk.setChecked(auto_refresh_posterboard)
@@ -458,7 +430,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
             self.device_manager.pref_manager.apply_over_wifi = apply_over_wifi
             self.device_manager.pref_manager.auto_reboot = auto_reboot
-            self.device_manager.pref_manager.allow_risky_tweaks = risky_tweaks
             video_handler.set_ignore_frame_limit(ignore_frame_limit)
             self.device_manager.pref_manager.show_all_spoofable_models = show_all_spoofable
             self.device_manager.pref_manager.disable_tendies_limit = disable_tendies_limit
@@ -495,10 +466,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.sbScrollArea.verticalScrollBar().setValue(0) # reset scroll to top
         self.ui.pages.setCurrentIndex(Page.StatusBar.value)
 
-    def on_springboardOptionsPageBtn_clicked(self):
-        self.pages[Page.Springboard].load()
-        self.ui.pages.setCurrentIndex(Page.Springboard.value)
-
     def on_internalOptionsPageBtn_clicked(self):
         self.pages[Page.InternalOptions].load()
         self.ui.pages.setCurrentIndex(Page.InternalOptions.value)
@@ -522,10 +489,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_passcodePageBtn_clicked(self):
         self.pages[Page.Passcode].load()
         self.ui.pages.setCurrentIndex(Page.Passcode.value)
-
-    def on_advancedPageBtn_clicked(self):
-        self.pages[Page.RiskyTweaks].load()
-        self.ui.pages.setCurrentIndex(Page.RiskyTweaks.value)
 
     def on_miscOptionsBtn_clicked(self):
         self.ui.pages.setCurrentIndex(Page.MiscOptions.value)
@@ -601,6 +564,17 @@ class MainWindow(QtWidgets.QMainWindow):
     @QtCore.Slot()
     def on_applyTweaksBtn_clicked(self):
         self.apply_changes()
+
+    def capture_originals(self):
+        if not self.apply_in_progress:
+            self.apply_in_progress = True
+            self.toggle_thread_btns(disabled=True)
+            self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, capture_only=True)
+            self.worker_thread.progress.connect(self.ui.statusLbl.setText)
+            self.worker_thread.alert.connect(self.alert_message)
+            self.worker_thread.finished.connect(self.finish_apply_thread)
+            self.worker_thread.finished.connect(self.worker_thread.deleteLater)
+            self.worker_thread.start()
 
     def apply_changes(self, reset_pages: list=None):
         if not self.apply_in_progress:

@@ -12,6 +12,77 @@ from shutil import rmtree
 from src.exceptions.nugget_exception import NuggetException
 from src.gui.thread_workers.pb_worker import PBDBThread
 from src.tweaks.tweaks import tweaks, TweakID
+from src.devicemanagement import idevice_tool
+
+BACKUP_RETRIES = 4
+BACKUP_RETRY_DELAY = 15
+
+
+async def backup_posterboard_database(udid: str, update_label=lambda x: None, update_progress=lambda x: None) -> str:
+    """Back up the device and return the extracted PosterBoard sqlite db path.
+
+    Runs the backup in the idevicebackup2 child process when available so a
+    SEGV in its crypto stack cannot take the GUI down. The backup files land
+    directly in the per-device backup folder, matching the layout the
+    Manifest.db lookup below expects.
+    """
+    app_data_path = path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), 'Backups')
+    if not path.exists(app_data_path):
+        makedirs(app_data_path)
+    backup_folder = path.join(app_data_path, udid)
+    # check if a full backup is needed (makes it faster)
+    needs_full = False
+    if path.exists(backup_folder):
+        files_to_verify = ["Info.plist", "Manifest.db", "Manifest.plist", "Status.plist"]
+        for file in files_to_verify:
+            if not path.exists(path.join(backup_folder, file)):
+                needs_full = True
+                break
+    if idevice_tool.available("idevicebackup2") and idevice_tool.use_wrapper():
+        def _backup_progress(value):
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                update_progress(float(value))
+        # After a reboot the device's backupd may not be ready yet and the
+        # mobilebackup2 handshake fails. That is transient — retry it with a
+        # backoff instead of surfacing a hard error (or worse, applying on a
+        # stale database).
+        for attempt in range(BACKUP_RETRIES):
+            try:
+                await asyncio.to_thread(
+                    idevice_tool.backup, udid, backup_folder,
+                    full=needs_full, progress_callback=_backup_progress)
+                break
+            except idevice_tool.ToolError as e:
+                if not idevice_tool.looks_like_transient_failure(str(e)):
+                    raise
+                if attempt >= BACKUP_RETRIES - 1:
+                    raise
+                print(f"Backup handshake failed, retrying in {BACKUP_RETRY_DELAY}s ({attempt + 2}/{BACKUP_RETRIES}): {e}")
+                await asyncio.sleep(BACKUP_RETRY_DELAY)
+    else:
+        service_provider = await create_using_usbmux(serial=udid)
+        async with Mobilebackup2Service(service_provider) as backup_client:
+            await backup_client.backup(full=needs_full, backup_directory=app_data_path, progress_callback=update_progress)
+        await service_provider.close()
+
+    # get the file, reading the sqlite db first to get the file id
+    update_label("Getting the file...")
+    db_path = path.join(backup_folder, "Manifest.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT fileID FROM Files WHERE domain = ? AND relativePath = ?",
+        ("AppDomain-com.apple.PosterBoard",
+            "Library/Application Support/PRBPosterExtensionDataStore/61/PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3"))
+    fileID = cursor.fetchone()
+    conn.close()
+    if fileID is None or len(fileID) == 0:
+        raise NuggetException("Could not find sqlite database in the backup!")
+    fileID = fileID[0]
+    db_file_path = path.join(backup_folder, fileID[:2], fileID)
+    if not path.exists(db_file_path):
+        raise NuggetException("The database file doesn't exist!")
+    return db_file_path
 
 class PosterBoardDBWizard(QWizard):
     def __init__(self, udid: str, pbDBLbl: QLabel, update_savedIds_list=lambda x: None):
@@ -111,39 +182,8 @@ class PosterBoardDBWizard(QWizard):
     async def _start_device_backup(self, update_label=lambda x: None, update_progress=lambda x: None):
         try:
             app_data_path = path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), 'Backups')
-            if not path.exists(app_data_path):
-                makedirs(app_data_path)
-            service_provider = await create_using_usbmux(serial=self.udid)
-            async with Mobilebackup2Service(service_provider) as backup_client:
-                backup_folder = path.join(app_data_path, self.udid)
-                # check if a full backup is needed (makes it faster)
-                needs_full = False
-                if path.exists(backup_folder):
-                    files_to_verify = ["Info.plist", "Manifest.db", "Manifest.plist", "Status.plist"]
-                    for file in files_to_verify:
-                        if not path.exists(path.join(backup_folder, file)):
-                            needs_full = True
-                            break
-                await backup_client.backup(full=needs_full, backup_directory=app_data_path, progress_callback=update_progress)
-            await service_provider.close()
-
-            # get the file, reading the sqlite db first to get the file id
-            update_label("Getting the file...")
-            db_path = path.join(backup_folder, "Manifest.db")
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT fileID FROM Files WHERE domain = ? AND relativePath = ?",
-                ("AppDomain-com.apple.PosterBoard",
-                    "Library/Application Support/PRBPosterExtensionDataStore/61/PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3"))
-            fileID = cursor.fetchone()
-            conn.close()
-            if fileID is None or len(fileID) == 0:
-                raise NuggetException("Could not find sqlite database in the backup!")
-            fileID = fileID[0]
-            db_file_path = path.join(backup_folder, fileID[:2], fileID)
-            if not path.exists(db_file_path):
-                raise NuggetException("The database file doesn't exist!")
+            backup_folder = path.join(app_data_path, self.udid)
+            db_file_path = await backup_posterboard_database(self.udid, update_label, update_progress)
             if not tweaks[TweakID.PosterBoard].config_manager.update_database_file(db_file_path, self.udid):
                 raise NuggetException("The database is not of the correct format!")
             update_label("sqlite: Selected")

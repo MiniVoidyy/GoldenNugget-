@@ -29,7 +29,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string notr="true">Nugget</string>
+   <string notr="true">GoldenNugget</string>
   </property>
   <property name="windowOpacity">
    <double>1.000000000000000</double>
@@ -354,7 +354,7 @@ QSlider::tick:horizontal {
 }</string>
          </property>
          <property name="text">
-          <string notr="true">Nugget</string>
+          <string notr="true">GoldenNugget</string>
          </property>
         </widget>
        </item>
@@ -1102,7 +1102,7 @@ QSlider::tick:horizontal {
 }</string>
                       </property>
                       <property name="text">
-                       <string notr="true">Nugget</string>
+                       <string notr="true">GoldenNugget</string>
                       </property>
                       <property name="alignment">
                        <set>Qt::AlignCenter</set>
@@ -1238,7 +1238,7 @@ QSlider::tick:horizontal {
                      <number>0</number>
                     </property>
                     <item>
-                     <widget class="QToolButton" name="leminBtn">
+                     <widget class="QToolButton" name="mainDevBtn">
                       <property name="enabled">
                        <bool>true</bool>
                       </property>
@@ -1248,8 +1248,144 @@ QSlider::tick:horizontal {
                         <height>35</height>
                        </size>
                       </property>
-                      <property name="toolTip">
-                       <string/>
+                      <property name="styleSheet">
+                       <string notr="true">QToolButton {
+	background: none;
+}</string>
+                      </property>
+                      <property name="text">
+                       <string>  awesomenull</string>
+                      </property>
+                      <property name="icon">
+                       <iconset resource="resources.qrc">
+                        <normaloff>:/icon/github.svg</normaloff>:/icon/github.svg</iconset>
+                      </property>
+                      <property name="toolButtonStyle">
+                       <enum>Qt::ToolButtonTextBesideIcon</enum>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <spacer name="horizontalSpacer">
+                      <property name="orientation">
+                       <enum>Qt::Horizontal</enum>
+                      </property>
+                      <property name="sizeType">
+                       <enum>QSizePolicy::Fixed</enum>
+                      </property>
+                      <property name="sizeHint" stdset="0">
+                       <size>
+                        <width>10</width>
+                        <height>20</height>
+                       </size>
+                      </property>
+                     </spacer>
+                    </item>
+                    <item>
+                     <widget class="QToolButton" name="toolButton_14">
+                      <property name="enabled">
+                       <bool>false</bool>
+                      </property>
+                      <property name="sizePolicy">
+                       <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                        <horstretch>0</horstretch>
+                        <verstretch>0</verstretch>
+                       </sizepolicy>
+                      </property>
+                      <property name="styleSheet">
+                       <string notr="true">QToolButton {
+	background: none;
+}</string>
+                      </property>
+                      <property name="text">
+                       <string>Main Developer</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <spacer name="horizontalSpacer_5">
+                      <property name="orientation">
+                       <enum>Qt::Horizontal</enum>
+                      </property>
+                      <property name="sizeType">
+                       <enum>QSizePolicy::Expanding</enum>
+                      </property>
+                      <property name="sizeHint" stdset="0">
+                       <size>
+                        <width>40</width>
+                        <height>20</height>
+                       </size>
+                      </property>
+                     </spacer>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item>
+                  <spacer name="verticalSpacer_16">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeType">
+                    <enum>QSizePolicy::Fixed</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>10</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                 <item>
+                  <widget class="QWidget" name="horizontalWidget_27" native="true">
+                   <layout class="QHBoxLayout" name="horizontalLayout_86">
+                    <property name="spacing">
+                     <number>0</number>
+                    </property>
+                    <property name="leftMargin">
+                     <number>0</number>
+                    </property>
+                    <property name="topMargin">
+                     <number>0</number>
+                    </property>
+                    <property name="rightMargin">
+                     <number>0</number>
+                    </property>
+                    <property name="bottomMargin">
+                     <number>0</number>
+                    </property>
+                    <item>
+                     <widget class="QToolButton" name="toolButton_16">
+                      <property name="enabled">
+                       <bool>false</bool>
+                      </property>
+                      <property name="minimumSize">
+                       <size>
+                        <width>145</width>
+                        <height>35</height>
+                       </size>
+                      </property>
+                      <property name="styleSheet">
+                       <string notr="true">QToolButton {
+	background: none;
+}</string>
+                      </property>
+                      <property name="text">
+                       <string>Nugget Creator</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QToolButton" name="leminBtn">
+                      <property name="enabled">
+                       <bool>true</bool>
+                      </property>
+                      <property name="minimumSize">
+                       <size>
+                        <width>150</width>
+                        <height>35</height>
+                       </size>
                       </property>
                       <property name="styleSheet">
                        <string notr="true">QToolButton {
@@ -1351,7 +1487,7 @@ QToolButton:pressed {
                      </widget>
                     </item>
                     <item>
-                     <spacer name="horizontalSpacer">
+                     <spacer name="horizontalSpacer_41">
                       <property name="orientation">
                        <enum>Qt::Horizontal</enum>
                       </property>
@@ -1367,28 +1503,7 @@ QToolButton:pressed {
                      </spacer>
                     </item>
                     <item>
-                     <widget class="QToolButton" name="toolButton_14">
-                      <property name="enabled">
-                       <bool>false</bool>
-                      </property>
-                      <property name="sizePolicy">
-                       <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                        <horstretch>0</horstretch>
-                        <verstretch>0</verstretch>
-                       </sizepolicy>
-                      </property>
-                      <property name="styleSheet">
-                       <string notr="true">QToolButton {
-	background: none;
-}</string>
-                      </property>
-                      <property name="text">
-                       <string>Main Developer</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
-                     <spacer name="horizontalSpacer_5">
+                     <spacer name="horizontalSpacer_42">
                       <property name="orientation">
                        <enum>Qt::Horizontal</enum>
                       </property>
@@ -1405,22 +1520,6 @@ QToolButton:pressed {
                     </item>
                    </layout>
                   </widget>
-                 </item>
-                 <item>
-                  <spacer name="verticalSpacer_16">
-                   <property name="orientation">
-                    <enum>Qt::Vertical</enum>
-                   </property>
-                   <property name="sizeType">
-                    <enum>QSizePolicy::Fixed</enum>
-                   </property>
-                   <property name="sizeHint" stdset="0">
-                    <size>
-                     <width>20</width>
-                     <height>10</height>
-                    </size>
-                   </property>
-                  </spacer>
                  </item>
                  <item>
                   <widget class="QWidget" name="horizontalWidget_16" native="true">
@@ -1597,6 +1696,53 @@ QToolButton:pressed {
                       <property name="text">
                        <string>Mikasa
 Quiet Daemon</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QToolButton" name="wind0ws11AeroBtn">
+                      <property name="sizePolicy">
+                       <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                        <horstretch>0</horstretch>
+                        <verstretch>0</verstretch>
+                       </sizepolicy>
+                      </property>
+                      <property name="minimumSize">
+                       <size>
+                        <width>0</width>
+                        <height>37</height>
+                       </size>
+                      </property>
+                      <property name="cursor">
+                       <cursorShape>PointingHandCursor</cursorShape>
+                      </property>
+                      <property name="toolTip">
+                       <string>iOS 27 Support and PosterBoard after iOS 26.4</string>
+                      </property>
+                      <property name="styleSheet">
+                       <string notr="true">QToolButton {
+	border-top-left-radius: 0px;
+	border-bottom-left-radius: 0px;
+	background: none;
+	border: 1px solid #3b3b3b;
+	border-left: none;
+}
+
+QToolButton:pressed {
+    background-color: #535353;
+    color: #FFFFFF;
+}</string>
+                      </property>
+                      <property name="text">
+                       <string>Wind0ws11Aero
+iOS 27 &amp; PosterBoard</string>
+                      </property>
+                      <property name="icon">
+                       <iconset resource="resources.qrc">
+                        <normaloff>:/icon/github.svg</normaloff>:/icon/github.svg</iconset>
+                      </property>
+                      <property name="toolButtonStyle">
+                       <enum>Qt::ToolButtonTextBesideIcon</enum>
                       </property>
                      </widget>
                     </item>
@@ -1787,7 +1933,7 @@ QToolButton:pressed {
               <item>
                <widget class="QLabel" name="appVersionLbl">
                 <property name="text">
-                 <string extracomment="Leave %VERSION %BETATAG the same">Nugget GUI - Version %VERSION %BETATAG</string>
+                 <string extracomment="Leave %VERSION %BETATAG the same">GoldenNugget GUI - Version %VERSION %BETATAG</string>
                 </property>
                 <property name="alignment">
                  <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -8046,13 +8192,285 @@ Please do not make GitHub issues on Nugget about them, it is not fixable.</strin
                           </property>
                          </widget>
                         </item>
-                        <item>
-                         <layout class="QHBoxLayout" name="disableSolariumHDRBtns"/>
-                        </item>
-                       </layout>
-                      </widget>
-                     </item>
-                    </layout>
+                         <item>
+                          <layout class="QHBoxLayout" name="disableSolariumHDRBtns"/>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                      <item>
+                       <widget class="QWidget" name="disallowGlassButtonsContent" native="true">
+                        <property name="sizePolicy">
+                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                          <horstretch>0</horstretch>
+                          <verstretch>0</verstretch>
+                         </sizepolicy>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayout_66">
+                         <property name="leftMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="topMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="rightMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="bottomMargin">
+                          <number>0</number>
+                         </property>
+                         <item>
+                          <widget class="QLabel" name="label_65">
+                           <property name="text">
+                            <string>Disable Liquid Glass on Buttons</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <layout class="QHBoxLayout" name="disallowGlassButtonsBtns"/>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                      <item>
+                       <widget class="QWidget" name="disallowGlassLockScreenContent" native="true">
+                        <property name="sizePolicy">
+                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                          <horstretch>0</horstretch>
+                          <verstretch>0</verstretch>
+                         </sizepolicy>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayout_67">
+                         <property name="leftMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="topMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="rightMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="bottomMargin">
+                          <number>0</number>
+                         </property>
+                         <item>
+                          <widget class="QLabel" name="label_66">
+                           <property name="text">
+                            <string>Disable Liquid Glass on Lock Screen</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <layout class="QHBoxLayout" name="disallowGlassLockScreenBtns"/>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                      <item>
+                       <widget class="QWidget" name="forceEnhancedSpecularsContent" native="true">
+                        <property name="sizePolicy">
+                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                          <horstretch>0</horstretch>
+                          <verstretch>0</verstretch>
+                         </sizepolicy>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayout_68">
+                         <property name="leftMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="topMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="rightMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="bottomMargin">
+                          <number>0</number>
+                         </property>
+                         <item>
+                          <widget class="QLabel" name="label_67">
+                           <property name="text">
+                            <string>Force Enhanced Speculars</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <layout class="QHBoxLayout" name="forceEnhancedSpecularsBtns"/>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                      <item>
+                       <widget class="QWidget" name="forceSolariumIntelligenceContent" native="true">
+                        <property name="sizePolicy">
+                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                          <horstretch>0</horstretch>
+                          <verstretch>0</verstretch>
+                         </sizepolicy>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayout_69">
+                         <property name="leftMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="topMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="rightMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="bottomMargin">
+                          <number>0</number>
+                         </property>
+                         <item>
+                          <widget class="QLabel" name="label_68">
+                           <property name="text">
+                            <string>Force Solarium for Intelligence</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <layout class="QHBoxLayout" name="forceSolariumIntelligenceBtns"/>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                      <item>
+                       <widget class="QWidget" name="uiSolariumFallbackContent" native="true">
+                        <property name="sizePolicy">
+                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                          <horstretch>0</horstretch>
+                          <verstretch>0</verstretch>
+                         </sizepolicy>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayout_70">
+                         <property name="leftMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="topMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="rightMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="bottomMargin">
+                          <number>0</number>
+                         </property>
+                         <item>
+                          <widget class="QLabel" name="label_69">
+                           <property name="text">
+                            <string>UIKit Solarium Fallback</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <layout class="QHBoxLayout" name="uiSolariumFallbackBtns"/>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                      <item>
+                       <widget class="QWidget" name="ignoreSolariumHardwareCheckContent" native="true">
+                        <property name="sizePolicy">
+                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                          <horstretch>0</horstretch>
+                          <verstretch>0</verstretch>
+                         </sizepolicy>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayout_71">
+                         <property name="leftMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="topMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="rightMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="bottomMargin">
+                          <number>0</number>
+                         </property>
+                         <item>
+                          <widget class="QLabel" name="label_70">
+                           <property name="text">
+                            <string>Ignore Solarium Hardware Check</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <layout class="QHBoxLayout" name="ignoreSolariumHardwareCheckBtns"/>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                      <item>
+                       <widget class="QWidget" name="ignoreSolariumOptOutContent" native="true">
+                        <property name="sizePolicy">
+                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                          <horstretch>0</horstretch>
+                          <verstretch>0</verstretch>
+                         </sizepolicy>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayout_72">
+                         <property name="leftMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="topMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="rightMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="bottomMargin">
+                          <number>0</number>
+                         </property>
+                         <item>
+                          <widget class="QLabel" name="label_71">
+                           <property name="text">
+                            <string>Ignore Solarium Opt-Out</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <layout class="QHBoxLayout" name="ignoreSolariumOptOutBtns"/>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                      <item>
+                       <widget class="QWidget" name="disableSpecularEverywhereContent" native="true">
+                        <property name="sizePolicy">
+                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                          <horstretch>0</horstretch>
+                          <verstretch>0</verstretch>
+                         </sizepolicy>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayout_73">
+                         <property name="leftMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="topMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="rightMargin">
+                          <number>0</number>
+                         </property>
+                         <property name="bottomMargin">
+                          <number>0</number>
+                         </property>
+                         <item>
+                          <widget class="QLabel" name="label_72">
+                           <property name="text">
+                            <string>Disable Specular Everywhere</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <layout class="QHBoxLayout" name="disableSpecularEverywhereBtns"/>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                     </layout>
                    </widget>
                   </item>
                  </layout>
@@ -10660,50 +11078,6 @@ Warning: Disabling will cause the battery to show &quot;Unknown Part&quot; or &q
                      <number>5</number>
                     </property>
                     <item row="0" column="0">
-                     <widget class="QToolButton" name="springboardOptionsPageBtn">
-                      <property name="sizePolicy">
-                       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                        <horstretch>0</horstretch>
-                        <verstretch>0</verstretch>
-                       </sizepolicy>
-                      </property>
-                      <property name="minimumSize">
-                       <size>
-                        <width>116</width>
-                        <height>96</height>
-                       </size>
-                      </property>
-                      <property name="cursor">
-                       <cursorShape>PointingHandCursor</cursorShape>
-                      </property>
-                      <property name="text">
-                       <string>SpringBoard</string>
-                      </property>
-                      <property name="icon">
-                       <iconset resource="resources.qrc">
-                        <normaloff>:/icon/app-indicator.svg</normaloff>:/icon/app-indicator.svg</iconset>
-                      </property>
-                      <property name="iconSize">
-                       <size>
-                        <width>36</width>
-                        <height>36</height>
-                       </size>
-                      </property>
-                      <property name="checkable">
-                       <bool>false</bool>
-                      </property>
-                      <property name="autoExclusive">
-                       <bool>false</bool>
-                      </property>
-                      <property name="toolButtonStyle">
-                       <enum>Qt::ToolButtonTextUnderIcon</enum>
-                      </property>
-                      <property name="cls" stdset="0">
-                       <string notr="true">miscBtn</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="1" column="0">
                      <widget class="QToolButton" name="daemonsPageBtn">
                       <property name="enabled">
                        <bool>true</bool>
@@ -10755,38 +11129,6 @@ Warning: Disabling will cause the battery to show &quot;Unknown Part&quot; or &q
                       <property name="icon">
                        <iconset resource="resources.qrc">
                         <normaloff>:/icon/hdd.svg</normaloff>:/icon/hdd.svg</iconset>
-                      </property>
-                      <property name="checkable">
-                       <bool>false</bool>
-                      </property>
-                      <property name="autoExclusive">
-                       <bool>false</bool>
-                      </property>
-                      <property name="toolButtonStyle">
-                       <enum>Qt::ToolButtonTextUnderIcon</enum>
-                      </property>
-                      <property name="cls" stdset="0">
-                       <string notr="true">miscBtn</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="2" column="0">
-                     <widget class="QToolButton" name="advancedPageBtn">
-                      <property name="sizePolicy">
-                       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                        <horstretch>0</horstretch>
-                        <verstretch>0</verstretch>
-                       </sizepolicy>
-                      </property>
-                      <property name="cursor">
-                       <cursorShape>PointingHandCursor</cursorShape>
-                      </property>
-                      <property name="text">
-                       <string>Risky</string>
-                      </property>
-                      <property name="icon">
-                       <iconset resource="resources.qrc">
-                        <normaloff>:/icon/star.svg</normaloff>:/icon/star.svg</iconset>
                       </property>
                       <property name="checkable">
                        <bool>false</bool>
@@ -11562,16 +11904,6 @@ Warning: Disabling will cause the battery to show &quot;Unknown Part&quot; or &q
                       </widget>
                      </item>
                      <item>
-                      <widget class="QCheckBox" name="showRiskyChk">
-                       <property name="cursor">
-                        <cursorShape>PointingHandCursor</cursorShape>
-                       </property>
-                       <property name="text">
-                        <string>Show Risky Tweak Options</string>
-                       </property>
-                      </widget>
-                     </item>
-                     <item>
                       <widget class="QCheckBox" name="showAllSpoofableChk">
                        <property name="cursor">
                         <cursorShape>PointingHandCursor</cursorShape>
@@ -11923,22 +12255,8 @@ It will be automatically found if this is left blank.</string>
                        </item>
                       </layout>
                      </item>
-                     <item>
-                      <layout class="QHBoxLayout" name="horizontalLayout_32">
-                       <property name="bottomMargin">
-                        <number>0</number>
-                       </property>
-                       <item>
-                        <widget class="QToolButton" name="pocketPosterHelperBtn">
-                         <property name="text">
-                          <string>Pocket Poster Helper</string>
-                         </property>
-                        </widget>
-                       </item>
-                      </layout>
-                     </item>
-                     <item>
-                      <spacer name="verticalSpacer_5">
+                      <item>
+                       <spacer name="verticalSpacer_5">
                        <property name="orientation">
                         <enum>Qt::Vertical</enum>
                        </property>

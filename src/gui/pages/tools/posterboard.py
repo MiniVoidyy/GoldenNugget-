@@ -43,18 +43,14 @@ class PosterboardPage(Page, QtCore.QObject):
 
     def load_page(self):
         # Page Selectors
-        self.ui.pbSetupPageBtn.clicked.connect(self.on_pbSetupPageBtn_clicked)
+        # the Setup page moved to Settings, so only the tendies/templates/video
+        # pages remain in the PosterBoard tab
+        self.ui.pbSetupPageBtn.hide()
+        self.ui.pbSetupPageBtn.setChecked(False)
+        self.ui.tendiesPageBtn.setChecked(True)
         self.ui.tendiesPageBtn.clicked.connect(self.on_tendiesPageBtn_clicked)
         self.ui.templatePageBtn.clicked.connect(self.on_templatePageBtn_clicked)
         self.ui.videoPageBtn.clicked.connect(self.on_videoPageBtn_clicked)
-
-        # Setup Page
-        self.ui.useConfigsBtn.clicked.connect(self.on_useConfigsBtn_clicked)
-        self.ui.useDescriptorsBtn.clicked.connect(self.on_useDescriptorsBtn_clicked)
-        self.ui.pbGetDBBtn.clicked.connect(self.on_pbGetDBBtn_clicked)
-        self.ui.pbDBBtn.clicked.connect(self.on_pbDBBtn_clicked)
-        self.ui.clearSavedIdsBtn.clicked.connect(self.on_clearSavedIdsBtn_clicked)
-        self.ui.removeSelectedIdBtn.clicked.connect(self.on_removeSelectedIdBtn_clicked)
 
         # Tendies Page
         self.ui.importTendiesBtn.clicked.connect(self.on_importTendiesBtn_clicked)
@@ -193,42 +189,25 @@ class PosterboardPage(Page, QtCore.QObject):
             template.create_ui(self.window, tweaks[TweakID.PosterBoard], widgets, self.pb_templateLayout)
 
     # PB Pages Selectors
-    def on_pbSetupPageBtn_clicked(self):
-        self.ui.pbSetupPageBtn.setChecked(True)
-        self.ui.tendiesPageBtn.setChecked(False)
-        self.ui.templatePageBtn.setChecked(False)
-        self.ui.videoPageBtn.setChecked(False)
-        self.ui.pbPages.setCurrentIndex(0)
+    # the Setup page moved to Settings, so the pages are now
+    # 0=tendies, 1=templates, 2=video
     def on_tendiesPageBtn_clicked(self):
-        self.ui.pbSetupPageBtn.setChecked(False)
         self.ui.tendiesPageBtn.setChecked(True)
         self.ui.templatePageBtn.setChecked(False)
         self.ui.videoPageBtn.setChecked(False)
-        self.ui.pbPages.setCurrentIndex(1)
+        self.ui.pbPages.setCurrentIndex(0)
     def on_templatePageBtn_clicked(self):
-        self.ui.pbSetupPageBtn.setChecked(False)
         self.ui.tendiesPageBtn.setChecked(False)
         self.ui.templatePageBtn.setChecked(True)
         self.ui.videoPageBtn.setChecked(False)
-        self.ui.pbPages.setCurrentIndex(2)
+        self.ui.pbPages.setCurrentIndex(1)
     def on_videoPageBtn_clicked(self):
-        self.ui.pbSetupPageBtn.setChecked(False)
         self.ui.tendiesPageBtn.setChecked(False)
         self.ui.templatePageBtn.setChecked(False)
         self.ui.videoPageBtn.setChecked(True)
-        self.ui.pbPages.setCurrentIndex(3)
+        self.ui.pbPages.setCurrentIndex(2)
 
     # Setup Page
-    def set_use_configs(self, use_configs: bool):
-        self.ui.useConfigsBtn.setChecked(use_configs)
-        self.ui.useDescriptorsBtn.setChecked(not use_configs)
-        self.ui.configOptions.setVisible(use_configs)
-        tweaks[TweakID.PosterBoard].use_configs = use_configs
-    def on_useConfigsBtn_clicked(self):
-        self.set_use_configs(True)
-    def on_useDescriptorsBtn_clicked(self):
-        self.set_use_configs(False)
-
     def on_pbGetDBBtn_clicked(self):
         wizard = PosterBoardDBWizard(self.window.device_manager.data_singleton.current_device.udid, self.ui.pbDBLbl, self.window.update_pb_saved_ids_list)
         wizard.exec()

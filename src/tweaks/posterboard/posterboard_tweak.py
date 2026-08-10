@@ -54,7 +54,7 @@ class PosterboardTweak(Tweak):
                 detailsBox = QtWidgets.QMessageBox()
                 detailsBox.setIcon(QtWidgets.QMessageBox.Critical)
                 detailsBox.setWindowTitle(QCoreApplication.tr("Warning"))
-                detailsBox.setText(QCoreApplication.tr("NOTE: You may need to reset all wallpapers (enable Risky Options in settings) and then re-apply for this file to work."))
+                detailsBox.setText(QCoreApplication.tr("NOTE: You may need to reset all wallpapers and then re-apply for this file to work."))
                 detailsBox.exec()
             return True
         return False

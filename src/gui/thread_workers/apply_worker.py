@@ -41,14 +41,18 @@ class ApplyThread(QThread):
     def alert_window(self, msg: ApplyAlertMessage):
         self.alert.emit(msg)
     
-    def __init__(self, manager, settings: QSettings, reset_pages: Optional[list[Page]] = None):
+    def __init__(self, manager, settings: QSettings, reset_pages: Optional[list[Page]] = None, capture_only: bool = False):
         super().__init__()
         self.manager = manager
         self.settings = settings
         self.reset_pages = reset_pages
+        self.capture_only = capture_only
 
     def do_work(self):
-        if self.reset_pages == None:
+        if self.capture_only:
+            # saving the original plists
+            self.manager.capture_originals(self.update_label, self.alert_window)
+        elif self.reset_pages == None:
             # applying tweaks
             self.manager.apply_changes(self.update_label, self.alert_window)
         else:

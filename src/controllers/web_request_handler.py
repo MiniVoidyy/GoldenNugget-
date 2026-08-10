@@ -1,8 +1,8 @@
-from requests import get, RequestException
+from requests import get, RequestException, HTTPError
 from json import JSONDecodeError
 from src.devicemanagement.constants import Version
 
-Nugget_Repo = "leminlimez/Nugget/releases/latest"
+Nugget_Repo = "awesomenull-dev/GoldenNugget/releases/latest"
 
 last_fetched_version: str = None
 
@@ -33,6 +33,11 @@ def get_latest_version() -> str:
         if tag_name:
             last_fetched_version = tag_name.replace("v", "")  # Remove 'v' from tag_name
             return last_fetched_version
+    except HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            # no releases published yet — not a real error
+            return None
+        print(f"Error fetching data: {e}")
     except RequestException as e:
         print(f"Error fetching data: {e}")
     except JSONDecodeError as e:

@@ -21,6 +21,9 @@ class HomePage(Page):
         self.ui.bigNuggetBtn.clicked.connect(self.on_bigNuggetBtn_clicked)
         self.ui.starOnGithubBtn.clicked.connect(self.on_githubBtn_clicked)
 
+        self.ui.mainDevBtn.clicked.connect(self.on_mainDevBtn_clicked)
+        self.ui.wind0ws11AeroBtn.clicked.connect(self.on_wind0ws11AeroBtn_clicked)
+
         self.ui.leminGithubBtn.clicked.connect(self.on_leminGitHubBtn_clicked)
         self.ui.leminTwitterBtn.clicked.connect(self.on_leminTwitterBtn_clicked)
         self.ui.leminKoFiBtn.clicked.connect(self.on_leminKoFiBtn_clicked)
@@ -68,9 +71,8 @@ class HomePage(Page):
         support_str: str = "<span style=\"color: #32d74b;\">" + QCoreApplication.tr("Supported!") + "</span></a>"
         if Version(version) < Version("17.0"):
             support_str = "<span style=\"color: #ff0000;\">" + QCoreApplication.tr("Not Supported.") + "</span></a>"
-        elif self.window.device_manager.get_current_device_patched():
-            # sparserestore fully patched
-            support_str = "<span style=\"color: #ffff00;\">"+ QCoreApplication.tr("Partially Supported.") + "</span></a>"
+        elif not self.window.device_manager.get_current_device_is_supported_by_fork():
+            support_str = "<span style=\"color: #ff0000;\">" + QCoreApplication.tr("Not Supported.") + "</span></a>"
         self.ui.phoneVersionLbl.setText(f"<a style=\"text-decoration:none; color: white;\" href=\"#\">iOS {version} ({build}) {support_str}")
 
     ## HOME PAGE LINKS
@@ -83,6 +85,11 @@ class HomePage(Page):
         webbrowser.open_new_tab("https://twitter.com/LeminLimez")
     def on_leminKoFiBtn_clicked(self):
         webbrowser.open_new_tab("https://ko-fi.com/leminlimez")
+
+    def on_mainDevBtn_clicked(self):
+        webbrowser.open_new_tab("https://github.com/awesomenull-dev")
+    def on_wind0ws11AeroBtn_clicked(self):
+        webbrowser.open_new_tab("https://github.com/Wind0ws11Aero")
 
     def on_posterRestoreBtn_clicked(self):
         webbrowser.open_new_tab("https://discord.gg/gWtzTVhMvh")

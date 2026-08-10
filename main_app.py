@@ -9,9 +9,10 @@ import traceback
 warnings.filterwarnings("ignore")
 
 from PySide6 import QtGui, QtWidgets
-from PySide6.QtCore import QSettings, QCoreApplication
+from PySide6.QtCore import QCoreApplication
 
 from src.controllers.translator import Translator
+from src.controllers.settings import Settings
 from src.gui.main_window import MainWindow
 from src.devicemanagement.device_manager import DeviceManager
 from src.tweaks.tweaks import tweaks, TweakID
@@ -55,20 +56,36 @@ if __name__ == "__main__":
             sys.exit()
 
     # 3. GUI STARTUP
-    print("Starting Nugget...")
+    print("Starting GoldenNugget...")
+    from src.controllers.nugget_logger import init_logging
+    init_logging()
     
     app = QtWidgets.QApplication([])
     dm = DeviceManager()
 
     QCoreApplication.setOrganizationDomain("com.leemin")
-    QCoreApplication.setApplicationName("Nugget")
-    settings = QSettings("Nugget", "settings")
+    QCoreApplication.setApplicationName("GoldenNugget")
+    settings = Settings("settings")
     translator = Translator(app, settings)
     translator.set_default_locale(translator.get_saved_locale_code())
     translator.load_translations()
 
     icon_path = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), "nugget.ico")
     app.setWindowIcon(QtGui.QIcon(icon_path))
+
+    # Restore the preset that was loaded right before the app restarted (pages
+    # read the tweak state only once on startup, so the preset must be applied
+    # before the window is created). The marker is cleared once applied.
+    last_loaded_preset = settings.value("last_loaded_preset", "", type=str)
+    if last_loaded_preset:
+        try:
+            from src.controllers.preset_manager import PresetManager
+            if PresetManager().load_preset(last_loaded_preset):
+                print(f"Restored preset: {last_loaded_preset}")
+        except Exception as e:
+            print(f"Failed to restore preset '{last_loaded_preset}': {e}")
+        finally:
+            settings.setValue("last_loaded_preset", "")
 
     widget = MainWindow(device_manager=dm, translator=translator)
     translator.fix_ui_for_rtl(widget.ui)
@@ -81,5 +98,5 @@ if __name__ == "__main__":
         elif arg.endswith('.batter'):
             tweaks[TweakID.Templates].add_template(arg)
 
-    print("Nugget launched.")
+    print("GoldenNugget launched.")
     sys.exit(app.exec())

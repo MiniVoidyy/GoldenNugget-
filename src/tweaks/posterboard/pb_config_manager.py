@@ -91,7 +91,7 @@ class PBConfigManager:
         for item in self.saved_items:
             # TODO: Remove if not in current configuration
             try:
-                db_cursor.execute("SELECT FROM poster WHERE UUID = ?", (item.uuid,))
+                db_cursor.execute("SELECT * FROM poster WHERE UUID = ?", (item.uuid,))
                 sort_keys = db_cursor.fetchall()
                 if sort_keys is None or len(sort_keys) == 0:
                     final_saved_items.append(item)

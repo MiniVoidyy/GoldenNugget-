@@ -8,13 +8,13 @@ from typing import Optional
 
 from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreApplyMethod
 from src.tweaks.posterboard.pb_config_item import PBConfigItem
+from src.controllers.settings import Settings
 
 class PreferenceManager:
     def __init__(self, settings: QSettings):
         self.settings = settings
         self.apply_over_wifi = False
         self.auto_reboot = True
-        self.allow_risky_tweaks = False
         self.show_all_spoofable_models = False
         self.disable_tendies_limit = False
         self.auto_refresh_posterboard = True
@@ -28,7 +28,7 @@ class PreferenceManager:
 
     # Mobile Gestalt Saving
     def get_mga_prefs(self) -> QSettings:
-        return QSettings("Nugget", "MGA Data")
+        return Settings("MGA Data")
 
     def save_mga_file(self, filepath: str, udid: str):
         mga_settings = self.get_mga_prefs()
@@ -66,9 +66,57 @@ class PreferenceManager:
                 and plist["CacheVersion"] == device_build
                 and plist["CacheExtra"]["0+nc/Udy4WNG8S+Q7a/s1A"] == device_model)
     
+    # Original Plist Saving
+    def get_original_plists_prefs(self) -> QSettings:
+        return Settings("Original Plists")
+
+    def _original_plist_key(self, model: str, build: str, path: str) -> str:
+        return f"{model}|{build}|{path}"
+
+    def save_original_plist(self, model: str, build: str, path: str, contents: bytes):
+        self.get_original_plists_prefs().setValue(
+            self._original_plist_key(model, build, path), contents)
+
+    def get_original_plist(self, model: str, build: str, path: str) -> Optional[bytes]:
+        settings = self.get_original_plists_prefs()
+        key = self._original_plist_key(model, build, path)
+        if not settings.contains(key):
+            return None
+        data = settings.value(key)
+        if data is None:
+            return None
+        return bytes(data)
+
+    def has_original_plist(self, model: str, build: str, path: str) -> bool:
+        return self.get_original_plists_prefs().contains(
+            self._original_plist_key(model, build, path))
+
+    def get_original_plists(self, model: str, build: str) -> dict[str, bytes]:
+        settings = self.get_original_plists_prefs()
+        prefix = f"{model}|{build}|"
+        result: dict[str, bytes] = {}
+        for key in settings.allKeys():
+            if key.startswith(prefix):
+                data = settings.value(key)
+                if data is not None:
+                    result[key[len(prefix):]] = bytes(data)
+        return result
+
+    def has_any_original_plists(self, model: str, build: str) -> bool:
+        settings = self.get_original_plists_prefs()
+        prefix = f"{model}|{build}|"
+        return any(key.startswith(prefix) for key in settings.allKeys())
+
+    def remove_original_plists(self, model: str, build: str):
+        settings = self.get_original_plists_prefs()
+        prefix = f"{model}|{build}|"
+        for key in list(settings.allKeys()):
+            if key.startswith(prefix):
+                settings.remove(key)
+
     # PosterBoard Configuration Database Saving
     def get_pbconfigs_prefs() -> QSettings:
-        return QSettings("Nugget", "PB Configs")
+        return Settings("PB Configs")
     def get_pbconfigs_db_save_path(udid: Optional[str]=None) -> str:
         app_data_path = path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), "PB_Saved_Databases")
         if not path.exists(app_data_path):
@@ -113,6 +161,8 @@ class PreferenceManager:
         if not pbc_settings.contains(udid):
             return []
         serialized_ids = pbc_settings.value(udid)
+        if serialized_ids is None:
+            return []
         ids: list[PBConfigItem] = []
         for id in serialized_ids:
             ids.append(PBConfigItem.from_dict(id))

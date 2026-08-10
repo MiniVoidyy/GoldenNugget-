@@ -43,14 +43,12 @@ class Page(Enum):
 
 def get_resettable_pages(device_manager) -> list[Page]:
     device_ver = Version(device_manager.get_current_device_version())
-    page_list: list[Page] = [Page.StatusBar, Page.Springboard, Page.InternalOptions, Page.Daemons]
+    page_list: list[Page] = [Page.StatusBar, Page.InternalOptions, Page.Daemons]
 
     # add the exploit related pages
     if device_ver >= Version("18.0") and not device_manager.get_current_device_patched():
         page_list.insert(0, Page.FeatureFlags)
     if not device_manager.get_current_device_patched():
         page_list.insert(0, Page.Gestalt)
-    if device_ver < Version("19.0"):
-        page_list.append(Page.RiskyTweaks)
 
     return page_list

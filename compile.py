@@ -79,4 +79,9 @@ elif os.name == 'nt':
     else:
         print("[!] ffmpeg not bundled: folder not found")
 
+    if os.path.isdir("idevice"):
+        args.append('--add-data=idevice;idevice')
+    else:
+        print("[!] libimobiledevice binaries not bundled: 'idevice' folder not found")
+
 PyInstaller.__main__.run(args)

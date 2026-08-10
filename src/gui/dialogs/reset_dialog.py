@@ -24,6 +24,10 @@ class ResetDialog(QDialog):
         layout.addWidget(message)
 
         pages = get_resettable_pages(self.device_manager)
+        self.missingLabel = QLabel()
+        self.missingLabel.setWordWrap(True)
+        self.missingLabel.setStyleSheet("color: #e8a33d;")
+        layout.addWidget(self.missingLabel)
         for page in pages:
             pageChk = QCheckBox(page.getPageName())
             pageChk.toggled.connect(lambda checked, p=page: self.toggle_page(checked, p))
@@ -31,6 +35,19 @@ class ResetDialog(QDialog):
         
         layout.addWidget(self.buttonBox)
         self.setLayout(layout)
+        self.update_missing_warning()
+
+    def update_missing_warning(self):
+        missing = self.device_manager.get_missing_original_plists(self.selected_pages)
+        if missing:
+            self.missingLabel.setText(self.tr(
+                "No saved original plists for the selected pages on this device. "
+                "They will be reset to empty, which restores defaults but may look "
+                "different from stock. Save originals from Settings first for a "
+                "clean restore."))
+            self.missingLabel.show()
+        else:
+            self.missingLabel.hide()
 
     def toggle_page(self, checked: bool, page: Page):
         if checked:
@@ -40,6 +57,7 @@ class ResetDialog(QDialog):
                 self.selected_pages.remove(page)
             except Exception:
                 print("Page not found in list, ignoring error.")
+        self.update_missing_warning()
 
     def accept(self):
         super().accept()

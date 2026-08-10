@@ -88,6 +88,12 @@ class CustomGestaltTweaks:
         CustomGestaltTweaks.custom_tweaks[id].deactivated = True
         CustomGestaltTweaks.custom_tweaks[id].tweak = None
 
+    def create_deactivated(value_type: ValueType = ValueType.Integer) -> "CustomGestaltTweak":
+        new_tweak = CustomGestaltTweak(None, value_type)
+        new_tweak.deactivated = True
+        CustomGestaltTweaks.custom_tweaks.append(new_tweak)
+        return new_tweak
+
     def apply_tweaks(plist: dict):
         for tweak in CustomGestaltTweaks.custom_tweaks:
             plist = tweak.apply_tweak(plist)

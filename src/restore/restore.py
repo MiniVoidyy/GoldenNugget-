@@ -6,7 +6,7 @@ import ssl
 import tempfile
 import time
 
-from . import backup, perform_restore
+from . import backup, perform_restore, reboot_device
 from .mbdb import _FileMode
 from .protective import clean_backup_for_restore, perform_protective_backup
 from pymobiledevice3.lockdown import LockdownClient, create_using_usbmux
@@ -431,13 +431,40 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
         # These errors usually mean the device rebooted successfully before acknowledging the restore.
         # We catch them and treat the process as successful.
         print("Device disconnected during restore - this is expected as the device reboots.")
-        
+        # The device severing the connection mid-restore is treated as a
+        # reboot (system/exploit files reboot on their own). But PosterBoard
+        # (AppDomain-*) restores do NOT reboot the device, so if a reboot was
+        # requested and the device is still reachable, reboot it explicitly
+        # now. If it already rebooted, the reconnect fails and we continue.
+        if reboot and lockdown_client is not None:
+            await _reboot_device_after_disconnect(lockdown_client.udid)
         if progress_callback:
             progress_callback(100)
             
     except Exception as e:
         # If it's a different error, we still want to see it
         raise e
+
+
+async def _reboot_device_after_disconnect(udid: str):
+    """Reboot the device after a mid-restore disconnect, unless it already
+    rebooted on its own. The connection was severed, so reconnect first:
+    if the device already rebooted (system/exploit files) lockdown is down
+    and the reconnect fails — that is expected, and we just continue."""
+    try:
+        new_ld = await create_using_usbmux(serial=udid, pair_timeout=15)
+    except Exception:
+        print("Device already rebooted (no lockdown service) - skipping explicit reboot.")
+        return
+    try:
+        await reboot_device(reboot=True, lockdown_client=new_ld)
+    except Exception as e:
+        print(f"Failed to reboot device after disconnect: {e}")
+    finally:
+        try:
+            await new_ld.close()
+        except Exception:
+            pass
 
 
 def restore_file(fp: str, restore_path: str, restore_name: str, reboot: bool = False, lockdown_client: LockdownClient = None):

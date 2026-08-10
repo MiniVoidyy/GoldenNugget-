@@ -51,6 +51,10 @@ class Device:
     def supported(self) -> bool:
         return self.has_exploit()
 
+    def is_supported_by_fork(self) -> bool:
+        # this fork only supports iOS 26.2 and newer (the iOS 27 era)
+        return Version(self.version) > Version("26.1")
+
 class Version:
     def __init__(self, major: int, minor: int = 0, patch: int = 0):
         self.major = major
