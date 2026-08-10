@@ -20,10 +20,7 @@ args = [
     '--hidden-import=zeroconf',
     '--hidden-import=pyimg4',
     '--hidden-import=zeroconf._utils.ipaddress',
-    '--hidden-import=zeroconf._handlers.answers',
-    '--hidden-import=inquirer',
-    '--hidden-import=readchar',
-    '--copy-metadata=readchar'
+    '--hidden-import=zeroconf._handlers.answers'
 ]
 
 if target_arch:
