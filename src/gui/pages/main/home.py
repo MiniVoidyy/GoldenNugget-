@@ -39,8 +39,6 @@ class HomePage(Page):
         self.ui.qtBtn.clicked.connect(self.on_qtBtn_clicked)
         self.ui.translatorsBtn.clicked.connect(self.on_translatorsBtn_clicked)
 
-        self.ui.discordBtn.clicked.connect(self.on_discordBtn_clicked)
-
     ## ACTIONS
     def updatePhoneInfo(self):
         # name label
@@ -111,9 +109,7 @@ class HomePage(Page):
     def on_translatorsBtn_clicked(self):
         webbrowser.open_new_tab("https://poeditor.com/join/project/UTqpVSE2UD")
 
-    def on_discordBtn_clicked(self):
-        webbrowser.open_new_tab("https://discord.gg/MN8JgqSAqT")
     def on_githubBtn_clicked(self):
-        webbrowser.open_new_tab("https://github.com/leminlimez/Nugget")
+        webbrowser.open_new_tab("https://github.com/awesomenull-dev/GoldenNugget")
     def on_bigNuggetBtn_clicked(self):
         webbrowser.open_new_tab("https://cowabun.ga")
