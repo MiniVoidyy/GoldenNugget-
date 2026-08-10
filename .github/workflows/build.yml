@@ -37,7 +37,7 @@ permissions:
 
 jobs:
   build-macos-intel:
-    if: ${{ github.event.inputs.build_for_macos_intel == 'true' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_for_macos_intel == 'true' }}
     runs-on: macos-15-intel
 
     steps:
@@ -74,7 +74,7 @@ jobs:
           if-no-files-found: error
 
   build-macos-arm:
-    if: ${{ github.event.inputs.build_for_macos_arm == 'true' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_for_macos_arm == 'true' }}
     runs-on: macos-15
 
     steps:
@@ -121,7 +121,7 @@ jobs:
           if-no-files-found: error
 
   build-windows:
-    if: ${{ github.event.inputs.build_for_windows == 'true' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_for_windows == 'true' }}
     runs-on: windows-latest
 
     steps:
@@ -155,7 +155,7 @@ jobs:
           if-no-files-found: error
 
   build-linux:
-    if: ${{ github.event.inputs.build_for_linux == 'true' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_for_linux == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -193,7 +193,7 @@ jobs:
           if-no-files-found: error
 
   build-linux-arm:
-    if: ${{ github.event.inputs.build_for_arm_linux == 'true' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_for_arm_linux == 'true' }}
     runs-on: ubuntu-24.04-arm
 
     steps:
