@@ -129,7 +129,7 @@ def materialize_plist(plist, device_values: dict[str, str]):
     return _walk(plist, transform)
 
 
-async def capture_original_plists(
+async def psysbackup(
     udid: str,
     paths: list[str],
     update_label=lambda x: None,

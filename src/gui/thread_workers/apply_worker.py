@@ -7,6 +7,7 @@ from src.gui.pages.pages_list import Page
 # Global Vars
 sudo_pwd = None # reset this variable whenever it is used
 sudo_action_complete = False
+restore_ready_complete = False
 def get_sudo_pwd() -> Optional[str]:
     pre_reset = sudo_pwd
     set_sudo_pwd(None)
@@ -20,6 +21,11 @@ def set_sudo_complete(isComplete: bool):
 def set_sudo_pwd(pwd: Optional[str]):
     global sudo_pwd
     sudo_pwd = pwd
+def get_restore_ready_complete() -> bool:
+    return restore_ready_complete
+def set_restore_ready_complete(isComplete: bool):
+    global restore_ready_complete
+    restore_ready_complete = isComplete
 
 class ApplyAlertMessage:
     def __init__(self, txt: str, title: str = "Error!", icon = QMessageBox.Critical, detailed_txt: str = None):
@@ -27,6 +33,12 @@ class ApplyAlertMessage:
         self.title = title
         self.icon = icon
         self.detailed_txt = detailed_txt
+
+class ConfirmRestoreDoneAlert(ApplyAlertMessage):
+    """Special alert that asks the user to press Ready once the device has
+    finished restoring before the next wallpaper is applied."""
+    def __init__(self, txt: str, title: str = "Wait for restore to finish"):
+        super().__init__(txt=txt, title=title, icon=QMessageBox.Information)
 
 class ApplyThread(QThread):
     progress = Signal(str)

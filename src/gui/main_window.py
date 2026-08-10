@@ -15,7 +15,7 @@ from src.devicemanagement.device_manager import DeviceManager
 
 from src.gui.dialogs import GestaltDialog, UpdateAppDialog
 from src.gui.dialogs.reset_dialog import ResetDialog
-from src.gui.thread_workers.apply_worker import ApplyThread, ApplyAlertMessage, RefreshDevicesThread, set_sudo_pwd, set_sudo_complete, get_sudo_pwd
+from src.gui.thread_workers.apply_worker import ApplyThread, ApplyAlertMessage, ConfirmRestoreDoneAlert, RefreshDevicesThread, set_sudo_pwd, set_sudo_complete, get_sudo_pwd, set_restore_ready_complete
 from src.gui.pages.pages_list import Page
 from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreApplyMethod
 
@@ -597,6 +597,18 @@ class MainWindow(QtWidgets.QMainWindow):
             if ok and pwd:
                 set_sudo_pwd(pwd)
             set_sudo_complete(True)
+            return
+        if isinstance(alert, ConfirmRestoreDoneAlert):
+            if log_to_console:
+                print(alert.txt)
+            detailsBox = QtWidgets.QMessageBox()
+            detailsBox.setIcon(QtWidgets.QMessageBox.Information)
+            detailsBox.setWindowTitle(alert.title)
+            detailsBox.setText(alert.txt)
+            detailsBox.setStandardButtons(QtWidgets.QMessageBox.Ok)
+            detailsBox.button(QtWidgets.QMessageBox.Ok).setText(self.tr("Ready"))
+            detailsBox.exec()
+            set_restore_ready_complete(True)
             return
         if log_to_console:
             print(alert.txt)
