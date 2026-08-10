@@ -15,10 +15,11 @@ settings). To keep user data alive, the three-phase flow in restore.py does:
       to the protective rows and orphan payload files removed — is restored
       back to the device after the security recovery.
 
-Protective scope: HomeDomain/{Accounts, ConfigurationProfiles, Preferences}
-(Apple ID + user settings) and, optionally, CameraRollDomain + MediaDomain
-(photos). KeychainDomain is intentionally excluded: enabling backup
-encryption is slow and keychain data is not needed for tweak functionality.
+Protective scope: HomeDomain/{Accounts, ConfigurationProfiles, Preferences,
+Library/SpringBoard} (Apple ID + user settings + home screen layout) and,
+optionally, CameraRollDomain + MediaDomain (photos). KeychainDomain is
+intentionally excluded: enabling backup encryption is slow and keychain data
+is not needed for tweak functionality.
 """
 
 import asyncio
@@ -74,6 +75,19 @@ APPLE_ID_PATH_PREFIXES = (
     "Library/Preferences",           # User settings (dark mode, wallpaper, etc.)
 )
 
+# Path prefixes within HomeDomain that hold SpringBoard's home screen layout
+# and icon state. Restoring these keeps the home screen (icon layout, folders,
+# dock) intact after the iOS 27 "safe state recovery" wipe.
+SPRINGBOARD_PATH_PREFIXES = (
+    "Library/SpringBoard",
+)
+
+# Files/dirs inside the protective HomeDomain scope that tweaks write
+# themselves — restoring the stale copies would undo the applied tweaks.
+_SKIP_PATH_PREFIXES = (
+    "Library/SpringBoard/statusBarOverrides",  # Status Bar tweak writes here
+)
+
 # Files iOS manages internally and rejects if included in a sparse backup
 # with incorrect metadata (e.g. wrong protection class). With copy=True the
 # existing on-device data is preserved anyway, so skipping them is safe.
@@ -89,7 +103,10 @@ def _is_protective_file(domain: str, relative_path: str, include_photos: bool = 
     if filename in _SKIP_FILES:
         return False
     if domain == "HomeDomain":
-        return relative_path.startswith(APPLE_ID_PATH_PREFIXES)
+        if relative_path.startswith(_SKIP_PATH_PREFIXES):
+            return False
+        return (relative_path.startswith(APPLE_ID_PATH_PREFIXES)
+                or relative_path.startswith(SPRINGBOARD_PATH_PREFIXES))
     if include_photos and domain in PROTECTIVE_DOMAINS:
         return True
     return False
@@ -437,7 +454,7 @@ async def perform_protective_backup(
         async with ProtectiveBackupService(lockdown_client, preserve_file=preserve) as mb:
             is_encrypted = await mb.get_will_encrypt()
             progress_callback(
-                "Creating protective backup (photos, Apple ID, settings)"
+                "Creating protective backup (photos, Apple ID, settings, home screen)"
                 + (" — encrypted" if is_encrypted else "") + "..."
             )
             await mb.backup(full=True, backup_directory=backup_root,
