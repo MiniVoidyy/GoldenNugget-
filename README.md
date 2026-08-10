@@ -8,7 +8,7 @@ Customize your device with animated wallpapers, disable pesky daemons, and more!
 Make sure you have installed the [requirements](#requirements) if you are on Windows or Linux.
 
 > [!WARNING]
-> Your Home screen layout, language, Apple ID and Region will be rested!\
+> Your Home screen layout, language, Apple ID, some settings and Region will be rested! Anything other like: Photos and app data will stay normally\
 > **THERE IS NO FIX RIGHT NOW**\
 > The only option right now is use IOS 26
 
