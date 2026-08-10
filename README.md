@@ -151,24 +151,9 @@ pyside6-lrelease src/qt/translations/Nugget_{language code}.ts -qm src/qt/transl
 
 The application itself can be compiled by running `compile.py`.
 
-## Sparserestore/BookRestore Info
-This uses the sparserestore exploit to write to files outside of the intended restore location, like mobilegestalt. Read the [Getting the File](#getting-the-file) section to learn how to get your mobilegestalt file.
-
-Sparserestore works on all versions iOS 17.0-18.1.1.
-
-BookRestore works on all versions iOS 18.2-26.1.
-
-> [!NOTE]
-> **Mobilegestalt and AI Enabler tweaks are not supported on iOS 26.2+.** It will never be supported, do not make issues asking for when it is supported.
-
-## Read More
-If you would like to read more about the inner workings of the exploit and iOS restore system, I made a write up which you can read [here][ReadMoreGist].
-
 ## Credits
 - Translations crowdsourced using [POEditor][POEditorJoin]. Thank you everyone who assisted in the translation effort!
-- [JJTech][JJTechGitHub] for Sparserestore/[TrollRestore][TrollStoreGitHub]
 - [Wind0ws11Aero] for IOS 27 Support and PosterBoard on IOS 26.5+
-- [Duy Tran][DuyGitHub] and [Huy Nguyen][HuyTwitter] for BookRestore/[bl_sbx][bl_sbxGitHub]
 - [PosterRestore][PosterRestoreDiscord] for their help with PosterBoard
   - Special thanks to [dootskyre][dootskyreX], [Middo][MiddoX], [dulark][dularkGitHub], forcequitOS, and pingubow for their work on this. It would not have been possible without them!
   - Thanks to [Snoolie for aar handling][python-aar-stuffGitHub]!
@@ -176,8 +161,6 @@ If you would like to read more about the inner workings of the exploit and iOS r
 - [disfordottie][disfordottieX] for some global flag features
 - [iTechExpert][iTechExpertTwitter] for various Springboard/Internal Options
 - [Mikasa-san][Mikasa-sanGitHub] for [Quiet Daemon][QuietDaemonGitHub]
-- [sneakyf1shy][sneakyf1shyGitHub] for [AI Eligibility][AIEligibilityGist] (iOS 18.1 beta 4 and below)
-- [lrdsnow][lrdsnowGitHub] for [EU Enabler][EUEnablerGitHub]
 - [pymobiledevice3][pymobiledevice3GitHub] for restoring and device algorithms.
 - [PySide6][PySide6Doc] for the GUI library.
 
