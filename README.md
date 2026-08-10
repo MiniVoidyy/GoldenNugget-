@@ -8,7 +8,7 @@ Customize your device with animated wallpapers, disable pesky daemons, and more!
 Make sure you have installed the [requirements](#requirements) if you are on Windows or Linux.
 
 > [!WARNING]
-> You will be need to re-login in your apple ID if using on IOS 27
+> You will need to re-login in your apple ID if using on IOS 27
 
 > [!WARNING]
 > This fork implements a three-phase backup→tweak→restore workflow to prevent data loss on iOS 27. Apple has patched the partial restore method that Nugget uses, so applying tweaks directly now triggers a security response that wipes AppleID, Keychain, Photos and settings. This fork preserves your data by backing it up first, then restoring it after the tweak is applied. **THIS WORKAROUND IS UNSTABLE NOW, I AM NOT RESPONSIBLE FOR ANY DATA LOSS/BOOTLOOP CAUSED BY GOLDENNUGGET.**
@@ -27,6 +27,8 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - See documentation on the structure of tendies and batter files in [documentation.md](documentation.md)
 - Templates: Custom Operations and file editing
   - See documentation on the structure of batter files in [documentation.md](documentation.md)
+- psysbackup: backup system plist
+  - Required to make "reset tweaks" function work without damaging system.
 - Status Bar
   - Change carrier name
   - Change secondary carrier name
