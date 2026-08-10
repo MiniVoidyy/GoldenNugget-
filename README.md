@@ -18,7 +18,7 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
 
 ## Features
 <details>
-<summary>iOS 17.0 - 27.0+</summary>
+<summary>iOS 26.2 - 27.0+</summary>
 
 - PosterBoard: Animated wallpapers and descriptors.
   - Community wallpapers can be found [here][WallpapersWebsite]
@@ -86,42 +86,6 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - PassBook
   - Spotlight
   - Voice Control
-- Risky (Hidden) Options:
-  - Disable thermalmonitord
-</details>
-<details>
-<summary>iOS 17.0 - 26.1</summary>
-
-- Mobile Gestalt:
-  - Enable Dynamic Island on any device
-  - Enable iPadOS on iPhones (use at your own risk)
-  - Enable iPhone X gestures on iPhone SEs
-  - Change Device Model Name (ie what shows in the Settings app)
-  - Enable Boot Chime
-  - Enable Charge Limit
-  - Enable Tap to Wake on unsupported devices (ie iPhone SEs)
-  - Enable Collision SOS
-  - Enable Stage Manager
-  - Disable the Wallpaper Parallax
-  - Disable Region Restrictions (ie. Shutter Sound)
-    - Note: This does not include enabling EU sideloading outside the EU.
-  - Show the Apple Pencil options in Settings app
-  - Show the Action Button options in Settings app
-  - Show Internal Storage info (Might cause problems on some devices, use at your own risk)
-  - Enable iPhone 16 camera button page in the Settings app (iOS 18.0+)
-  - Enable AOD on any device (Warning: this may cause burn in)
-- EU Enabler (iOS 17.6-)
-- Feature Flags:
-  - Enable Kiosk Mode
-  - Disable Liquid Glass/Solarium (iOS 26.0 - 26.1)
-  - Enable lock screen clock animation, lock screen page duplication button, and more!
-  - Disable the new iOS 18 Photos UI (iOS 18.0 betas only, unknown which patched it)
-</details>
-<details>
-<summary>iOS 18.1 - 26.1</summary>
-
-- AI Enabler
-- Device Spoofing
 </details>
 
 ## Requirements:
@@ -167,13 +131,6 @@ python3 main_app.py
 ```
 > [!NOTE]
 > Depending on your system configuration, use either `python/pip` or `python3/pip3`.
-
-## Getting the File
-On iOS 26.1 and below, you may need to get the mobilegestalt file that is specific to your device. To do that, follow these steps:
-1. Install the [Shortcuts][ShortcutsApp] app from the iOS app store.
-2. Download this shortcut: [Save MobileGestalt][MobilegestaltShortcut]
-3. Save the file and share it to your computer.
-4. Place it in the same folder as the python file (or specify the path in the program)
 
 ## Building
 To compile `mainwindow.ui` for Python, run the following command:
