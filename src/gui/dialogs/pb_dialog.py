@@ -10,22 +10,13 @@ from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 from shutil import rmtree
 
 from src.exceptions.nugget_exception import NuggetException
+from src.devicemanagement.constants import is_supported_by_fork
 from src.gui.thread_workers.pb_worker import PBDBThread
 from src.tweaks.tweaks import tweaks, TweakID
-from src.devicemanagement import idevice_tool
-
-BACKUP_RETRIES = 4
-BACKUP_RETRY_DELAY = 15
 
 
 async def backup_posterboard_database(udid: str, update_label=lambda x: None, update_progress=lambda x: None) -> str:
-    """Back up the device and return the extracted PosterBoard sqlite db path.
-
-    Runs the backup in the idevicebackup2 child process when available so a
-    SEGV in its crypto stack cannot take the GUI down. The backup files land
-    directly in the per-device backup folder, matching the layout the
-    Manifest.db lookup below expects.
-    """
+    """Back up the device and return the extracted PosterBoard sqlite db path."""
     app_data_path = path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), 'Backups')
     if not path.exists(app_data_path):
         makedirs(app_data_path)
@@ -38,31 +29,17 @@ async def backup_posterboard_database(udid: str, update_label=lambda x: None, up
             if not path.exists(path.join(backup_folder, file)):
                 needs_full = True
                 break
-    if idevice_tool.available("idevicebackup2") and idevice_tool.use_wrapper():
-        def _backup_progress(value):
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                update_progress(float(value))
-        # After a reboot the device's backupd may not be ready yet and the
-        # mobilebackup2 handshake fails. That is transient — retry it with a
-        # backoff instead of surfacing a hard error (or worse, applying on a
-        # stale database).
-        for attempt in range(BACKUP_RETRIES):
-            try:
-                await asyncio.to_thread(
-                    idevice_tool.backup, udid, backup_folder,
-                    full=needs_full, progress_callback=_backup_progress)
-                break
-            except idevice_tool.ToolError as e:
-                if not idevice_tool.looks_like_transient_failure(str(e)):
-                    raise
-                if attempt >= BACKUP_RETRIES - 1:
-                    raise
-                print(f"Backup handshake failed, retrying in {BACKUP_RETRY_DELAY}s ({attempt + 2}/{BACKUP_RETRIES}): {e}")
-                await asyncio.sleep(BACKUP_RETRY_DELAY)
-    else:
-        service_provider = await create_using_usbmux(serial=udid)
+    service_provider = await create_using_usbmux(serial=udid)
+    try:
+        # hard-block fetching the database from an unsupported (old) iOS version
+        if not is_supported_by_fork(service_provider.all_values.get("ProductVersion", "0.0")):
+            raise NuggetException(
+                "This version of iOS is not supported by this fork.\n\n"
+                "GoldenNugget only supports iOS 26.2 and newer. "
+                "Please use the original Nugget for iOS 26.1 and earlier.")
         async with Mobilebackup2Service(service_provider) as backup_client:
             await backup_client.backup(full=needs_full, backup_directory=app_data_path, progress_callback=update_progress)
+    finally:
         await service_provider.close()
 
     # get the file, reading the sqlite db first to get the file id

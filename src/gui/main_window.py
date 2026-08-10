@@ -10,7 +10,7 @@ from src.controllers.web_request_handler import is_update_available
 from src.controllers.translator import Translator
 import src.controllers.video_handler as video_handler
 
-from src.devicemanagement.constants import Version
+from src.devicemanagement.constants import Version, LEGACY_SUPPORT_ENABLED
 from src.devicemanagement.device_manager import DeviceManager
 
 from src.gui.dialogs import GestaltDialog, UpdateAppDialog
@@ -22,7 +22,7 @@ from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreAp
 from src.tweaks.tweaks import tweaks, TweakID
 
 App_Version = "8.0"
-App_Build = 1
+App_Build = 0
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, device_manager: DeviceManager, translator: Translator):
@@ -120,7 +120,10 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def updateAppVersionLabel(self):
         new_text: str = self.ui.appVersionLbl.text()
-        new_text = new_text.replace("%VERSION", App_Version)
+        version_str = App_Version
+        if LEGACY_SUPPORT_ENABLED:
+            version_str = f"{App_Version} (legacy)"
+        new_text = new_text.replace("%VERSION", version_str)
         if App_Build > 0:
             new_text = new_text.replace("%BETATAG", f"(beta {App_Build})")
         else:

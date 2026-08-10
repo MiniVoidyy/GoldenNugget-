@@ -50,6 +50,13 @@ if not os.path.exists(TENDIE):
 
 pb = tweaks[TweakID.PosterBoard]
 pb.use_configs = True
+
+# A fresh PosterBoard database is fetched from the device via the "Fetch
+# Database File" backup (pb_dialog.backup_posterboard_database) right before
+# the apply in DeviceManager._apply_changes, so no manual fetch is needed.
+# If that fetch fails, config mode raises its own clear error.
+pb.config_manager.update_for_saved_database(dm.get_current_device_udid())
+
 added = pb.add_tendie(TENDIE)
 print("Tendie added:", added, "| descriptors:", pb.get_descriptor_count())
 if not added:

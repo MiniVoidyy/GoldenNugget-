@@ -1,4 +1,9 @@
+import sys
 from enum import Enum
+
+# When launched with --enable-legacy-support, all iOS version restrictions are
+# lifted so the fork can be used on old versions at the user's own risk.
+LEGACY_SUPPORT_ENABLED = "--enable-legacy-support" in sys.argv
 
 class Device:
     def __init__(self, 
@@ -52,8 +57,13 @@ class Device:
         return self.has_exploit()
 
     def is_supported_by_fork(self) -> bool:
-        # this fork only supports iOS 26.2 and newer (the iOS 27 era)
-        return Version(self.version) > Version("26.1")
+        return is_supported_by_fork(self.version)
+
+def is_supported_by_fork(version: str) -> bool:
+    if LEGACY_SUPPORT_ENABLED:
+        return True
+    # this fork only supports iOS 26.2 and newer (the iOS 27 era)
+    return Version(version) > Version("26.1")
 
 class Version:
     def __init__(self, major: int, minor: int = 0, patch: int = 0):

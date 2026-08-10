@@ -26,7 +26,7 @@ import pymobiledevice3.service_connection as _sc
 # Bump SSL handshake timeout from 10s to 60s for all lockdown services.
 _sc.DEFAULT_SSL_HANDSHAKE_TIMEOUT = 60
 
-from src.devicemanagement.constants import Device, Version
+from src.devicemanagement.constants import Device, Version, is_supported_by_fork
 from src.devicemanagement.data_singleton import DataSingleton
 from .preference_manager import PreferenceManager
 
@@ -204,7 +204,9 @@ class DeviceManager:
                 tweaks[TweakID.SpoofCPU].value[0] = "Placeholder"
         else:
             self.data_singleton.current_device = self.devices[index]
-            if Version(self.devices[index].version) < Version("17.0"):
+            if not self.devices[index].is_supported_by_fork():
+                # hard-block old versions (< 26.2): the device is listed so the
+                # user sees it, but every action is refused.
                 self.data_singleton.device_available = False
                 self.data_singleton.gestalt_path = None
             else:
@@ -482,7 +484,16 @@ class DeviceManager:
         ))
     
     ## APPLYING OR REMOVING TWEAKS AND RESTORING
+    def _raise_if_unsupported(self):
+        if not self.get_current_device_is_supported_by_fork():
+            raise NuggetException(QCoreApplication.tr(
+                "This version of iOS is not supported by this fork.\n\n"
+                "GoldenNugget only supports iOS 26.2 and newer. "
+                "Please use the original Nugget for iOS 26.1 and earlier."))
+
     async def start_restore(self, files_to_restore: list[FileToRestore], use_bookrestore: bool, update_label=lambda x: None, skips_br_for_folders: bool=False, reboot_for_br: bool=False):
+        # hard-block any restore on an unsupported (old) iOS version
+        self._raise_if_unsupported()
         # if skips_br_for_folders is True, the message will be added to the result letting them know that they can apply feature flags now
         self.update_label = update_label
         self.do_not_unplug = ""
@@ -592,20 +603,17 @@ class DeviceManager:
         pb = tweaks[TweakID.PosterBoard]
         original_tendies = list(pb.tendies)
         try:
-            if not self.get_current_device_is_supported_by_fork():
-                raise NuggetException(QCoreApplication.tr(
-                    "This version of iOS is not supported by this fork.\n\n"
-                    "GoldenNugget only supports iOS 26.2 and newer. "
-                    "Please use the original Nugget for iOS 26.1 and earlier."))
+            self._raise_if_unsupported()
             update_label(QCoreApplication.tr("Applying changes to files..."))
             if not os.environ.get("GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE"):
                 await self._maybe_capture_originals(update_label)
             device_values = await self._get_lockdown_values()
 
-            # Applying several tendies in a single restore corrupts the
-            # PosterBoard sqlite database (and PosterBoard itself), so split
-            # them up: with N tendies loaded, run N separate restores, one
-            # tendie per restore.
+            # Applying several tendies in a single restore can race
+            # PosterBoard's sqlite regeneration, so split them up: with N
+            # tendies loaded, run N separate restores, one tendie per
+            # restore. Between passes wait so PosterBoard has time to
+            # regenerate its database before the next one is staged on top.
             if len(original_tendies) > 1:
                 passes = [[tendie] for tendie in original_tendies]
             else:
@@ -613,16 +621,12 @@ class DeviceManager:
 
             for pass_idx, tendie_subset in enumerate(passes):
                 if pass_idx > 0:
-                    # the device rebooted after the previous restore — wait for it to return
-                    update_label(QCoreApplication.tr("Waiting for device to reconnect..."))
-                    if not await self._wait_for_device_reconnect():
-                        raise NuggetException(QCoreApplication.tr(
-                            "Failed to reconnect to the device after the previous restore. "
-                            "Please reboot it manually and re-apply the remaining wallpapers."))
+                    update_label(QCoreApplication.tr("Waiting for PosterBoard to regenerate..."))
+                    await asyncio.sleep(50)
                 # fetch a fresh copy of the PosterBoard database before each
                 # tendie so the config manager always builds on the current
-                # state. GOLDENNUGGET_SKIP_PB_BACKUP=1 skips the full
-                # mobilebackup2 backup before the restore.
+                # on-device state. GOLDENNUGGET_SKIP_PB_BACKUP=1 skips the
+                # backup before the restore.
                 if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
                     await self._backup_posterboard_database(update_label, force=True)
                 pb.tendies = tendie_subset
@@ -642,25 +646,6 @@ class DeviceManager:
             close_dl_connection()
             show_alert(final_alert)
 
-    async def _wait_for_device_reconnect(self, timeout: float = 300) -> bool:
-        """Wait for the device to come back after a reboot (between split applies)."""
-        udid = self.get_current_device_udid()
-        if not udid:
-            return False
-        max_timeout = time.time() + timeout
-        connected = False
-        while not connected and time.time() < max_timeout:
-            try:
-                ld = await create_using_usbmux(serial=udid, pair_timeout=timeout)
-                try:
-                    await ld.close()
-                except Exception:
-                    pass
-                connected = True
-            except Exception:
-                await asyncio.sleep(1)
-        return connected
-
     async def _backup_posterboard_database(self, update_label=lambda x: None, force: bool = False):
         """Fetch the device's PosterBoard sqlite database before applying wallpapers.
 
@@ -671,11 +656,11 @@ class DeviceManager:
         fetched copies are only reused when the database is genuinely needed and
         a fresh one isn't required (``force=False``).
 
-        Uses the same mechanism as the "Fetch Database File" wizard (full
-        mobilebackup2 backup + Manifest.db lookup). The backup runs in the
-        idevicebackup2 child process when available so a crash in a C extension
-        cannot kill the GUI. Failure is non-fatal: the apply continues and the
-        config mode surfaces its own clear error later.
+        Uses the same mechanism as the "Fetch Database File" wizard
+        (``backup_posterboard_database`` in ``src/gui/dialogs/pb_dialog.py``),
+        i.e. a full mobilebackup2 backup + Manifest.db lookup. Failure is
+        non-fatal: the apply continues and config mode surfaces its own clear
+        error later.
         """
         udid = self.get_current_device_udid()
         if not udid:
@@ -757,6 +742,7 @@ class DeviceManager:
 
     async def _capture_originals(self, update_label=lambda x: None, show_alert=lambda x: None):
         try:
+            self._raise_if_unsupported()
             udid = self.get_current_device_udid()
             if not udid:
                 raise NuggetException(QCoreApplication.tr("No device connected."))
@@ -1066,11 +1052,7 @@ class DeviceManager:
         asyncio.run(self._reset_tweaks(reset_pages, settings, update_label, show_alert))
     async def _reset_tweaks(self, reset_pages: list[Page], settings: QSettings, update_label=lambda x: None, show_alert=lambda x: None):
         try:
-            if not self.get_current_device_is_supported_by_fork():
-                raise NuggetException(QCoreApplication.tr(
-                    "This version of iOS is not supported by this fork.\n\n"
-                    "GoldenNugget only supports iOS 26.2 and newer. "
-                    "Please use the original Nugget for iOS 26.1 and earlier."))
+            self._raise_if_unsupported()
             # create the restore file list
             files_to_restore: list[FileToRestore] = []
             # Generate backup
