@@ -15,7 +15,7 @@ from src.devicemanagement.device_manager import DeviceManager
 
 from src.gui.dialogs import GestaltDialog, UpdateAppDialog
 from src.gui.dialogs.reset_dialog import ResetDialog
-from src.gui.thread_workers.apply_worker import ApplyThread, ApplyAlertMessage, ConfirmRestoreDoneAlert, RefreshDevicesThread, set_sudo_pwd, set_sudo_complete, get_sudo_pwd, set_restore_ready_complete
+from src.gui.thread_workers.apply_worker import ApplyThread, ApplyAlertMessage, RefreshDevicesThread, set_sudo_pwd, set_sudo_complete, get_sudo_pwd
 from src.gui.pages.pages_list import Page
 from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreApplyMethod
 
@@ -48,11 +48,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.ipadOSAlphaWarningLbl.hide()
         self.ui.featureFlagsPageBtn.hide()
         self.ui.statusBarPageBtn.hide()
+        self.ui.springboardOptionsPageBtn.hide()
         self.ui.internalOptionsPageBtn.hide()
         self.ui.daemonsPageBtn.hide()
         self.ui.templatesPageBtn.hide()
         self.ui.passcodePageBtn.hide()
-        self.ui.miscOptionsBtn.hide()
+        self.ui.tweaksPageBtn.hide()
         self.ui.applyPageBtn.hide()
         self.ui.sidebarDiv1.hide()
         self.ui.sidebarDiv2.hide()
@@ -65,6 +66,7 @@ class MainWindow(QtWidgets.QMainWindow):
             Page.EUEnabler: Pages.Eligibility(window=self, ui=self.ui),
             Page.FeatureFlags: Pages.FeatureFlags(ui=self.ui),
             Page.StatusBar: Pages.StatusBar(ui=self.ui),
+            Page.Springboard: Pages.Springboard(ui=self.ui),
             Page.InternalOptions: Pages.Internal(ui=self.ui),
             Page.LiquidGlass: Pages.LiquidGlass(ui=self.ui),
             Page.Daemons: Pages.Daemons(ui=self.ui),
@@ -97,17 +99,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.featureFlagsPageBtn.clicked.connect(self.on_featureFlagsPageBtn_clicked)
         self.ui.euEnablerPageBtn.clicked.connect(self.on_euEnablerPageBtn_clicked)
         self.ui.statusBarPageBtn.clicked.connect(self.on_statusBarPageBtn_clicked)
+        self.ui.springboardOptionsPageBtn.clicked.connect(self.on_springboardOptionsPageBtn_clicked)
         self.ui.internalOptionsPageBtn.clicked.connect(self.on_internalOptionsPageBtn_clicked)
         self.ui.liquidGlassPageBtn.clicked.connect(self.on_liquidGlassPageBtn_clicked)
         self.ui.daemonsPageBtn.clicked.connect(self.on_daemonsPageBtn_clicked)
         self.ui.posterboardPageBtn.clicked.connect(self.on_posterboardPageBtn_clicked)
         self.ui.templatesPageBtn.clicked.connect(self.on_templatesPageBtn_clicked)
-        self.ui.miscOptionsBtn.clicked.connect(self.on_miscOptionsBtn_clicked)
+        self.ui.tweaksPageBtn.clicked.connect(self.on_tweaksPageBtn_clicked)
         self.ui.applyPageBtn.clicked.connect(self.on_applyPageBtn_clicked)
         self.ui.settingsPageBtn.clicked.connect(self.on_settingsPageBtn_clicked)
 
         ## APPLY PAGE ACTIONS
-        self.ui.applyTweaksBtn.clicked.connect(self.on_applyPageBtn_clicked)
+        self.ui.applyTweaksBtn.clicked.connect(self.on_applyTweaksBtn_clicked)
+        self.ui.revertLastApplyBtn.clicked.connect(self.on_revertLastApplyBtn_clicked)
         self.ui.restartUACBtn.clicked.connect(self.on_restartUACBtn_clicked)
         self.ui.removeTweaksBtn.clicked.connect(self.on_removeTweaksBtn_clicked)
         self.ui.chooseGestaltBtn.clicked.connect(self.on_chooseGestaltBtn_clicked)
@@ -183,12 +187,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.gestaltPageBtn.hide()
             self.ui.featureFlagsPageBtn.hide()
             self.ui.statusBarPageBtn.hide()
+            self.ui.springboardOptionsPageBtn.hide()
             self.ui.internalOptionsPageBtn.hide()
             self.ui.daemonsPageBtn.hide()
             self.ui.templatesPageBtn.hide()
             self.ui.passcodePageBtn.hide()
             self.ui.posterboardPageBtn.hide()
-            self.ui.miscOptionsBtn.hide()
+            self.ui.tweaksPageBtn.hide()
 
             self.ui.sidebarDiv2.hide()
             self.ui.applyPageBtn.hide()
@@ -211,12 +216,13 @@ class MainWindow(QtWidgets.QMainWindow):
             # show all pages
             self.ui.sidebarDiv1.show()
             self.ui.statusBarPageBtn.show()
+            self.ui.springboardOptionsPageBtn.show()
             self.ui.internalOptionsPageBtn.show()
             self.ui.daemonsPageBtn.show()
             self.ui.templatesPageBtn.show()
             self.ui.passcodePageBtn.hide()
             self.ui.posterboardPageBtn.show()
-            self.ui.miscOptionsBtn.show()
+            self.ui.tweaksPageBtn.show()
             
             self.ui.sidebarDiv2.show()
             self.ui.applyPageBtn.show()
@@ -307,6 +313,12 @@ class MainWindow(QtWidgets.QMainWindow):
                         view.show()
                     else:
                         view.hide()
+            # The Status Bar override file is dropped by the iOS 27
+            # safe-state-recovery wipe, so the whole feature is hidden on iOS 27+.
+            if device_ver >= Version("27.0"):
+                self.ui.statusBarPageBtn.hide()
+            else:
+                self.ui.statusBarPageBtn.show()
             if device_ver >= Version("18.0"):
                 # show the other dynamic island options
                 self.ui.dynamicIslandDrp.addItem("2622 (iPhone 16 Pro Dynamic Island)")
@@ -469,6 +481,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.sbScrollArea.verticalScrollBar().setValue(0) # reset scroll to top
         self.ui.pages.setCurrentIndex(Page.StatusBar.value)
 
+    def on_springboardOptionsPageBtn_clicked(self):
+        self.pages[Page.Springboard].load()
+        self.ui.pages.setCurrentIndex(Page.Springboard.value)
+
     def on_internalOptionsPageBtn_clicked(self):
         self.pages[Page.InternalOptions].load()
         self.ui.pages.setCurrentIndex(Page.InternalOptions.value)
@@ -493,8 +509,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pages[Page.Passcode].load()
         self.ui.pages.setCurrentIndex(Page.Passcode.value)
 
-    def on_miscOptionsBtn_clicked(self):
-        self.ui.pages.setCurrentIndex(Page.MiscOptions.value)
+    def on_tweaksPageBtn_clicked(self):
+        self.ui.pages.setCurrentIndex(Page.Tweaks.value)
 
     def on_applyPageBtn_clicked(self):
         self.ui.pages.setCurrentIndex(Page.Apply.value)
@@ -568,6 +584,18 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_applyTweaksBtn_clicked(self):
         self.apply_changes()
 
+    @QtCore.Slot()
+    def on_revertLastApplyBtn_clicked(self):
+        if not self.apply_in_progress:
+            self.apply_in_progress = True
+            self.toggle_thread_btns(disabled=True)
+            self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, revert_last_apply_only=True)
+            self.worker_thread.progress.connect(self.ui.statusLbl.setText)
+            self.worker_thread.alert.connect(self.alert_message)
+            self.worker_thread.finished.connect(self.finish_apply_thread)
+            self.worker_thread.finished.connect(self.worker_thread.deleteLater)
+            self.worker_thread.start()
+
     def capture_originals(self):
         if not self.apply_in_progress:
             self.apply_in_progress = True
@@ -598,18 +626,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 set_sudo_pwd(pwd)
             set_sudo_complete(True)
             return
-        if isinstance(alert, ConfirmRestoreDoneAlert):
-            if log_to_console:
-                print(alert.txt)
-            detailsBox = QtWidgets.QMessageBox()
-            detailsBox.setIcon(QtWidgets.QMessageBox.Information)
-            detailsBox.setWindowTitle(alert.title)
-            detailsBox.setText(alert.txt)
-            detailsBox.setStandardButtons(QtWidgets.QMessageBox.Ok)
-            detailsBox.button(QtWidgets.QMessageBox.Ok).setText(self.tr("Ready"))
-            detailsBox.exec()
-            set_restore_ready_complete(True)
-            return
         if log_to_console:
             print(alert.txt)
         detailsBox = QtWidgets.QMessageBox()
@@ -619,7 +635,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if alert.detailed_txt != None:
             detailsBox.setDetailedText(alert.detailed_txt)
         # hacky workaround to make changes from the apply thread after successfully applying
-        if alert.icon == QtWidgets.QMessageBox.Information:
+        if alert.icon == QtWidgets.QMessageBox.Information and not alert.is_revert:
             if tweaks[TweakID.CreateBRFolders].enabled:
                 tweaks[TweakID.CreateBRFolders].set_enabled(False)
                 self.ui.createEligFolderChk.setChecked(False)
@@ -634,5 +650,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if disabled or not self.apply_in_progress:
             self.ui.applyTweaksBtn.setDisabled(disabled)
             self.ui.removeTweaksBtn.setDisabled(disabled)
+            self.ui.revertLastApplyBtn.setDisabled(disabled)
         if disabled or not self.refresh_in_progress:
             self.ui.refreshBtn.setDisabled(disabled)

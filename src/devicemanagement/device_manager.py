@@ -26,11 +26,16 @@ import pymobiledevice3.service_connection as _sc
 # Bump SSL handshake timeout from 10s to 60s for all lockdown services.
 _sc.DEFAULT_SSL_HANDSHAKE_TIMEOUT = 60
 
+# Temporarily allow writing up to this many PosterBoard tendies in a single
+# restore. Applying more than one tendie at once can race PosterBoard's sqlite
+# regeneration, so the count is capped.
+MAX_TENDIES_PER_RESTORE = 3
+
 from src.devicemanagement.constants import Device, Version, is_supported_by_fork
 from src.devicemanagement.data_singleton import DataSingleton
 from .preference_manager import PreferenceManager
 
-from src.gui.thread_workers.apply_worker import ApplyAlertMessage, ConfirmRestoreDoneAlert, get_restore_ready_complete, set_restore_ready_complete
+from src.gui.thread_workers.apply_worker import ApplyAlertMessage
 from src.gui.pages.pages_list import Page
 from src.controllers.path_handler import fix_windows_path
 from src.controllers.files_handler import get_bundle_files
@@ -595,6 +600,22 @@ class DeviceManager:
         if progress != None:
             prog = f" ({progress:6.1f}% )"
         self.update_label(QCoreApplication.tr("Restoring to device...{0}{1}").format(prog, self.do_not_unplug))
+    def _backup_progress(self, update_label):
+        """Progress callback for backup-driven captures (psysbackup).
+
+        Unlike ``progress_callback`` it does not depend on ``self.update_label``
+        (only set by ``start_restore``), so it is safe to call before any
+        restore has started.
+        """
+        def _cb(progress):
+            if isinstance(progress, str):
+                update_label(progress)
+                return
+            prog = ""
+            if progress != None:
+                prog = f" ({progress:6.1f}% )"
+            update_label(QCoreApplication.tr("Backing up device...{0}").format(prog))
+        return _cb
     def apply_changes(self, update_label=lambda x: None, show_alert=lambda x: None):
         asyncio.run(self._apply_changes(update_label, show_alert))
     async def _apply_changes(self, update_label=lambda x: None, show_alert=lambda x: None):
@@ -607,55 +628,53 @@ class DeviceManager:
             update_label(QCoreApplication.tr("Applying changes to files..."))
             if not os.environ.get("GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE"):
                 await self._maybe_capture_originals(update_label)
+                await self._snapshot_last_apply(update_label)
             device_values = await self._get_lockdown_values()
 
-            # Applying several tendies in a single restore can race
-            # PosterBoard's sqlite regeneration, so split them up: with N
-            # tendies loaded, run N separate restores, one tendie per
-            # restore. Between passes the user confirms the device finished
-            # restoring so PosterBoard has time to regenerate its database
-            # before the next one is staged on top.
-            if len(original_tendies) > 1:
-                passes = [[tendie] for tendie in original_tendies]
-            else:
-                passes = [original_tendies]
-
-            for pass_idx, tendie_subset in enumerate(passes):
-                if pass_idx > 0:
-                    # Ask the user to confirm the device is done restoring
-                    # instead of guessing with a fixed wait time.
-                    set_restore_ready_complete(False)
-                    update_label(QCoreApplication.tr("Waiting for you to confirm the device has finished restoring..."))
-                    show_alert(ConfirmRestoreDoneAlert(
-                        txt=QCoreApplication.tr(
-                            "Wallpaper {0} of {1} applied.\n\n"
-                            "Wait until your device has finished restoring and "
-                            "rebooting, then press Ready to apply the next wallpaper."
-                        ).format(pass_idx + 1, len(passes)),
-                        title=QCoreApplication.tr("Wait for restore to finish")))
-                    while not get_restore_ready_complete():
-                        await asyncio.sleep(0.5)
-                # fetch a fresh copy of the PosterBoard database before each
-                # tendie so the config manager always builds on the current
-                # on-device state. GOLDENNUGGET_SKIP_PB_BACKUP=1 skips the
-                # backup before the restore.
+            if Version(self.get_current_device_version()) >= Version("27.0"):
+                # iOS 27 uses the heavy three-phase protective restore, so all
+                # selected tendies are written in a single restore (capped at
+                # MAX_TENDIES_PER_RESTORE to keep the restore small).
+                pb.tendies = original_tendies[:MAX_TENDIES_PER_RESTORE]
+                # fetch a fresh copy of the PosterBoard database before the
+                # restore so the config manager builds on the current on-device
+                # state. GOLDENNUGGET_SKIP_PB_BACKUP=1 skips the backup.
                 if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
                     await self._backup_posterboard_database(update_label, force=True)
-                # re-capture the original plists before each tendie so the
-                # plist merges build on the current on-device state (the first
-                # restore may have changed them), like the first pass does.
-                if not os.environ.get("GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE"):
-                    await self._maybe_capture_originals(update_label, force=pass_idx > 0)
-                pb.tendies = tendie_subset
-                # PosterBoard templates are only applied with the first
-                # tendie — re-applying them in every split pass would
-                # duplicate them.
                 final_alert, files_to_restore = await self._apply_tweak_pass(
                     update_label,
-                    templates=tweaks[TweakID.Templates].templates if pass_idx == 0 else [],
+                    templates=tweaks[TweakID.Templates].templates,
                     device_values=device_values,
                 )
                 update_label(QCoreApplication.tr("Success!"))
+            else:
+                # iOS 26 and older: apply one tendie per restore (the old
+                # method). Applying several tendies in a single restore can race
+                # PosterBoard's sqlite regeneration, so each tendie gets its own
+                # restore with a wait in between for PosterBoard to regenerate.
+                if len(original_tendies) > 1:
+                    passes = [[tendie] for tendie in original_tendies]
+                else:
+                    passes = [original_tendies]
+                for pass_idx, tendie_subset in enumerate(passes):
+                    if pass_idx > 0:
+                        update_label(QCoreApplication.tr("Waiting for PosterBoard to regenerate..."))
+                        await asyncio.sleep(50)
+                    # fetch a fresh copy of the PosterBoard database before each
+                    # tendie so the config manager builds on the current
+                    # on-device state.
+                    if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
+                        await self._backup_posterboard_database(update_label, force=True)
+                    pb.tendies = tendie_subset
+                    # PosterBoard templates are only applied with the first
+                    # tendie — re-applying them in every split pass would
+                    # duplicate them.
+                    final_alert, files_to_restore = await self._apply_tweak_pass(
+                        update_label,
+                        templates=tweaks[TweakID.Templates].templates if pass_idx == 0 else [],
+                        device_values=device_values,
+                    )
+                    update_label(QCoreApplication.tr("Success!"))
         except Exception as e:
             final_alert = show_apply_error(e, update_label, files_list=files_to_restore)
         finally:
@@ -708,6 +727,80 @@ class DeviceManager:
             update_label(QCoreApplication.tr("Warning: could not back up the PosterBoard database automatically."))
 
     ## ORIGINAL PLIST SAVING
+    async def _snapshot_last_apply(self, update_label=lambda x: None):
+        """Snapshot the plists that are about to be overwritten so the most
+        recent apply can be reverted ("auto-revert").
+
+        The snapshot is stored per device (UDID) and is replaced on every
+        apply, so it always represents the state before the last apply.
+        """
+        udid = self.get_current_device_udid()
+        if not udid:
+            return
+        try:
+            update_label(QCoreApplication.tr("Capturing pre-apply state..."))
+            captured = await psysbackup(
+                udid, self._get_original_plist_paths(), update_label,
+                self._backup_progress(update_label))
+            self.pref_manager.save_last_apply(udid, captured)
+        except Exception as e:
+            print(f"Failed to snapshot pre-apply state: {e}")
+            print(traceback.format_exc())
+            update_label(QCoreApplication.tr(
+                "Warning: could not snapshot the pre-apply state. "
+                "Reverting the last apply may not be possible."))
+
+    def revert_last_apply(self, update_label=lambda x: None, show_alert=lambda x: None):
+        asyncio.run(self._revert_last_apply(update_label, show_alert))
+
+    async def _revert_last_apply(self, update_label=lambda x: None, show_alert=lambda x: None):
+        files_to_restore: list[FileToRestore] = []
+        final_alert = None
+        try:
+            self._raise_if_unsupported()
+            udid = self.get_current_device_udid()
+            if not udid:
+                raise NuggetException(QCoreApplication.tr("No device connected."))
+            snapshot = self.pref_manager.get_last_apply(udid)
+            if not snapshot:
+                raise NuggetException(QCoreApplication.tr(
+                    "No saved state to revert. Apply tweaks first to create a revert point."))
+            update_label(QCoreApplication.tr("Reverting last apply..."))
+            use_bookrestore = self.get_current_device_uses_bookrestore()
+            device_values = await self._get_lockdown_values()
+            uses_domains = False
+            for path, contents in snapshot.items():
+                file_path, domain = self.get_domain_for_path(path, use_bookrestore=use_bookrestore)
+                try:
+                    # Re-materialize the templated snapshot so device-specific
+                    # placeholders (<DeviceName>, ...) get the current values.
+                    contents = plistlib.dumps(materialize_plist(plistlib.loads(contents), device_values))
+                except Exception:
+                    pass
+                files_to_restore.append(FileToRestore(
+                    contents=contents, restore_path=file_path, domain=domain))
+                if domain != "":
+                    uses_domains = True
+            if not use_bookrestore:
+                await self.add_skip_setup(files_to_restore, uses_domains)
+            await self.start_restore(files_to_restore, use_bookrestore, update_label)
+            self.pref_manager.remove_last_apply(udid)
+            update_label(QCoreApplication.tr("Success!"))
+            msg = QCoreApplication.tr("Your tweaks were reverted to the state before the last apply.")
+            if self.pref_manager.auto_reboot:
+                msg += QCoreApplication.tr("\n\nYour device will now restart.\n\nRemember to turn Find My back on!")
+            else:
+                msg += QCoreApplication.tr("\n\nPlease restart your device to see changes.")
+            final_alert = ApplyAlertMessage(
+                txt=QCoreApplication.tr("All done! ") + msg,
+                title=QCoreApplication.tr("Success!"),
+                icon=QMessageBox.Information,
+                is_revert=True)
+        except Exception as e:
+            final_alert = show_apply_error(e, update_label, files_list=files_to_restore)
+        finally:
+            show_alert(final_alert)
+
     async def _get_lockdown_values(self) -> dict:
         udid = self.get_current_device_udid()
         if not udid:
@@ -757,14 +850,11 @@ class DeviceManager:
     def _get_original_plist_paths(self) -> list[str]:
         return [loc.value for loc in FileLocation if loc != FileLocation.mga]
 
-    async def _maybe_capture_originals(self, update_label=lambda x: None, force: bool = False):
-        """Capture original plists so tweaks can merge with untouched settings.
+    async def _maybe_capture_originals(self, update_label=lambda x: None):
+        """Capture original plists on the first apply for this model/build.
 
-        Runs once per device model/build on the first apply unless
-        ``force=True`` (used before each subsequent tendie so the plist merges
-        build on the current on-device state). Skipped when
-        GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE=1 is set. Failure is non-fatal:
-        applying tweaks does not need the originals.
+        Skipped when GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE=1 is set. Failure is
+        non-fatal: applying tweaks does not need the originals.
         """
         if os.environ.get("GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE"):
             return
@@ -777,11 +867,11 @@ class DeviceManager:
             build = all_values.get("BuildVersion", "")
             if not model or not build:
                 return
-            if not force and self.pref_manager.has_any_original_plists(model, build):
+            if self.pref_manager.has_any_original_plists(model, build):
                 return
             update_label(QCoreApplication.tr("Capturing original plists..."))
             templated = await psysbackup(
-                udid, self._get_original_plist_paths(), update_label, self.progress_callback)
+                udid, self._get_original_plist_paths(), update_label, self._backup_progress(update_label))
             for path, data in templated.items():
                 self.pref_manager.save_original_plist(model, build, path, data)
             update_label(QCoreApplication.tr("Original plists saved."))
@@ -807,7 +897,7 @@ class DeviceManager:
                     "Could not read the device model and iOS build."))
             update_label(QCoreApplication.tr("Capturing original plists..."))
             templated = await psysbackup(
-                udid, self._get_original_plist_paths(), update_label, self.progress_callback)
+                udid, self._get_original_plist_paths(), update_label, self._backup_progress(update_label))
             if not templated:
                 raise NuggetException(QCoreApplication.tr(
                     "No original plists were found on the device."))
@@ -1159,6 +1249,10 @@ class DeviceManager:
                         domain="HomeDomain"
                     ))
                     uses_domains = True
+                elif page == Page.Springboard:
+                    ## SPRINGBOARD
+                    files_to_null.append(FileLocation.springboard.value)
+                    files_to_null.append(FileLocation.uikit.value)
                 elif page == Page.Daemons:
                     ## DAEMONS
                     default_daemons = {

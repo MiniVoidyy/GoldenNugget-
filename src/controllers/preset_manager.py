@@ -199,6 +199,7 @@ class PresetManager:
         tweak_loader.load_eligibility(None)
         tweak_loader.load_featureflags()
         tweak_loader.load_internal()
+        tweak_loader.load_springboard()
         tweak_loader.load_liquidglass()
         tweak_loader.load_daemons()
 

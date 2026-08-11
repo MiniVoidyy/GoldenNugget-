@@ -16,7 +16,7 @@ class Page(Enum):
     Templates = 10
     Passcode = 11
     RiskyTweaks = 12
-    MiscOptions = 13
+    Tweaks = 13
     Apply = 14
     Settings = 15
 
@@ -35,7 +35,7 @@ class Page(Enum):
             "Templates",
             "Passcode",
             "Resolution Modifications",
-            "Miscellaneous",
+            "Tweaks",
             "Apply",
             "Settings"
         ]
@@ -43,7 +43,12 @@ class Page(Enum):
 
 def get_resettable_pages(device_manager) -> list[Page]:
     device_ver = Version(device_manager.get_current_device_version())
-    page_list: list[Page] = [Page.StatusBar, Page.InternalOptions, Page.Daemons]
+    page_list: list[Page] = [Page.StatusBar, Page.Springboard, Page.InternalOptions, Page.Daemons]
+
+    # Status Bar overrides don't survive the iOS 27 safe-state-recovery wipe,
+    # so the feature is hidden on iOS 27+ and nothing can be reset for it.
+    if device_ver >= Version("27.0"):
+        page_list.remove(Page.StatusBar)
 
     # add the exploit related pages
     if device_ver >= Version("18.0") and not device_manager.get_current_device_patched():

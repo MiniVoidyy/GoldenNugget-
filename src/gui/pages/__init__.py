@@ -4,6 +4,7 @@ from .tools.gestalt import GestaltPage as MobileGestalt
 from .tools.eligibility import EligibilityPage as Eligibility
 from .tools.featureflags import FeatureFlagsPage as FeatureFlags
 from .tools.status_bar import StatusBarPage as StatusBar
+from .tools.springboard import SpringboardPage as Springboard
 from .tools.internal import InternalPage as Internal
 from .tools.liquidglass import LiquidGlassPage as LiquidGlass
 from .tools.daemons import DaemonsPage as Daemons

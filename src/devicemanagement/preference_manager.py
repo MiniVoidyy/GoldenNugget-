@@ -114,6 +114,28 @@ class PreferenceManager:
             if key.startswith(prefix):
                 settings.remove(key)
 
+    # Last Apply Snapshot (for reverting the most recent apply)
+    def get_last_apply_prefs(self) -> QSettings:
+        return Settings("Last Apply")
+
+    def save_last_apply(self, udid: str, files: dict):
+        self.get_last_apply_prefs().setValue(udid, files)
+
+    def get_last_apply(self, udid: str) -> Optional[dict]:
+        settings = self.get_last_apply_prefs()
+        if not settings.contains(udid):
+            return None
+        data = settings.value(udid)
+        if data is None:
+            return None
+        return {str(k): bytes(v) for k, v in data.items()}
+
+    def has_last_apply(self, udid: str) -> bool:
+        return self.get_last_apply_prefs().contains(udid)
+
+    def remove_last_apply(self, udid: str):
+        self.get_last_apply_prefs().remove(udid)
+
     # PosterBoard Configuration Database Saving
     def get_pbconfigs_prefs() -> QSettings:
         return Settings("PB Configs")

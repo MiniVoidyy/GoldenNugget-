@@ -16,17 +16,21 @@ settings). To keep user data alive, the three-phase flow in restore.py does:
       back to the device after the security recovery.
 
 Protective scope: HomeDomain/{Accounts, ConfigurationProfiles, Preferences,
-Library/SpringBoard} (Apple ID + user settings + home screen layout) and,
-optionally, CameraRollDomain + MediaDomain (photos). KeychainDomain is
+Library/SpringBoard} (Apple ID + user settings + home screen layout),
+Library/ControlCenter (Control Center module layout), and, optionally,
+CameraRollDomain + MediaDomain (photos). KeychainDomain is
 intentionally excluded: enabling backup encryption is slow and keychain data
 is not needed for tweak functionality.
 """
 
 import asyncio
+import hashlib
 import os
+import plistlib
 import shutil
 import sqlite3
 import struct
+import time
 import uuid as _uuid
 import warnings
 import traceback
@@ -82,10 +86,18 @@ SPRINGBOARD_PATH_PREFIXES = (
     "Library/SpringBoard",
 )
 
+# Path prefixes within HomeDomain holding the Control Center module layout
+# (Library/ControlCenter/ModuleConfiguration.plist). Not part of the
+# "user settings" prefix above, so it must be listed explicitly — otherwise
+# the iOS 27 wipe resets Control Center to its default modules.
+CONTROL_CENTER_PATH_PREFIXES = (
+    "Library/ControlCenter",
+)
+
 # Files/dirs inside the protective HomeDomain scope that tweaks write
 # themselves — restoring the stale copies would undo the applied tweaks.
 _SKIP_PATH_PREFIXES = (
-    "Library/SpringBoard/statusBarOverrides",  # Status Bar tweak writes here
+    "Library/SpringBoard/statusBarOverrides",  # Not captured stale; re-injected with fresh tweak content
 )
 
 # Files iOS manages internally and rejects if included in a sparse backup
@@ -106,7 +118,8 @@ def _is_protective_file(domain: str, relative_path: str, include_photos: bool = 
         if relative_path.startswith(_SKIP_PATH_PREFIXES):
             return False
         return (relative_path.startswith(APPLE_ID_PATH_PREFIXES)
-                or relative_path.startswith(SPRINGBOARD_PATH_PREFIXES))
+                or relative_path.startswith(SPRINGBOARD_PATH_PREFIXES)
+                or relative_path.startswith(CONTROL_CENTER_PATH_PREFIXES))
     if include_photos and domain in PROTECTIVE_DOMAINS:
         return True
     return False
@@ -547,3 +560,147 @@ def clean_backup_for_restore(backup_dir: "str | Path", udid: str,
             d.rmdir()
 
     return removed_rows, removed_files
+
+
+def _build_mbfile_blob(relative_path: str, contents: bytes, mode: int = 33188,
+                       owner: int = 501, group: int = 501) -> bytes:
+    """Build a ``MBFile`` archive blob for an injected backup file.
+
+    Matches the NSKeyedArchiver structure BackupAgent2 writes to the
+    ``file`` column of Manifest.db: an ``MBFile`` object carrying the file's
+    metadata plus a ``Digest`` (SHA1 of the payload) and the data-protection
+    extended attribute. Mode/ownership mirror a regular mobile-owned
+    HomeDomain file; the extended attribute marks the file as exempt from
+    data protection by SpringBoard (same as IconState.plist and friends).
+    """
+    now = int(time.time())
+    extended_attributes = plistlib.dumps(
+        {"com.apple.dataprotection.policy.exception-applied-by": b"com.apple.springboard"},
+        fmt=plistlib.FMT_BINARY,
+    )
+    objects = [
+        "$null",
+        {
+            "Birth": now,
+            "LastModified": now,
+            "LastStatusChange": now,
+            "Flags": 0,
+            "GroupID": group,
+            "UserID": owner,
+            "Mode": mode,
+            "ProtectionClass": 4,
+            "Size": len(contents),
+            "RelativePath": plistlib.UID(2),
+            "Digest": plistlib.UID(3),
+            "ExtendedAttributes": plistlib.UID(4),
+            "$class": plistlib.UID(5),
+        },
+        relative_path,
+        hashlib.sha1(contents).digest(),
+        extended_attributes,
+        {"$classname": "MBFile", "$classes": ["MBFile", "NSObject"]},
+    ]
+    return plistlib.dumps(
+        {
+            "$version": 100000,
+            "$archiver": "NSKeyedArchiver",
+            "$top": {"root": plistlib.UID(1)},
+            "$objects": objects,
+        },
+        fmt=plistlib.FMT_BINARY,
+    )
+
+
+def _patch_donor_blob(donor_blob: bytes, relative_path: str, contents: bytes,
+                      mode: Optional[int] = None, owner: Optional[int] = None,
+                      group: Optional[int] = None) -> bytes:
+    """Re-target a real MBFile blob from the same backup for a new payload.
+
+    Cloning a row the device itself produced guarantees byte-exact metadata
+    (extended attributes, protection class) instead of risking a hand-built
+    archive the restore agent might reject. Only the path, digest, size and
+    (optionally) mode/ownership change.
+    """
+    blob = plistlib.loads(donor_blob)
+    objects = blob["$objects"]
+    info = objects[1]
+    objects[info["RelativePath"]] = relative_path
+    objects[info["Digest"]] = hashlib.sha1(contents).digest()
+    info["Size"] = len(contents)
+    if mode is not None:
+        info["Mode"] = mode
+    if owner is not None:
+        info["UserID"] = owner
+    if group is not None:
+        info["GroupID"] = group
+    return plistlib.dumps(blob, fmt=plistlib.FMT_BINARY)
+
+
+def inject_file_into_backup(backup_dir: "str | Path", udid: str, domain: str,
+                            relative_path: str, contents: bytes,
+                            mode: Optional[int] = None,
+                            owner: Optional[int] = None,
+                            group: Optional[int] = None) -> bool:
+    """Add a file to a pruned backup's Manifest.db and payload store.
+
+    The iOS 27 "safe state recovery" wipe clears HomeDomain files that were
+    staged by the sparse restore but are absent from the protective backup.
+    Files the tweak writes can therefore be re-added here with their *new*
+    content so Phase 3's mobilebackup2 restore lays them down natively (AFC
+    cannot reach HomeDomain, so that is the only reliable path on iOS 27).
+
+    The file ID follows the standard ``SHA1("<domain>-<relativePath>")``
+    convention and the payload is placed in the ``<aa>/<fileID>`` layout the
+    restore agent expects. Returns True when the file was added.
+    """
+    device_dir = Path(backup_dir) / udid
+    if not device_dir.is_dir():
+        # Tolerate backup_dir already pointing at the device directory.
+        if (Path(backup_dir) / "Manifest.db").exists():
+            device_dir = Path(backup_dir)
+        else:
+            return False
+
+    manifest_db = device_dir / "Manifest.db"
+    if not manifest_db.exists():
+        return False
+
+    file_id = hashlib.sha1(f"{domain}-{relative_path}".encode("utf-8")).hexdigest()
+
+    conn = sqlite3.connect(str(manifest_db))
+    try:
+        flags, blob = 1, None
+        # Clone a surviving regular-file row (directory rows lack Digest and
+        # ExtendedAttributes) that carries both, so the patched blob stays
+        # byte-compatible with what the restore agent wrote.
+        for candidate_flags, candidate_blob in conn.execute(
+            "SELECT flags, file FROM Files WHERE domain = ? AND file IS NOT NULL "
+            "AND relativePath != ? AND flags = 1",
+            (domain, relative_path),
+        ):
+            try:
+                info = plistlib.loads(candidate_blob)["$objects"][1]
+                if "Digest" in info and "ExtendedAttributes" in info:
+                    flags, blob = candidate_flags, candidate_blob
+                    break
+            except Exception:
+                continue
+        if blob is None:
+            blob = _build_mbfile_blob(
+                relative_path, contents,
+                mode=mode or 33188, owner=owner or 501, group=group or 501)
+        else:
+            blob = _patch_donor_blob(
+                blob, relative_path, contents, mode, owner, group)
+        payload = device_dir / file_id[:2] / file_id
+        payload.parent.mkdir(parents=True, exist_ok=True)
+        payload.write_bytes(contents)
+        conn.execute(
+            "INSERT OR REPLACE INTO Files (fileID, domain, relativePath, flags, file) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (file_id, domain, relative_path, flags, sqlite3.Binary(blob)),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return True

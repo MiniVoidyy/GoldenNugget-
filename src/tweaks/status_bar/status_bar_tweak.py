@@ -12,6 +12,11 @@ class StatusBarTweak(Tweak):
 
     def apply_tweak(self, files_to_restore: list[FileToRestore]):
         if self.enabled:
+            # TEMPORARY: Status Bar overrides are disabled until the iOS 27
+            # wipe-survival fix (backup injection) is verified working — on
+            # iOS 27 the staged override is currently dropped by the
+            # safe-state-recovery wipe. Remove this early return to re-enable.
+            return
             files_to_restore.append(FileToRestore(
                 contents=self.setter.get_data(),
                 restore_path="/Library/SpringBoard/statusBarOverrides",

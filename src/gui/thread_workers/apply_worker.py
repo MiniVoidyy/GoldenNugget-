@@ -7,7 +7,6 @@ from src.gui.pages.pages_list import Page
 # Global Vars
 sudo_pwd = None # reset this variable whenever it is used
 sudo_action_complete = False
-restore_ready_complete = False
 def get_sudo_pwd() -> Optional[str]:
     pre_reset = sudo_pwd
     set_sudo_pwd(None)
@@ -21,24 +20,14 @@ def set_sudo_complete(isComplete: bool):
 def set_sudo_pwd(pwd: Optional[str]):
     global sudo_pwd
     sudo_pwd = pwd
-def get_restore_ready_complete() -> bool:
-    return restore_ready_complete
-def set_restore_ready_complete(isComplete: bool):
-    global restore_ready_complete
-    restore_ready_complete = isComplete
 
 class ApplyAlertMessage:
-    def __init__(self, txt: str, title: str = "Error!", icon = QMessageBox.Critical, detailed_txt: str = None):
+    def __init__(self, txt: str, title: str = "Error!", icon = QMessageBox.Critical, detailed_txt: str = None, is_revert: bool = False):
         self.txt = txt
         self.title = title
         self.icon = icon
         self.detailed_txt = detailed_txt
-
-class ConfirmRestoreDoneAlert(ApplyAlertMessage):
-    """Special alert that asks the user to press Ready once the device has
-    finished restoring before the next wallpaper is applied."""
-    def __init__(self, txt: str, title: str = "Wait for restore to finish"):
-        super().__init__(txt=txt, title=title, icon=QMessageBox.Information)
+        self.is_revert = is_revert
 
 class ApplyThread(QThread):
     progress = Signal(str)
@@ -53,15 +42,19 @@ class ApplyThread(QThread):
     def alert_window(self, msg: ApplyAlertMessage):
         self.alert.emit(msg)
     
-    def __init__(self, manager, settings: QSettings, reset_pages: Optional[list[Page]] = None, capture_only: bool = False):
+    def __init__(self, manager, settings: QSettings, reset_pages: Optional[list[Page]] = None, capture_only: bool = False, revert_last_apply_only: bool = False):
         super().__init__()
         self.manager = manager
         self.settings = settings
         self.reset_pages = reset_pages
         self.capture_only = capture_only
+        self.revert_last_apply_only = revert_last_apply_only
 
     def do_work(self):
-        if self.capture_only:
+        if self.revert_last_apply_only:
+            # reverting the last apply (auto-revert)
+            self.manager.revert_last_apply(self.update_label, self.alert_window)
+        elif self.capture_only:
             # saving the original plists
             self.manager.capture_originals(self.update_label, self.alert_window)
         elif self.reset_pages == None:

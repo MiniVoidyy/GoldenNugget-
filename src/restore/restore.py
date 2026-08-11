@@ -8,7 +8,11 @@ import time
 
 from . import backup, perform_restore, reboot_device
 from .mbdb import _FileMode
-from .protective import clean_backup_for_restore, perform_protective_backup
+from .protective import (
+    clean_backup_for_restore,
+    inject_file_into_backup,
+    perform_protective_backup,
+)
 from pymobiledevice3.lockdown import LockdownClient, create_using_usbmux
 from pymobiledevice3.services.installation_proxy import InstallationProxyService
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
@@ -160,6 +164,15 @@ _PHASE_TWEAK_END = 60
 # Erase All Contents) → full boot can take several minutes.
 _RECONNECT_TIMEOUT = 20 * 60
 
+# HomeDomain tweak files. They are injected into the protective backup after
+# pruning (with the freshly-applied tweak content) so Phase 3's mobilebackup2
+# restore writes them back after the wipe cleared the sparse restore's copy.
+# AFC cannot reach HomeDomain on iOS 27 — ``com.apple.afc`` only exposes the
+# media directory — so backup injection is the one reliable path.
+_HOME_DOMAIN_TWEAK_PATHS = (
+    "Library/SpringBoard/statusBarOverrides",  # Status Bar tweak
+)
+
 
 def _scaled_callback(progress_callback, lo: float, hi: float):
     """Map pymobiledevice3's raw 0-100 progress into the [lo, hi] range.
@@ -190,7 +203,7 @@ async def _wait_for_device(udid: str, progress_callback,
     """
     from pymobiledevice3.exceptions import (
         DeviceNotFoundError, PasswordRequiredError, NotPairedError,
-        ConnectionFailedError,
+        ConnectionFailedError, ConnectionTerminatedError,
     )
     start = time.monotonic()
     deadline = start + timeout
@@ -205,7 +218,8 @@ async def _wait_for_device(udid: str, progress_callback,
         try:
             return await create_using_usbmux(serial=udid, autopair=True)
         except (DeviceNotFoundError, PasswordRequiredError, NotPairedError,
-                ConnectionFailedError, ConnectionError, OSError,
+                ConnectionFailedError, ConnectionTerminatedError,
+                ConnectionError, OSError,
                 asyncio.TimeoutError) as e:
             last_error = e
         if time.monotonic() + delay > deadline:
@@ -301,6 +315,23 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
         )
         print(f"[iOS27] Protective backup pruned: "
               f"-{removed_rows} manifest rows, -{removed_files} payload files")
+
+        # Re-inject the HomeDomain tweak files into the pruned backup so Phase
+        # 3 restores their *fresh* content. The wipe can drop the copy the
+        # sparse restore (Phase 2) stages, and these paths are intentionally
+        # excluded from the backup so a stale on-device copy never overwrites
+        # the tweak — injecting the new content covers both cases. AFC cannot
+        # reach HomeDomain on iOS 27, so this is the only reliable path.
+        for file in back.files:
+            if (isinstance(file, backup.ConcreteFile)
+                    and file.domain == "HomeDomain"
+                    and file.path in _HOME_DOMAIN_TWEAK_PATHS):
+                inject_file_into_backup(
+                    backup_root, udid, file.domain, file.path,
+                    file.read_contents(),
+                    mode=_FileMode.S_IFREG | int(file.mode),
+                    owner=file.owner, group=file.group)
+
         progress_callback(_PHASE_BACKUP_END)
 
         # === Phase 2: apply tweaks → reboot (40-60%) ===

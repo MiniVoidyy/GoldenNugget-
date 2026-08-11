@@ -1,7 +1,7 @@
 from enum import Enum, auto
 
 class TweakID(Enum):
-    # misc pages
+    # tweaks page
     PosterBoard = auto()
     Templates = auto()
     StatusBar = auto()

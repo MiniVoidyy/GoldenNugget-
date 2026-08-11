@@ -22,5 +22,5 @@ tweaks = {
     TweakID.Passcode: PasscodeThemeTweak(),
 
     ## Creating the folders for BookRestore
-    TweakID.CreateBRFolders: BookRestoreFileTweak()
+    TweakID.CreateBRFolders: BookRestoreFileTweak(),
 }
