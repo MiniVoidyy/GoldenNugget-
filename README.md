@@ -22,7 +22,6 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
 
 - PosterBoard: Animated wallpapers and descriptors.
   - Community wallpapers can be found [here][WallpapersWebsite]
-  - Converting videos to wallpapers
   - Customizing community-made wallpapers via batter files
   - See documentation on the structure of tendies and batter files in [documentation.md](documentation.md)
 - Templates: Custom Operations and file editing
@@ -51,7 +50,7 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - Show Supervision Text on Lock Screen
   - Show Dynamic Island in Screenshots
   - Enable AirPlay support for Stage Manager
-  - Show Red/Green Authentication Line on Lock Screen (See [this issue](https://github.com/leminlimez/Nugget/issues/656) for what it looks like)
+  - Show Red/Green Authentication Line on Lock Screen (See [this issue](https://github.com/leminlimez/Nugget/issues/656) for what it looks like)miscellaneous
   - Disable Floating Tab Bar on iPads
 - Internal Options
   - Enabling Key Flick (iPad-style keyboard) on iPhones (iOS 26.0-)
