@@ -29,7 +29,7 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - See documentation on the structure of batter files in [documentation.md](documentation.md)
 - psysbackup: backup system plist
   - Required to make "reset tweaks" function work without damaging system.
-- Status Bar
+- Status Bar (broken on IOS 27 rn)
   - Change carrier name
   - Change secondary carrier name
   - Enable/Disable the primary or secondary carriers
