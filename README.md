@@ -155,7 +155,7 @@ The application itself can be compiled by running `compile.py`.
 
 ## Credits
 - Translations crowdsourced using [POEditor][POEditorJoin]. Thank you everyone who assisted in the translation effort!
-- [Wind0ws11Aero] for IOS 27 Support and PosterBoard on IOS 26.5+
+- [Wind0ws11Aero] for IOS 27 Support
 - [PosterRestore][PosterRestoreDiscord] for their help with PosterBoard
   - Special thanks to [dootskyre][dootskyreX], [Middo][MiddoX], [dulark][dularkGitHub], forcequitOS, and pingubow for their work on this. It would not have been possible without them!
   - Thanks to [Snoolie for aar handling][python-aar-stuffGitHub]!
