@@ -152,6 +152,9 @@ pyside6-lrelease src/qt/translations/Nugget_{language code}.ts -qm src/qt/transl
 
 The application itself can be compiled by running `compile.py`.
 
+# Contributing
+See [CONTRIBUTING.md](https://github.com/awesomenull-dev/GoldenNugget/blob/main/CONTRIBUTING.md)
+
 ## Credits
 - Translations crowdsourced using [POEditor][POEditorJoin]. Thank you everyone who assisted in the translation effort!
 - [Wind0ws11Aero] for IOS 27 Support
