@@ -89,6 +89,15 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - Voice Control
 </details>
 
+## Arbitrary Star Graph
+<a href="https://www.star-history.com/#awesomenull-dev/GoldenNugget&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=leminlimez/Nugget&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=leminlimez/Nugget&type=Date" />
+    <img alt="Star History" src="https://api.star-history.com/svg?repos=leminlimez/Nugget&type=Date" />
+  </picture>
+</a>
+
 ## Requirements:
 <details>
 <summary>Windows</summary>
