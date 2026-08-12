@@ -11,7 +11,7 @@ And as i said already if there is NO EVIDENCE of work, your PR will be auto-reje
 About bug fixes.\
 This fixes shouldn't cause more bugs. Even trough nugget was ALWAYS really unstable in long perspective\
 I still want to have normal stability\
-Thats all.
+That's all.
 ## 3. New Features
 # 1. QOL (goldennugget app features)
 New features should NOT be useless.\
@@ -43,4 +43,4 @@ To keep the repository history clean and easy to read, please use the following 
 If your PR does not follow this format, you may be asked to rename it before it gets reviewed.
 # end
 That's all, i hope this guideline was useful.\
-You can leave you opinion about it in Discostions 
+You can leave you opinion about it in discussion
