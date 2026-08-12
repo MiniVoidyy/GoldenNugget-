@@ -508,22 +508,40 @@ async def perform_keychain_appleid_backup(
     completes, giving the user a complete encrypted backup they can restore
     from if anything goes wrong.
 
-    NOTE: Backup encryption must be enabled on the device beforehand
-    (Settings > General > Transfer or Reset iPhone > Backup Password).
-    If not enabled, keychain data will NOT be included in the backup.
+    Encryption is temporarily enabled with a random password, then disabled
+    after the backup completes — no user interaction required.
 
     Returns True if the backup was created successfully.
     """
     if progress_callback is None:
         progress_callback = lambda x: None
 
+    import secrets
+    temp_password = secrets.token_urlsafe(32)
+
     progress_callback("Creating encrypted keychain + Apple ID backup...")
 
     async with ProtectiveBackupService(lockdown_client) as mb:
+        # Temporarily enable backup encryption
+        progress_callback("Enabling backup encryption...")
+        try:
+            await mb.change_password(new=temp_password)
+            print("[KeychainBackup] Backup encryption enabled")
+        except Exception as e:
+            print(f"[KeychainBackup] Failed to enable encryption: {e}")
+            progress_callback("Failed to enable encryption")
+            return False
+
         is_encrypted = await mb.get_will_encrypt()
         if not is_encrypted:
-            print("[KeychainBackup] Warning: backup is NOT encrypted — keychain data will not be included! "
-                  "Enable backup password in Settings > General > Transfer or Reset iPhone > Backup Password")
+            print("[KeychainBackup] Warning: backup is NOT encrypted after enabling!")
+            progress_callback("Encryption not active")
+            # Try to disable anyway
+            try:
+                await mb.change_password(old=temp_password, new="")
+            except Exception:
+                pass
+            return False
 
         # We want ONLY KeychainDomain + HomeDomain (Apple ID + profiles)
         # So we use a selective preserve callback that keeps only those.
@@ -558,6 +576,15 @@ async def perform_keychain_appleid_backup(
 
         await mb.backup(full=True, backup_directory=backup_root,
                         progress_callback=progress_callback)
+
+        # Disable encryption after backup
+        progress_callback("Disabling backup encryption...")
+        try:
+            await mb.change_password(old=temp_password, new="")
+            print("[KeychainBackup] Backup encryption disabled")
+        except Exception as e:
+            print(f"[KeychainBackup] Failed to disable encryption: {e}")
+            # Don't fail the whole operation if disable fails
 
     progress_callback("Encrypted keychain + Apple ID backup complete")
     return True
