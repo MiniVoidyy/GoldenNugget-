@@ -12,6 +12,7 @@ from .mbdb import _FileMode
 from .protective import (
     clean_backup_for_restore,
     inject_file_into_backup,
+    perform_keychain_appleid_backup,
     perform_protective_backup,
 )
 from pymobiledevice3.lockdown import LockdownClient, create_using_usbmux
@@ -152,13 +153,17 @@ def has_sparserestore_capability(lockdown_client: LockdownClient = None) -> bool
     return minor == 0
 
 
-# --- iOS 27+ three-phase restore -------------------------------------------
+# --- iOS 27+ four-phase restore --------------------------------------------
 #
 # Progress is mapped into per-phase ranges so the GUI bar never jumps
-# backwards: Phase 1 (protective backup) 0-40, Phase 2 (sparse restore +
-# reboot) 40-60, Phase 3 (reconnect + protective restore) 60-100.
-_PHASE_BACKUP_END = 40
-_PHASE_TWEAK_END = 60
+# backwards:
+#   Phase 1 (protective backup):        0-35
+#   Phase 2 (sparse restore + reboot):  35-55
+#   Phase 3 (reconnect + restore):      55-90
+#   Phase 4 (encrypted keychain backup): 90-100
+_PHASE_BACKUP_END = 35
+_PHASE_TWEAK_END = 55
+_PHASE_RESTORE_END = 90
 
 # How long to wait for the device to come back after the iOS 27 security
 # recovery before giving up. Apple logo → reboot → progress bar (like
@@ -391,6 +396,8 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
 
     Retries while SpringBoard / mobilebackup2 are still coming up after the
     security recovery (they can take minutes on iOS 27).
+
+    The progress_callback is already pre-scaled by the caller.
     """
     max_retries = 12
     for attempt in range(1, max_retries + 1):
@@ -401,8 +408,7 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
                     system=True, copy=True, remove=False,
                     reboot=reboot, source=udid,
                     skip_apps=True,
-                    progress_callback=_scaled_callback(
-                        progress_callback, _PHASE_TWEAK_END + 10, 100),
+                    progress_callback=progress_callback,
                 )
             return
         except (PyMobileDevice3Exception, ConnectionTerminatedError,
@@ -417,17 +423,22 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
 
 async def _restore_ios27(back: backup.Backup, reboot: bool,
                          lockdown_client: LockdownClient, progress_callback):
-    """iOS 27+ three-phase restore: backup → tweak → reboot → restore.
+    """iOS 27+ four-phase restore: backup → tweak → reboot → restore → keychain backup.
 
-    Phase 1 (0-40%):  Selective backup of photos, Apple ID, and user
+    Phase 1 (0-35%):  Selective backup of photos, Apple ID, and user
                       settings. Non-protective data is discarded mid-stream,
                       so no multi-GB full backup ever hits the disk.
                       (KeychainDomain is skipped — enabling backup
                       encryption is slow and not needed for tweaks.)
-    Phase 2 (40-60%): Apply tweaks via sparse restore → reboot, which
+    Phase 2 (35-55%): Apply tweaks via sparse restore → reboot, which
                       triggers the iOS 27 "safe state recovery" wipe.
-    Phase 3 (60-100%): Reconnect and restore the pruned Phase 1 backup so
+    Phase 3 (55-90%): Reconnect and restore the pruned Phase 1 backup so
                       user data survives the wipe.
+    Phase 4 (90-100%): Encrypted backup of KeychainDomain + HomeDomain
+                      (Apple ID accounts, ConfigurationProfiles, preferences).
+                      This gives the user a complete encrypted backup they can
+                      restore from if anything goes wrong. Requires device
+                      passcode for encryption.
     """
     udid = lockdown_client.udid
     protective_dir = tempfile.mkdtemp(prefix="nugget_protective_")
@@ -435,7 +446,7 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
     os.makedirs(backup_root, exist_ok=True)
     backup_complete = False
     try:
-        # === Phase 1: selective protective backup (0-40%) ===
+        # === Phase 1: selective protective backup (0-35%) ===
         progress_callback(0)
         await perform_protective_backup(
             lockdown_client, backup_root,
@@ -483,7 +494,7 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
 
         progress_callback(_PHASE_BACKUP_END)
 
-        # === Phase 2: apply tweaks → reboot (40-60%) ===
+        # === Phase 2: apply tweaks → reboot (35-55%) ===
         try:
             await perform_restore(
                 backup=back, reboot=True,
@@ -497,7 +508,7 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
             pass
         progress_callback(_PHASE_TWEAK_END)
 
-        # === Phase 3: reconnect + restore protective backup (60-100%) ===
+        # === Phase 3: reconnect + restore protective backup (55-90%) ===
         lc = await _wait_for_device(udid, progress_callback)
         try:
             # SpringBoard may still be launching after a fresh boot; the
@@ -506,13 +517,31 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
             progress_callback("Waiting for SpringBoard to finish launching...")
             await asyncio.sleep(10)
             await _restore_protective_backup(
-                lc, backup_root, udid, reboot, progress_callback)
+                lc, backup_root, udid, reboot,
+                _scaled_callback(progress_callback, _PHASE_TWEAK_END, _PHASE_RESTORE_END))
         finally:
             try:
                 await lc.close()
             except Exception:
                 # Connection may already be severed by the final reboot.
                 pass
+
+        # === Phase 4: encrypted keychain + Apple ID backup (90-100%) ===
+        progress_callback(_PHASE_RESTORE_END)
+        keychain_dir = os.path.join(protective_dir, "keychain_backup")
+        os.makedirs(keychain_dir, exist_ok=True)
+        try:
+            # Reconnect for the keychain backup (Phase 3's connection is closed)
+            lc4 = await _wait_for_device(udid, progress_callback, timeout=60)
+            await perform_keychain_appleid_backup(
+                lc4, keychain_dir,
+                progress_callback=_scaled_callback(progress_callback, _PHASE_RESTORE_END, 100))
+            await lc4.close()
+            print(f"[iOS27] Phase 4 complete: encrypted keychain backup at {keychain_dir}")
+        except Exception as e:
+            # Phase 4 is best-effort — don't fail the whole restore if it fails.
+            print(f"[iOS27] Phase 4 (keychain backup) failed: {e}")
+            progress_callback("Keychain backup failed (non-fatal)")
     except Exception as e:
         if backup_complete:
             # Phase 1 succeeded but a later phase failed: keep the backup

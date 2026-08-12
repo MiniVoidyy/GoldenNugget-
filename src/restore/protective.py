@@ -494,6 +494,75 @@ async def perform_protective_backup(
     return is_encrypted
 
 
+async def perform_keychain_appleid_backup(
+    lockdown_client: LockdownClient,
+    backup_root: str,
+    progress_callback=None,
+) -> bool:
+    """Phase 4: Create an ENCRYPTED backup containing KeychainDomain + HomeDomain
+    (Apple ID accounts, ConfigurationProfiles, user settings).
+
+    This backup is encrypted so the keychain data is actually usable. The
+    protective backup (Phase 1) intentionally skips KeychainDomain because
+    enabling backup encryption is slow. This phase runs AFTER the three-phase flow
+    completes, giving the user a complete encrypted backup they can restore
+    from if anything goes wrong.
+
+    NOTE: Backup encryption must be enabled on the device beforehand
+    (Settings > General > Transfer or Reset iPhone > Backup Password).
+    If not enabled, keychain data will NOT be included in the backup.
+
+    Returns True if the backup was created successfully.
+    """
+    if progress_callback is None:
+        progress_callback = lambda x: None
+
+    progress_callback("Creating encrypted keychain + Apple ID backup...")
+
+    async with ProtectiveBackupService(lockdown_client) as mb:
+        is_encrypted = await mb.get_will_encrypt()
+        if not is_encrypted:
+            print("[KeychainBackup] Warning: backup is NOT encrypted — keychain data will not be included! "
+                  "Enable backup password in Settings > General > Transfer or Reset iPhone > Backup Password")
+
+        # We want ONLY KeychainDomain + HomeDomain (Apple ID + profiles)
+        # So we use a selective preserve callback that keeps only those.
+        def _keep_keychain_and_appleid(file_name: str, device_name: str) -> bool:
+            if Path(file_name).name in _BACKUP_METADATA_FILES:
+                return True
+            if "/" not in device_name:
+                return True
+            domain, rel_path = device_name.split("/", 1)
+            # Keep KeychainDomain entirely
+            if domain == "KeychainDomain":
+                return True
+            # Keep HomeDomain Apple ID / profiles / preferences
+            if domain == "HomeDomain":
+                return (rel_path.startswith("Library/Accounts")
+                        or rel_path.startswith("Library/ConfigurationProfiles")
+                        or rel_path.startswith("Library/Preferences"))
+            return False
+
+        # Wrap with selective filter
+        selective = _SelectiveDeviceLink(mb.service, preserve_file=_keep_keychain_and_appleid)
+        handlers = getattr(mb.service, "_dl_handlers", {})
+        if "DLMessageUploadFiles" in handlers:
+            handlers["DLMessageUploadFiles"] = selective.upload_files
+        if "DLMessageMoveItems" in handlers:
+            handlers["DLMessageMoveItems"] = selective.move_items
+        if "DLMessageCopyItem" in handlers:
+            handlers["DLMessageCopyItem"] = selective.copy_item
+
+        shutil.rmtree(backup_root, ignore_errors=True)
+        Path(backup_root).mkdir(parents=True, exist_ok=True)
+
+        await mb.backup(full=True, backup_directory=backup_root,
+                        progress_callback=progress_callback)
+
+    progress_callback("Encrypted keychain + Apple ID backup complete")
+    return True
+
+
 def _iter_payload_files(device_dir: Path):
     """Yield every payload file in the backup, flat or in hash subdirectories."""
     for entry in sorted(device_dir.iterdir()):
