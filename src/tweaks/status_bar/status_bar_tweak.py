@@ -10,18 +10,106 @@ class StatusBarTweak(Tweak):
         super().__init__(key=None)
         self.setter = Setter()
 
-    def apply_tweak(self, files_to_restore: list[FileToRestore]):
+    # iOS 27+: the status bar is Speakeasy, a SpringBoard feature flag — the
+    # classic Library/SpringBoard/statusBarOverrides file is no longer read.
+    # The overrides are written into the FeatureFlags Global.plist instead
+    # (category "SpringBoard", flag "SpeakeasyNewStatusBar").
+    def apply_tweak(self, flag_plist: dict = None) -> dict:
+        if not self.enabled or flag_plist is None:
+            return flag_plist
+        category = flag_plist.setdefault("SpringBoard", {})
+        category["SpeakeasyNewStatusBar"] = self.get_speakeasy_payload()
+        return flag_plist
+
+    # iOS 26 and below: classic binary statusBarOverrides in HomeDomain.
+    def apply_classic_tweak(self, files_to_restore: list[FileToRestore]):
         if self.enabled:
-            # TEMPORARY: Status Bar overrides are disabled until the iOS 27
-            # wipe-survival fix (backup injection) is verified working — on
-            # iOS 27 the staged override is currently dropped by the
-            # safe-state-recovery wipe. Remove this early return to re-enable.
-            return
             files_to_restore.append(FileToRestore(
                 contents=self.setter.get_data(),
                 restore_path="/Library/SpringBoard/statusBarOverrides",
                 domain="HomeDomain"
             ))
+
+    def get_speakeasy_payload(self) -> dict:
+        """Translate the StatusBarOverrideData struct into the Speakeasy flag value.
+
+        TODO(ios27): the actual dict schema is not confirmed — the keys below
+        are guesses mirroring the classic statusBarOverrides plist format
+        (override* bools + nested values dict). They must be verified on-device
+        once the real keys are extracted from SpringBoard (speakeasy strings
+        in the dyld shared cache).
+        """
+        overrides = self.setter.get_overrides()
+        if self.setter.silly_mode:
+            # mirror Setter.get_data(): turn every non-overridden item on
+            overrides = ffi.new("StatusBarOverrideData *")
+            ffi.memmove(overrides, self.setter.get_overrides(), ffi.sizeof(self.setter.get_overrides()))
+            for i in range(46):
+                if overrides.overrideItemIsEnabled[i] == 0:
+                    overrides.overrideItemIsEnabled[i] = 1
+                    overrides.values.itemIsEnabled[i] = 1
+
+        override: dict = {}
+        values: dict = {}
+        if any(overrides.overrideItemIsEnabled[i] != 0 for i in range(46)):
+            override["overrideItemIsEnabled"] = [
+                int(overrides.overrideItemIsEnabled[i]) for i in range(46)]
+            values["itemIsEnabled"] = [
+                int(overrides.values.itemIsEnabled[i]) for i in range(46)]
+        if overrides.overrideTimeString != 0:
+            override["overrideTimeString"] = 1
+            values["timeString"] = ffi.string(overrides.values.timeString).decode()
+        if overrides.overrideDateString != 0:
+            override["overrideDateString"] = 1
+            values["dateString"] = ffi.string(overrides.values.dateString).decode()
+        if overrides.overrideGSMSignalStrengthBars != 0:
+            override["overrideGSMSignalStrengthBars"] = 1
+            values["GSMSignalStrengthBars"] = overrides.values.GSMSignalStrengthBars
+        if overrides.overrideSecondaryGSMSignalStrengthBars != 0:
+            override["overrideSecondaryGSMSignalStrengthBars"] = 1
+            values["secondaryGSMSignalStrengthBars"] = overrides.values.secondaryGSMSignalStrengthBars
+        if overrides.overrideWifiSignalStrengthBars != 0:
+            override["overrideWifiSignalStrengthBars"] = 1
+            values["wifiSignalStrengthBars"] = overrides.values.wifiSignalStrengthBars
+        if overrides.overrideServiceString != 0:
+            override["overrideServiceString"] = 1
+            values["serviceString"] = ffi.string(overrides.values.serviceString).decode()
+        if overrides.overrideSecondaryServiceString != 0:
+            override["overrideSecondaryServiceString"] = 1
+            values["secondaryServiceString"] = ffi.string(overrides.values.secondaryServiceString).decode()
+        if overrides.overridePrimaryServiceBadgeString != 0:
+            override["overridePrimaryServiceBadgeString"] = 1
+            values["primaryServiceBadgeString"] = ffi.string(overrides.values.primaryServiceBadgeString).decode()
+        if overrides.overrideSecondaryServiceBadgeString != 0:
+            override["overrideSecondaryServiceBadgeString"] = 1
+            values["secondaryServiceBadgeString"] = ffi.string(overrides.values.secondaryServiceBadgeString).decode()
+        if overrides.overrideDataNetworkType != 0:
+            override["overrideDataNetworkType"] = 1
+            values["dataNetworkType"] = overrides.values.dataNetworkType
+        if overrides.overrideSecondaryDataNetworkType != 0:
+            override["overrideSecondaryDataNetworkType"] = 1
+            values["secondaryDataNetworkType"] = overrides.values.secondaryDataNetworkType
+        if overrides.overrideBatteryCapacity != 0:
+            override["overrideBatteryCapacity"] = 1
+            values["batteryCapacity"] = overrides.values.batteryCapacity
+        if overrides.overrideBatteryDetailString != 0:
+            override["overrideBatteryDetailString"] = 1
+            values["batteryDetailString"] = ffi.string(overrides.values.batteryDetailString).decode()
+        if overrides.overrideBreadcrumb != 0:
+            override["overrideBreadcrumb"] = 1
+            values["breadcrumbTitle"] = ffi.string(overrides.values.breadcrumbTitle).decode()
+        if overrides.overrideDisplayRawGSMSignal != 0:
+            override["overrideDisplayRawGSMSignal"] = 1
+            values["displayRawGSMSignal"] = overrides.values.displayRawGSMSignal
+        if overrides.overrideDisplayRawWifiSignal != 0:
+            override["overrideDisplayRawWifiSignal"] = 1
+            values["displayRawWifiSignal"] = overrides.values.displayRawWifiSignal
+
+        payload: dict = {"Enabled": True}
+        payload.update(override)
+        if values:
+            payload["values"] = values
+        return payload
 
         
     ### PRIMARY CARRIER

@@ -80,6 +80,35 @@ def absolute_path_to_backup_location(path: str) -> tuple[Optional[str], Optional
     return None, None
 
 
+_MANAGED_PREFERENCES_MOBILE = "/var/Managed Preferences/mobile/"
+
+
+def mobile_user_fallback_path(path: str) -> Optional[str]:
+    """Return the HomeDomain copy of a managed-preference file.
+
+    A reset writes an empty dict to ``/var/Managed Preferences/mobile/*.plist``,
+    permanently nulling it. The corresponding ``/var/mobile/Library/Preferences/
+    *.plist`` (HomeDomain) is a separate file that resets do not touch, so it
+    still holds the user's real settings — a usable fallback when the primary
+    copy was already nulled before the capture ran.
+    """
+    if path.startswith(_MANAGED_PREFERENCES_MOBILE):
+        return "/var/mobile/Library/Preferences/" + path[len(_MANAGED_PREFERENCES_MOBILE):]
+    return None
+
+
+def is_empty_plist(data: bytes) -> bool:
+    """True when ``data`` parses as an empty plist dict.
+
+    The nulled plists written by resets are exactly ``{}`` — capturing one as
+    an "original" would make every later reset restore the nulled state.
+    """
+    try:
+        return plistlib.loads(data) == {}
+    except Exception:
+        return False
+
+
 def get_device_values(all_values: dict) -> dict[str, str]:
     """Extract the templatable device-specific values from lockdown values."""
     values = {}

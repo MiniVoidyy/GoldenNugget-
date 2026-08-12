@@ -91,6 +91,20 @@ class PreferenceManager:
         return self.get_original_plists_prefs().contains(
             self._original_plist_key(model, build, path))
 
+    def has_nonempty_original_plist(self, model: str, build: str, path: str) -> bool:
+        """True when a usable (non-empty) original is stored for this path.
+
+        Empty dicts are the nulled state resets write, so they never count as
+        an original.
+        """
+        data = self.get_original_plist(model, build, path)
+        if data is None:
+            return False
+        try:
+            return plistlib.loads(bytes(data)) != {}
+        except Exception:
+            return False
+
     def get_original_plists(self, model: str, build: str) -> dict[str, bytes]:
         settings = self.get_original_plists_prefs()
         prefix = f"{model}|{build}|"
@@ -103,9 +117,27 @@ class PreferenceManager:
         return result
 
     def has_any_original_plists(self, model: str, build: str) -> bool:
+        """True when at least one non-empty original plist is stored for this
+        model/build.
+
+        Empty dicts are the nulled state resets write — older versions could
+        save them as "originals" (captured from a device that was already
+        reset), poisoning the store forever. They do not count here so a
+        poisoned capture is redone on the next apply.
+        """
         settings = self.get_original_plists_prefs()
         prefix = f"{model}|{build}|"
-        return any(key.startswith(prefix) for key in settings.allKeys())
+        for key in settings.allKeys():
+            if key.startswith(prefix):
+                data = settings.value(key)
+                if data is None:
+                    continue
+                try:
+                    if plistlib.loads(bytes(data)) != {}:
+                        return True
+                except Exception:
+                    continue
+        return False
 
     def remove_original_plists(self, model: str, build: str):
         settings = self.get_original_plists_prefs()

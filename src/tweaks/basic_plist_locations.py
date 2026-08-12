@@ -26,7 +26,7 @@ class FileLocation(Enum):
 
     # Daemons
     disabledDaemons = "/var/db/com.apple.xpc.launchd/disabled.plist"
-    screentime = "/var/mobile/Library/Preferences/ScreenTimeAgent.plist"
+    screentime = "/var/mobile/Library/Preferences/com.apple.ScreenTimeAgent.plist"
 
     # Risky Options
     ota = "/var/Managed Preferences/mobile/com.apple.MobileAsset.plist"

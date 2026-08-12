@@ -11,7 +11,7 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
 > You will need to re-login in your apple ID if using on IOS 27
 
 > [!WARNING]
-> This fork implements a three-phase backup→tweak→restore workflow to prevent data loss on iOS 27. Apple has patched the partial restore method that Nugget uses, so applying tweaks directly now triggers a security response that wipes AppleID, Keychain, Photos and settings. This fork preserves your data by backing it up first, then restoring it after the tweak is applied. **THIS WORKAROUND IS UNSTABLE NOW, I AM NOT RESPONSIBLE FOR ANY DATA LOSS/BOOTLOOP CAUSED BY GOLDENNUGGET.**
+> This fork implements a three-phase backup→tweak→restore workflow to prevent data loss on iOS 27. Apple has patched the partial restore method that Nugget uses, so applying tweaks directly now triggers a security response that wipes AppleID, Keychain, Photos and settings. This fork preserves your data by backing it up first, then restoring it after the tweak is applied. Control Center module layout and home screen are also preserved. **THIS WORKAROUND IS UNSTABLE NOW, I AM NOT RESPONSIBLE FOR ANY DATA LOSS/BOOTLOOP CAUSED BY GOLDENNUGGET.**
 
 > [!NOTE]
 > Please back up your data before using this Project! GoldenNugget may cause unforeseen problems, so it is better to be safe than sorry. We are not responsible for any damage done to your device.
@@ -29,6 +29,8 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - See documentation on the structure of batter files in [documentation.md](documentation.md)
 - psysbackup: backup system plist
   - Required to make "reset tweaks" function work without damaging system.
+- Revert Last Apply: restore your device to its exact state before the most
+  recent apply with one click
 - Status Bar
   - Change carrier name
   - Change secondary carrier name
@@ -50,9 +52,12 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - Hide AC Power on Lock Screen
   - Show Supervision Text on Lock Screen
   - Show Dynamic Island in Screenshots
+  - Hide Dynamic Island Completely
   - Enable AirPlay support for Stage Manager
   - Show Red/Green Authentication Line on Lock Screen (See [this issue](https://github.com/leminlimez/Nugget/issues/656) for what it looks like)
   - Disable Floating Tab Bar on iPads
+  - WatchOS Compatibility
+  - AirDrop Disable Time Limit
 - Internal Options
   - Enabling Key Flick (iPad-style keyboard) on iPhones (iOS 26.0-)
   - Build Version in Status Bar

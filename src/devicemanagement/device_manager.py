@@ -29,6 +29,20 @@ _sc.DEFAULT_SSL_HANDSHAKE_TIMEOUT = 60
 # Temporarily allow writing up to this many PosterBoard tendies in a single
 # restore. Applying more than one tendie at once can race PosterBoard's sqlite
 # regeneration, so the count is capped.
+# Reset-critical managed plists that must all have a usable (non-empty)
+# original before the capture is considered done. A reset nulls these files
+# (writes {}), so an empty saved original would make every reset restore the
+# nulled state. Each path has a HomeDomain fallback, so a successful capture
+# always fills them — even on a device whose files were already nulled.
+_ORIGINAL_CAPTURE_REQUIRED = (
+    "/var/Managed Preferences/mobile/com.apple.springboard.plist",
+    "/var/Managed Preferences/mobile/com.apple.UIKit.plist",
+    "/var/Managed Preferences/mobile/.GlobalPreferences.plist",
+    "/var/Managed Preferences/mobile/com.apple.AppStore.plist",
+    "/var/Managed Preferences/mobile/com.apple.backboardd.plist",
+    "/var/Managed Preferences/mobile/com.apple.mobilenotes.plist",
+)
+
 MAX_TENDIES_PER_RESTORE = 3
 
 from src.devicemanagement.constants import Device, Version, is_supported_by_fork
@@ -50,7 +64,7 @@ from src.tweaks.basic_plist_locations import FileLocation
 
 from src.restore import reboot_device
 from src.restore.restore import restore_files, FileToRestore
-from src.restore.original_plist import psysbackup, materialize_plist
+from src.restore.original_plist import psysbackup, materialize_plist, is_empty_plist, mobile_user_fallback_path
 from src.restore.bookrestore import perform_bookrestore, create_server_folder, create_local_server, cleanup_server_folder, close_dl_connection, generate_bldbmanager, br_files
 from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreApplyMethod
 from src.restore.mbdb import _FileMode
@@ -605,16 +619,16 @@ class DeviceManager:
 
         Unlike ``progress_callback`` it does not depend on ``self.update_label``
         (only set by ``start_restore``), so it is safe to call before any
-        restore has started.
+        restore has started. Status strings pass through as labels; anything
+        that is not a number is dropped so the bar never sees garbage.
         """
         def _cb(progress):
             if isinstance(progress, str):
                 update_label(progress)
                 return
-            prog = ""
-            if progress != None:
-                prog = f" ({progress:6.1f}% )"
-            update_label(QCoreApplication.tr("Backing up device...{0}").format(prog))
+            if isinstance(progress, bool) or not isinstance(progress, (int, float)):
+                return
+            update_label(QCoreApplication.tr("Backing up device... ({0:.1f}%)").format(progress))
         return _cb
     def apply_changes(self, update_label=lambda x: None, show_alert=lambda x: None):
         asyncio.run(self._apply_changes(update_label, show_alert))
@@ -850,11 +864,56 @@ class DeviceManager:
     def _get_original_plist_paths(self) -> list[str]:
         return [loc.value for loc in FileLocation if loc != FileLocation.mga]
 
+    async def _capture_original_plists(self, udid: str, update_label) -> dict:
+        """Run the psysbackup capture and return usable originals.
+
+        The mobile-user copy (HomeDomain) of a managed-preference file is
+        preferred over the managed copy: tweaks and resets write only to
+        ``/var/Managed Preferences/mobile/*.plist``, so the HomeDomain copy is
+        the truest original even when tweaks were applied before the capture
+        ran (e.g. when "Save Originals" is tapped after an apply). The managed
+        copy is used only when no HomeDomain copy exists. Entries that are
+        still empty after both sources are dropped — a nulled plist must never
+        be stored as an "original", otherwise reset keeps restoring the nulled
+        state.
+        """
+        paths = self._get_original_plist_paths()
+        fallbacks = [mobile_user_fallback_path(p) for p in paths]
+        fallbacks = [f for f in fallbacks if f is not None and f not in paths]
+        captured = await psysbackup(
+            udid, paths + fallbacks, update_label, self._backup_progress(update_label))
+        originals = {}
+        for path in paths:
+            data = None
+            fallback = mobile_user_fallback_path(path)
+            if fallback:
+                data = captured.get(fallback)
+            if data is None or is_empty_plist(data):
+                data = captured.get(path)
+            if data is not None and not is_empty_plist(data):
+                originals[path] = data
+        return originals
+
+    def _original_plists_usable(self, model: str, build: str) -> bool:
+        """True when every reset-critical plist has a non-empty original.
+
+        Stale captures that stored nulled (empty) plists — taken from a
+        device that was already reset — count as missing, so they are redone.
+        """
+        if not model or not build:
+            return False
+        return all(
+            self.pref_manager.has_nonempty_original_plist(model, build, path)
+            for path in _ORIGINAL_CAPTURE_REQUIRED
+        )
+
     async def _maybe_capture_originals(self, update_label=lambda x: None):
         """Capture original plists on the first apply for this model/build.
 
         Skipped when GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE=1 is set. Failure is
-        non-fatal: applying tweaks does not need the originals.
+        non-fatal: applying tweaks does not need the originals. Only non-empty
+        originals count as captured, so a poisoned (nulled) capture is redone
+        on a later apply.
         """
         if os.environ.get("GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE"):
             return
@@ -867,12 +926,15 @@ class DeviceManager:
             build = all_values.get("BuildVersion", "")
             if not model or not build:
                 return
-            if self.pref_manager.has_any_original_plists(model, build):
+            if self._original_plists_usable(model, build):
                 return
             update_label(QCoreApplication.tr("Capturing original plists..."))
-            templated = await psysbackup(
-                udid, self._get_original_plist_paths(), update_label, self._backup_progress(update_label))
-            for path, data in templated.items():
+            originals = await self._capture_original_plists(udid, update_label)
+            if not originals:
+                update_label(QCoreApplication.tr(
+                    "Warning: could not capture original plists automatically."))
+                return
+            for path, data in originals.items():
                 self.pref_manager.save_original_plist(model, build, path, data)
             update_label(QCoreApplication.tr("Original plists saved."))
         except Exception as e:
@@ -896,8 +958,7 @@ class DeviceManager:
                 raise NuggetException(QCoreApplication.tr(
                     "Could not read the device model and iOS build."))
             update_label(QCoreApplication.tr("Capturing original plists..."))
-            templated = await psysbackup(
-                udid, self._get_original_plist_paths(), update_label, self._backup_progress(update_label))
+            templated = await self._capture_original_plists(udid, update_label)
             if not templated:
                 raise NuggetException(QCoreApplication.tr(
                     "No original plists were found on the device."))
@@ -930,17 +991,22 @@ class DeviceManager:
                 return True
             if page == Page.InternalOptions:
                 return True
+            if page == Page.Springboard:
+                return True
         return False
 
     def get_missing_original_plists(self, reset_pages: list[Page]) -> list[str]:
-        """Return the nulled plist paths lacking a saved original (for pre-reset warnings)."""
+        """Return the nulled plist paths lacking a usable original (for pre-reset warnings).
+
+        Only paths the reset will null without a non-empty saved original are
+        reported, so the warning reflects exactly what would be written as an
+        empty plist.
+        """
         if not self._original_plists_required(reset_pages):
             return []
         model = self.get_current_device_model()
         build = self.get_current_device_build()
         if not model or not build:
-            return []
-        if self.pref_manager.has_any_original_plists(model, build):
             return []
         paths = []
         if Page.FeatureFlags in reset_pages and not self.get_current_device_uses_bookrestore():
@@ -954,7 +1020,10 @@ class DeviceManager:
                 FileLocation.pasteboard.value,
                 FileLocation.notes.value,
             ])
-        return paths
+        return [
+            path for path in paths
+            if not self.pref_manager.has_nonempty_original_plist(model, build, path)
+        ]
 
     async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None, device_values: dict = None):
         """Generate all tweak files and restore them to the device in one pass.
@@ -1031,9 +1100,17 @@ class DeviceManager:
                     elif not tweak.is_empty():
                         use_bookrestore = True
                 elif isinstance(tweak, StatusBarTweak):
-                    tweak.apply_tweak(files_to_restore=files_to_restore)
-                    if tweak.enabled:
-                        uses_domains = True
+                    if Version(self.get_current_device_version()) >= Version("27.0"):
+                        # iOS 27: the status bar is Speakeasy, a SpringBoard
+                        # feature flag — the classic statusBarOverrides file
+                        # is no longer read, so write the FeatureFlags plist.
+                        flag_plist = tweak.apply_tweak(flag_plist)
+                        if tweak.enabled:
+                            use_bookrestore = True
+                    else:
+                        tweak.apply_classic_tweak(files_to_restore=files_to_restore)
+                        if tweak.enabled:
+                            uses_domains = True
                 elif isinstance(tweak, BookRestoreFileTweak):
                     continue
                 else:
@@ -1243,12 +1320,31 @@ class DeviceManager:
                         files_to_null.append(FileLocation.featureflags.value)
                 elif page == Page.StatusBar:
                     ## STATUS BAR
-                    files_to_restore.append(FileToRestore(
-                        contents=b"",
-                        restore_path="/Library/SpringBoard/statusBarOverrides",
-                        domain="HomeDomain"
-                    ))
-                    uses_domains = True
+                    if Version(self.get_current_device_version()) >= Version("27.0"):
+                        # iOS 27: the status bar is Speakeasy, a SpringBoard
+                        # feature flag — disable it instead of writing the
+                        # unread classic statusBarOverrides file. An empty flag
+                        # dict (no "Enabled" key) keeps SpringBoard's default
+                        # behavior — {"Enabled": False} could be read as
+                        # disabling the whole Speakeasy status bar.
+                        use_bookrestore = True
+                        self.concat_file(
+                            contents=plistlib.dumps({
+                                "SpringBoard": {
+                                    "SpeakeasyNewStatusBar": {}
+                                }
+                            }),
+                            path=FileLocation.featureflags.value,
+                            files_to_restore=files_to_restore,
+                            use_bookrestore=use_bookrestore
+                        )
+                    else:
+                        files_to_restore.append(FileToRestore(
+                            contents=b"",
+                            restore_path="/Library/SpringBoard/statusBarOverrides",
+                            domain="HomeDomain"
+                        ))
+                        uses_domains = True
                 elif page == Page.Springboard:
                     ## SPRINGBOARD
                     files_to_null.append(FileLocation.springboard.value)
@@ -1280,11 +1376,18 @@ class DeviceManager:
                     files_to_null.append(FileLocation.notes.value)
             
             # add the files to null from the list
-            if self._original_plists_required(reset_pages) and not original_plists:
-                raise NuggetException(QCoreApplication.tr(
-                    "Cannot reset: no original plists have been saved for this device.\n\n"
-                    "Open Settings and tap \"Save Originals\" (with this device connected) "
-                    "so the reset can restore your original files instead of empty ones."))
+            if self._original_plists_required(reset_pages):
+                model = all_values.get("ProductType", "")
+                build = all_values.get("BuildVersion", "")
+                missing_or_empty = [
+                    path for path in files_to_null
+                    if not self.pref_manager.has_nonempty_original_plist(model, build, path)
+                ]
+                if missing_or_empty and not self._original_plists_usable(model, build):
+                    raise NuggetException(QCoreApplication.tr(
+                        "Cannot reset: the saved original plists for this device are empty.\n\n"
+                        "Open Settings and tap \"Save Originals\" (with this device connected) "
+                        "so the reset can restore your original files instead of empty ones."))
             for file_path in files_to_null:
                 if file_path == FileLocation.mga.value:
                     # MobileGestalt is nulled on purpose to clear spoofed values;

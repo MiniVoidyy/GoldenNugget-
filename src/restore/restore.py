@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import os
 import plistlib
 import shutil
@@ -171,7 +172,142 @@ _RECONNECT_TIMEOUT = 20 * 60
 # media directory — so backup injection is the one reliable path.
 _HOME_DOMAIN_TWEAK_PATHS = (
     "Library/SpringBoard/statusBarOverrides",  # Status Bar tweak
+    # FeatureFlags user-level override candidates (iOS 27). The system-level
+    # /var/preferences/FeatureFlags/Global.plist is on the restore agent's
+    # sysprefs allowlist-blocklist: backups may only rewrite files the device
+    # already knows (verified with a radios.plist marker probe). These user
+    # paths ride the same proven HomeDomain injection.
+    "Library/Preferences/com.apple.FeatureFlags.plist",  # CFPreferences suite
+    "Library/FeatureFlags/Global.plist",
+    "Library/FeatureFlags/Domain/SpringBoard.plist",
 )
+
+# SystemPreferencesDomain tweak files, re-injected for the same reason as the
+# HomeDomain ones: the iOS 27 wipe clears whatever the sparse restore staged
+# unless the protective backup carries it. /var/preferences is outside the
+# protective scope, so tweak files landing there must be injected by hand.
+_SYSTEM_PREFERENCES_TWEAK_PATHS = (
+    "FeatureFlags/Global.plist",  # Status Bar (Speakeasy) feature flag override
+)
+
+# Run 7 (iOS 27): the Speakeasy gate in SpringBoard reads flag
+# "Speakeasy"/"SpeakeasyNewStatusBar" of domain "SpringBoard" (confirmed in
+# /System/Library/FeatureFlags/Domain/SpringBoard.plist of 24A5408d). The only
+# override store FeatureFlags.framework reads is /var/preferences/FeatureFlags/
+# Settings.plist, so every writable surface gets armed: the HomeDomain prefs
+# plists (CFPreferences suites read by SpringBoard/UIKit at boot) plus a new
+# SystemPreferencesDomain row aimed at the system store (delivery is verified
+# via the post-restore backup).
+_SPEAKEASY_DISABLE_FLAGS = (
+    "Speakeasy",
+    "SpeakeasyNewStatusBar",
+    "SpeakeasyAttributionManager",
+    "SpeakeasyStatusBarWindowRotation",
+)
+_SPEAKEASY_PREF_KEYS = {flag: False for flag in _SPEAKEASY_DISABLE_FLAGS}
+_SPEAKEASY_FLAG_DICT = {flag: {"Enabled": False} for flag in _SPEAKEASY_DISABLE_FLAGS}
+_SPEAKEASY_PLIST_PATHS = (
+    "Library/Preferences/com.apple.springboard.plist",
+    "Library/Preferences/com.apple.SpringBoard.plist",
+    "Library/Preferences/com.apple.UIKit.plist",
+    "Library/Preferences/com.apple.FeatureFlags.plist",
+)
+# MCX (MDM) managed preferences — read with higher priority than user
+# defaults by CFPreferences, so they can force the gate's pref lookups off.
+_SPEAKEASY_MANAGED_PLIST_PATHS = (
+    "mobile/com.apple.springboard.plist",
+    "mobile/com.apple.UIKit.plist",
+    "mobile/com.apple.FeatureFlags.plist",
+)
+_SYSTEM_FF_SETTINGS_PATH = "FeatureFlags/Settings.plist"
+_ROOT_DOMAIN_FF_PATHS = (
+    "preferences/FeatureFlags/Settings.plist",
+    "Library/FeatureFlags/Settings.plist",
+)
+
+
+def _read_manifest_plist(device_dir: str, domain: str, rel_path: str):
+    """Load a plist the way the fresh backup stored it (payload <aa>/<fileID>)."""
+    import sqlite3 as _sqlite3
+    file_id = hashlib.sha1(f"{domain}-{rel_path}".encode("utf-8")).hexdigest()
+    payload = os.path.join(device_dir, file_id[:2], file_id)
+    conn = _sqlite3.connect(os.path.join(device_dir, "Manifest.db"))
+    try:
+        row = conn.execute(
+            "SELECT file FROM Files WHERE fileID = ?", (file_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    data = None
+    if os.path.exists(payload):
+        data = open(payload, "rb").read()
+    if data is None and row is not None and row[0] is not None:
+        try:
+            blob = plistlib.loads(row[0])
+            if "Digest" in blob["$objects"][1]:
+                digest = blob["$objects"][blob["$objects"][1]["Digest"]]
+                data = bytes(digest)
+        except Exception:
+            data = None
+    if data is None:
+        return {}
+    try:
+        return plistlib.loads(data)
+    except Exception:
+        return {}
+
+
+def _inject_speakeasy_disable(backup_root: str, udid: str) -> list:
+    """Arm every writable Speakeasy-disable surface in the pruned backup."""
+    device_dir = os.path.join(backup_root, udid)
+    if not os.path.isdir(device_dir):
+        device_dir = backup_root
+    if not os.path.exists(os.path.join(device_dir, "Manifest.db")):
+        return []
+    injected = []
+    for rel_path in _SPEAKEASY_PLIST_PATHS:
+        plist = _read_manifest_plist(device_dir, "HomeDomain", rel_path)
+        if rel_path.endswith("com.apple.FeatureFlags.plist"):
+            category = plist.setdefault("SpringBoard", {})
+            category.update(_SPEAKEASY_FLAG_DICT)
+        else:
+            plist.update(_SPEAKEASY_PREF_KEYS)
+        ok = inject_file_into_backup(
+            backup_root, udid, "HomeDomain", rel_path,
+            plistlib.dumps(plist, fmt=plistlib.FMT_BINARY),
+            mode=_FileMode.S_IFREG | 0o644,
+        )
+        injected.append((f"HomeDomain/{rel_path}", ok))
+    for rel_path in _SPEAKEASY_MANAGED_PLIST_PATHS:
+        plist = _read_manifest_plist(device_dir, "ManagedPreferencesDomain", rel_path)
+        if rel_path.endswith("com.apple.FeatureFlags.plist"):
+            category = plist.setdefault("SpringBoard", {})
+            category.update(_SPEAKEASY_FLAG_DICT)
+        else:
+            plist.update(_SPEAKEASY_PREF_KEYS)
+        ok = inject_file_into_backup(
+            backup_root, udid, "ManagedPreferencesDomain", rel_path,
+            plistlib.dumps(plist, fmt=plistlib.FMT_BINARY),
+            mode=_FileMode.S_IFREG | 0o644,
+        )
+        injected.append((f"ManagedPreferencesDomain/{rel_path}", ok))
+    settings = {"SpringBoard": dict(_SPEAKEASY_FLAG_DICT)}
+    ok = inject_file_into_backup(
+        backup_root, udid, "SystemPreferencesDomain", _SYSTEM_FF_SETTINGS_PATH,
+        plistlib.dumps(settings, fmt=plistlib.FMT_BINARY),
+        mode=_FileMode.S_IFREG | 0o644,
+        owner=0, group=0,
+    )
+    injected.append((f"SystemPreferencesDomain/{_SYSTEM_FF_SETTINGS_PATH}", ok))
+    for rel_path in _ROOT_DOMAIN_FF_PATHS:
+        ok = inject_file_into_backup(
+            backup_root, udid, "RootDomain", rel_path,
+            plistlib.dumps(settings, fmt=plistlib.FMT_BINARY),
+            mode=_FileMode.S_IFREG | 0o644,
+            owner=0, group=0,
+        )
+        injected.append((f"RootDomain/{rel_path}", ok))
+    return injected
 
 
 def _scaled_callback(progress_callback, lo: float, hi: float):
@@ -329,8 +465,21 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                 inject_file_into_backup(
                     backup_root, udid, file.domain, file.path,
                     file.read_contents(),
-                    mode=_FileMode.S_IFREG | int(file.mode),
+                    mode=_FileMode.S_IFREG | 0o644,
                     owner=file.owner, group=file.group)
+            elif (isinstance(file, backup.ConcreteFile)
+                    and file.domain == "SystemPreferencesDomain"
+                    and file.path in _SYSTEM_PREFERENCES_TWEAK_PATHS):
+                ok = inject_file_into_backup(
+                    backup_root, udid, file.domain, file.path,
+                    file.read_contents(),
+                    mode=_FileMode.S_IFREG | 0o644,
+                    owner=file.owner, group=file.group)
+                print(f"[iOS27] Injected {file.domain}/{file.path} "
+                      f"into protective backup: {ok}")
+
+        for label, ok in _inject_speakeasy_disable(backup_root, udid):
+            print(f"[iOS27] Speakeasy-disable {label}: {ok}")
 
         progress_callback(_PHASE_BACKUP_END)
 

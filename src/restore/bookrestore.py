@@ -476,7 +476,7 @@ async def perform_bookrestore(files: list[FileToRestore], lockdown_client: Lockd
                         current_device_books_uuid_callback = lambda x: None, progress_callback = lambda x: None,
                         transfer_mode: BookRestoreFileTransferMethod = BookRestoreFileTransferMethod.LocalHost,
                         do_full_reboot: bool = False):
-    if not lockdown_client.developer_mode_status:
+    if not await lockdown_client.get_developer_mode_status():
         # enable developer mode
         progress_callback("Enabling Developer Mode...")
         await AmfiService(lockdown=lockdown_client).reveal_developer_mode_option_in_ui()
