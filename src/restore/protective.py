@@ -49,6 +49,47 @@ from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 # Importing this module applies it process-wide.
 _sc.DEFAULT_SSL_HANDSHAKE_TIMEOUT = 60
 
+# Debug mode: set gNugget_DEV_MODE=enable in environment for verbose output
+_DEBUG_MODE = os.environ.get("gNugget_DEV_MODE", "").lower() in ("1", "true", "yes", "enable")
+
+# Log file path
+_LOG_FILE = "/tmp/goldennugget_log.txt"
+
+def _log_write(msg: str) -> None:
+    """Write message to log file (always writes, regardless of debug mode)."""
+    try:
+        with open(_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}\n")
+    except Exception:
+        pass  # Never fail on logging
+
+def _dbg(msg: str) -> None:
+    """Print debug message only in dev mode, also write to log."""
+    if _DEBUG_MODE:
+        print(f"[DEBUG] {msg}")
+    _log_write(f"[DEBUG] {msg}")
+
+def _dbg_verbose(msg: str) -> None:
+    """Print verbose debug message only in dev mode, also write to log."""
+    if _DEBUG_MODE:
+        print(f"[DEBUG-VERBOSE] {msg}")
+    _log_write(f"[DEBUG-VERBOSE] {msg}")
+
+def log_info(msg: str) -> None:
+    """Log info message (always writes to log file)."""
+    print(f"[INFO] {msg}")
+    _log_write(f"[INFO] {msg}")
+
+def log_warn(msg: str) -> None:
+    """Log warning message (always writes to log file)."""
+    print(f"[WARN] {msg}")
+    _log_write(f"[WARN] {msg}")
+
+def log_error(msg: str) -> None:
+    """Log error message (always writes to log file)."""
+    print(f"[ERROR] {msg}")
+    _log_write(f"[ERROR] {msg}")
+
 # --- DeviceLink protocol constants (from pymobiledevice3.services.device_link) ---
 _SIZE_FORMAT = ">I"
 _CODE_FORMAT = ">B"
@@ -492,6 +533,261 @@ async def perform_protective_backup(
         await mb.backup(full=True, backup_directory=backup_root,
                         progress_callback=progress_callback)
     return is_encrypted
+
+
+async def create_encrypted_keychain_backup(
+    lockdown_client: LockdownClient,
+    backup_root: str,
+    progress_callback=None,
+) -> str | None:
+    """Create an ENCRYPTED backup of KeychainDomain + HomeDomain (Apple ID, profiles, prefs).
+
+    This is called during Phase 1 (before the wipe) to capture keychain data
+    in encrypted form. If encryption is already enabled on the device, we use
+    that existing encryption. If not, we temporarily enable it with a random
+    password, then disable after the backup completes.
+
+    Returns the encryption password (str) if we enabled it ourselves (caller
+    must use this to disable after restore), None if using device's existing
+    encryption (password unknown), or None if failed.
+    """
+    if progress_callback is None:
+        progress_callback = lambda x: None
+
+    import secrets
+    temp_password = secrets.token_urlsafe(32)
+
+    progress_callback("Creating encrypted keychain + Apple ID backup (Phase 1)...")
+
+    # Step 1: Check if encryption is already enabled
+    progress_callback("Checking backup encryption status...")
+    encryption_was_enabled = False
+    async with ProtectiveBackupService(lockdown_client) as mb:
+        is_encrypted = await mb.get_will_encrypt()
+        if is_encrypted:
+            encryption_was_enabled = True
+            print("[KeychainBackup] Backup encryption already enabled on device")
+            progress_callback("Using existing backup encryption")
+        else:
+            # Step 2: Enable encryption with our temp password
+            progress_callback("Enabling backup encryption...")
+            try:
+                await mb.change_password(new=temp_password)
+                print("[KeychainBackup] Backup encryption enabled with temp password")
+            except Exception as e:
+                print(f"[KeychainBackup] Failed to enable encryption: {e}")
+                progress_callback("Failed to enable encryption")
+                return None
+
+            is_encrypted = await mb.get_will_encrypt()
+            if not is_encrypted:
+                print("[KeychainBackup] Warning: backup is NOT encrypted after enabling!")
+                progress_callback("Encryption not active")
+                try:
+                    await mb.change_password(old=temp_password, new="")
+                except Exception:
+                    pass
+                return None
+
+    # Step 3: Create a NEW service for the backup (change_password closes the connection)
+    progress_callback("Starting encrypted backup...")
+
+    # We want KeychainDomain + HomeDomain (Apple ID + profiles + preferences) + SystemPreferencesDomain + daemon AppDomains
+    captured_domains = set()
+    skipped_domains = set()
+    total_calls = 0
+    def _keep_keychain_and_appleid(file_name: str, device_name: str) -> bool:
+        nonlocal total_calls
+        total_calls += 1
+        if Path(file_name).name in _BACKUP_METADATA_FILES:
+            return True
+        if "/" not in device_name:
+            return True
+        domain, rel_path = device_name.split("/", 1)
+        # DEBUG: log device_names to understand format (first 50 in verbose mode)
+        if total_calls <= 100:
+            _dbg_verbose(f"KeychainBackup CALL #{total_calls}: device_name={device_name}, file_name={file_name}")
+        # Keep KeychainDomain entirely
+        if domain == "KeychainDomain":
+            captured_domains.add(domain)
+            _dbg(f"KeychainBackup CAPTURED: {domain}")
+            return True
+        # Keep HomeDomain Apple ID / profiles / preferences
+        if domain == "HomeDomain":
+            if (rel_path.startswith("Library/Accounts")
+                    or rel_path.startswith("Library/ConfigurationProfiles")
+                    or rel_path.startswith("Library/Preferences")):
+                captured_domains.add(f"{domain}/{rel_path}")
+                _dbg(f"KeychainBackup CAPTURED: {domain}/{rel_path}")
+                return True
+            else:
+                skipped_domains.add(f"{domain}/{rel_path}")
+                _dbg_verbose(f"KeychainBackup SKIPPED HomeDomain: {rel_path}")
+        # Keep SystemPreferencesDomain (may have profile/MDM data)
+        if domain == "SystemPreferencesDomain":
+            captured_domains.add(domain)
+            _dbg(f"KeychainBackup CAPTURED: {domain}")
+            return True
+        # Keep daemon AppDomains that store auth/profile state
+        if domain.startswith("AppDomain-"):
+            bundle = domain.removeprefix("AppDomain-")
+            if bundle in {
+                "com.apple.accountsd",       # Apple ID auth tokens, session
+                "com.apple.imagent",         # iMessage encryption keys
+                "com.apple.mdmd",            # MDM daemon state
+                "com.apple.profilesd",       # Profile daemon state
+                "com.apple.apsd",            # Push notification tokens
+                "com.apple.identityservicesd", # iCloud identity
+                "com.apple.mobileassetd",    # Asset downloads (profiles)
+            }:
+                captured_domains.add(domain)
+                _dbg(f"KeychainBackup CAPTURED: {domain}")
+                return True
+            else:
+                skipped_domains.add(domain)
+                _dbg_verbose(f"KeychainBackup SKIPPED AppDomain: {bundle}")
+        return False
+
+    async with ProtectiveBackupService(lockdown_client, preserve_file=_keep_keychain_and_appleid) as mb:
+        # Verify encryption is active
+        is_encrypted = await mb.get_will_encrypt()
+        if not is_encrypted:
+            print("[KeychainBackup] Warning: backup is NOT encrypted on new connection!")
+            progress_callback("Encryption lost")
+            return None
+
+        shutil.rmtree(backup_root, ignore_errors=True)
+        Path(backup_root).mkdir(parents=True, exist_ok=True)
+
+        await mb.backup(full=True, backup_directory=backup_root,
+                        progress_callback=progress_callback)
+
+        _dbg(f"KeychainBackup CAPTURED SUMMARY: {sorted(captured_domains)}")
+        _dbg(f"KeychainBackup SKIPPED SUMMARY: {sorted(skipped_domains)}")
+        print(f"[KeychainBackup] Captured: {len(captured_domains)} domains/paths, Skipped: {len(skipped_domains)} domains, Total calls: {total_calls}")
+
+    # Step 4: Disable encryption only if we enabled it ourselves
+    if not encryption_was_enabled:
+        progress_callback("Disabling backup encryption...")
+        async with ProtectiveBackupService(lockdown_client) as mb:
+            try:
+                await mb.change_password(old=temp_password, new="")
+                print("[KeychainBackup] Backup encryption disabled")
+            except Exception as e:
+                print(f"[KeychainBackup] Failed to disable encryption: {e}")
+    else:
+        print("[KeychainBackup] Keeping existing backup encryption (user's password)")
+
+    progress_callback("Encrypted keychain + Apple ID backup complete")
+    # Return temp password only if we enabled it ourselves; None means use existing encryption
+    return None if encryption_was_enabled else temp_password
+
+
+async def restore_encrypted_keychain_backup(
+    lockdown_client: LockdownClient,
+    backup_root: str,
+    backup_password: str | None = None,
+    progress_callback=None,
+) -> bool:
+    """Restore the encrypted KeychainDomain + HomeDomain backup created in Phase 1.
+
+    This is called during Phase 4 (after Phase 3's unencrypted restore).
+    The backup must already be encrypted (created with create_encrypted_keychain_backup).
+    After restore, backup encryption is disabled on the device using the backup_password.
+
+    Returns True if the restore was successful.
+    """
+    if progress_callback is None:
+        progress_callback = lambda x: None
+
+    progress_callback("Restoring encrypted keychain + Apple ID backup (Phase 4)...")
+
+    async with ProtectiveBackupService(lockdown_client) as mb:
+        # Check if backup is encrypted
+        is_encrypted = await mb.get_will_encrypt()
+        if not is_encrypted:
+            print("[KeychainRestore] Warning: backup directory is not encrypted!")
+
+        # Restore KeychainDomain + HomeDomain + SystemPreferencesDomain + daemon AppDomains
+        # We use the same selective filter to only restore those domains
+        restored_domains = set()
+        skipped_restore = set()
+        restore_calls = 0
+        def _restore_keychain_and_appleid(file_name: str, device_name: str) -> bool:
+            nonlocal restore_calls
+            restore_calls += 1
+            if Path(file_name).name in _BACKUP_METADATA_FILES:
+                return True
+            if "/" not in device_name:
+                return True
+            domain, rel_path = device_name.split("/", 1)
+            if restore_calls <= 100:
+                _dbg_verbose(f"KeychainRestore CALL #{restore_calls}: device_name={device_name}, file_name={file_name}")
+            if domain == "KeychainDomain":
+                restored_domains.add(domain)
+                _dbg(f"KeychainRestore WILL RESTORE: {domain}")
+                return True
+            if domain == "HomeDomain":
+                if (rel_path.startswith("Library/Accounts")
+                        or rel_path.startswith("Library/ConfigurationProfiles")
+                        or rel_path.startswith("Library/Preferences")):
+                    restored_domains.add(f"{domain}/{rel_path}")
+                    _dbg(f"KeychainRestore WILL RESTORE: {domain}/{rel_path}")
+                    return True
+                else:
+                    skipped_restore.add(f"{domain}/{rel_path}")
+                    _dbg_verbose(f"KeychainRestore SKIPPED HomeDomain: {rel_path}")
+            if domain == "SystemPreferencesDomain":
+                restored_domains.add(domain)
+                _dbg(f"KeychainRestore WILL RESTORE: {domain}")
+                return True
+            if domain.startswith("AppDomain-"):
+                bundle = domain.removeprefix("AppDomain-")
+                if bundle in {
+                    "com.apple.accountsd",
+                    "com.apple.imagent",
+                    "com.apple.mdmd",
+                    "com.apple.profilesd",
+                    "com.apple.apsd",
+                    "com.apple.identityservicesd",
+                    "com.apple.mobileassetd",
+                }:
+                    restored_domains.add(domain)
+                    _dbg(f"KeychainRestore WILL RESTORE: {domain}")
+                    return True
+                else:
+                    skipped_restore.add(domain)
+                    _dbg_verbose(f"KeychainRestore SKIPPED AppDomain: {bundle}")
+            return False
+
+        _dbg(f"KeychainRestore WILL RESTORE SUMMARY: {sorted(restored_domains)}")
+        _dbg(f"KeychainRestore SKIPPED SUMMARY: {sorted(skipped_restore)}")
+        print(f"[KeychainRestore] Will restore: {len(restored_domains)} domains/paths, Skipped: {len(skipped_restore)} domains, Total calls: {restore_calls}")
+
+        # The restore will restore everything in the backup directory,
+        # but we only populated it with KeychainDomain + HomeDomain
+        await mb.restore(
+            backup_root,
+            system=True, copy=True, remove=False,
+            reboot=False,  # Don't reboot - Phase 3 already rebooted
+            progress_callback=progress_callback,
+        )
+
+        # Disable encryption after restore using the backup password
+        progress_callback("Disabling backup encryption...")
+        try:
+            if backup_password:
+                await mb.change_password(old=backup_password, new="")
+                print("[KeychainRestore] Backup encryption disabled with saved password")
+            else:
+                # Try without password (may work if encryption was already off)
+                await mb.change_password(old="", new="")
+                print("[KeychainRestore] Backup encryption disabled (no password)")
+        except Exception as e:
+            print(f"[KeychainRestore] Failed to disable encryption: {e}")
+
+    progress_callback("Encrypted keychain + Apple ID restore complete")
+    return True
 
 
 async def perform_keychain_appleid_backup(

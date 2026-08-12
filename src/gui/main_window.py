@@ -421,6 +421,7 @@ class MainWindow(QtWidgets.QMainWindow):
             skip_setup = self.settings.value("skip_setup", True, type=bool)
             supervised = self.settings.value("supervised", False, type=bool)
             organization_name = self.settings.value("organization_name", "", type=str)
+            use_encrypted_backup = self.settings.value("use_encrypted_backup", False, type=bool)
 
             self.ui.allowWifiApplyingChk.setChecked(apply_over_wifi)
             self.ui.autoRebootChk.setChecked(auto_reboot)
@@ -429,6 +430,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.forcePBRefreshChk.setChecked(auto_refresh_posterboard)
             self.ui.showAllSpoofableChk.setChecked(show_all_spoofable)
             self.ui.trustStoreChk.setChecked(restore_truststore)
+            # Experimental encrypted backup option
+            if hasattr(self.ui, 'encryptedBackupChk'):
+                self.ui.encryptedBackupChk.setChecked(use_encrypted_backup)
             
             self.ui.brApplyModeDrp.setCurrentIndex(br_apply_mode)
             self.ui.brTransferModeDrp.setCurrentIndex(br_transfer_mode)
@@ -450,6 +454,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.device_manager.pref_manager.disable_tendies_limit = disable_tendies_limit
             self.device_manager.pref_manager.auto_refresh_posterboard = auto_refresh_posterboard
             self.device_manager.pref_manager.restore_truststore = restore_truststore
+            self.device_manager.pref_manager.use_encrypted_backup = use_encrypted_backup
             self.device_manager.pref_manager.bookrestore_apply_mode = BookRestoreApplyMethod(br_apply_mode)
             self.device_manager.pref_manager.bookrestore_transfer_mode = BookRestoreFileTransferMethod(br_transfer_mode)
             self.device_manager.pref_manager.skip_setup = skip_setup

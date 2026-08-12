@@ -12,7 +12,9 @@ from .mbdb import _FileMode
 from .protective import (
     clean_backup_for_restore,
     inject_file_into_backup,
-    perform_keychain_appleid_backup,
+    log_error,
+    log_info,
+    log_warn,
     perform_protective_backup,
 )
 from pymobiledevice3.lockdown import LockdownClient, create_using_usbmux
@@ -153,17 +155,13 @@ def has_sparserestore_capability(lockdown_client: LockdownClient = None) -> bool
     return minor == 0
 
 
-# --- iOS 27+ four-phase restore --------------------------------------------
+# --- iOS 27+ three-phase restore -------------------------------------------
 #
 # Progress is mapped into per-phase ranges so the GUI bar never jumps
-# backwards:
-#   Phase 1 (protective backup):        0-35
-#   Phase 2 (sparse restore + reboot):  35-55
-#   Phase 3 (reconnect + restore):      55-90
-#   Phase 4 (encrypted keychain backup): 90-100
-_PHASE_BACKUP_END = 35
-_PHASE_TWEAK_END = 55
-_PHASE_RESTORE_END = 90
+# backwards: Phase 1 (protective backup) 0-40, Phase 2 (sparse restore +
+# reboot) 40-60, Phase 3 (reconnect + protective restore) 60-100.
+_PHASE_BACKUP_END = 40
+_PHASE_TWEAK_END = 60
 
 # How long to wait for the device to come back after the iOS 27 security
 # recovery before giving up. Apple logo → reboot → progress bar (like
@@ -193,41 +191,6 @@ _HOME_DOMAIN_TWEAK_PATHS = (
 # protective scope, so tweak files landing there must be injected by hand.
 _SYSTEM_PREFERENCES_TWEAK_PATHS = (
     "FeatureFlags/Global.plist",  # Status Bar (Speakeasy) feature flag override
-)
-
-# Run 7 (iOS 27): the Speakeasy gate in SpringBoard reads flag
-# "Speakeasy"/"SpeakeasyNewStatusBar" of domain "SpringBoard" (confirmed in
-# /System/Library/FeatureFlags/Domain/SpringBoard.plist of 24A5408d). The only
-# override store FeatureFlags.framework reads is /var/preferences/FeatureFlags/
-# Settings.plist, so every writable surface gets armed: the HomeDomain prefs
-# plists (CFPreferences suites read by SpringBoard/UIKit at boot) plus a new
-# SystemPreferencesDomain row aimed at the system store (delivery is verified
-# via the post-restore backup).
-_SPEAKEASY_DISABLE_FLAGS = (
-    "Speakeasy",
-    "SpeakeasyNewStatusBar",
-    "SpeakeasyAttributionManager",
-    "SpeakeasyStatusBarWindowRotation",
-)
-_SPEAKEASY_PREF_KEYS = {flag: False for flag in _SPEAKEASY_DISABLE_FLAGS}
-_SPEAKEASY_FLAG_DICT = {flag: {"Enabled": False} for flag in _SPEAKEASY_DISABLE_FLAGS}
-_SPEAKEASY_PLIST_PATHS = (
-    "Library/Preferences/com.apple.springboard.plist",
-    "Library/Preferences/com.apple.SpringBoard.plist",
-    "Library/Preferences/com.apple.UIKit.plist",
-    "Library/Preferences/com.apple.FeatureFlags.plist",
-)
-# MCX (MDM) managed preferences — read with higher priority than user
-# defaults by CFPreferences, so they can force the gate's pref lookups off.
-_SPEAKEASY_MANAGED_PLIST_PATHS = (
-    "mobile/com.apple.springboard.plist",
-    "mobile/com.apple.UIKit.plist",
-    "mobile/com.apple.FeatureFlags.plist",
-)
-_SYSTEM_FF_SETTINGS_PATH = "FeatureFlags/Settings.plist"
-_ROOT_DOMAIN_FF_PATHS = (
-    "preferences/FeatureFlags/Settings.plist",
-    "Library/FeatureFlags/Settings.plist",
 )
 
 
@@ -260,59 +223,6 @@ def _read_manifest_plist(device_dir: str, domain: str, rel_path: str):
         return plistlib.loads(data)
     except Exception:
         return {}
-
-
-def _inject_speakeasy_disable(backup_root: str, udid: str) -> list:
-    """Arm every writable Speakeasy-disable surface in the pruned backup."""
-    device_dir = os.path.join(backup_root, udid)
-    if not os.path.isdir(device_dir):
-        device_dir = backup_root
-    if not os.path.exists(os.path.join(device_dir, "Manifest.db")):
-        return []
-    injected = []
-    for rel_path in _SPEAKEASY_PLIST_PATHS:
-        plist = _read_manifest_plist(device_dir, "HomeDomain", rel_path)
-        if rel_path.endswith("com.apple.FeatureFlags.plist"):
-            category = plist.setdefault("SpringBoard", {})
-            category.update(_SPEAKEASY_FLAG_DICT)
-        else:
-            plist.update(_SPEAKEASY_PREF_KEYS)
-        ok = inject_file_into_backup(
-            backup_root, udid, "HomeDomain", rel_path,
-            plistlib.dumps(plist, fmt=plistlib.FMT_BINARY),
-            mode=_FileMode.S_IFREG | 0o644,
-        )
-        injected.append((f"HomeDomain/{rel_path}", ok))
-    for rel_path in _SPEAKEASY_MANAGED_PLIST_PATHS:
-        plist = _read_manifest_plist(device_dir, "ManagedPreferencesDomain", rel_path)
-        if rel_path.endswith("com.apple.FeatureFlags.plist"):
-            category = plist.setdefault("SpringBoard", {})
-            category.update(_SPEAKEASY_FLAG_DICT)
-        else:
-            plist.update(_SPEAKEASY_PREF_KEYS)
-        ok = inject_file_into_backup(
-            backup_root, udid, "ManagedPreferencesDomain", rel_path,
-            plistlib.dumps(plist, fmt=plistlib.FMT_BINARY),
-            mode=_FileMode.S_IFREG | 0o644,
-        )
-        injected.append((f"ManagedPreferencesDomain/{rel_path}", ok))
-    settings = {"SpringBoard": dict(_SPEAKEASY_FLAG_DICT)}
-    ok = inject_file_into_backup(
-        backup_root, udid, "SystemPreferencesDomain", _SYSTEM_FF_SETTINGS_PATH,
-        plistlib.dumps(settings, fmt=plistlib.FMT_BINARY),
-        mode=_FileMode.S_IFREG | 0o644,
-        owner=0, group=0,
-    )
-    injected.append((f"SystemPreferencesDomain/{_SYSTEM_FF_SETTINGS_PATH}", ok))
-    for rel_path in _ROOT_DOMAIN_FF_PATHS:
-        ok = inject_file_into_backup(
-            backup_root, udid, "RootDomain", rel_path,
-            plistlib.dumps(settings, fmt=plistlib.FMT_BINARY),
-            mode=_FileMode.S_IFREG | 0o644,
-            owner=0, group=0,
-        )
-        injected.append((f"RootDomain/{rel_path}", ok))
-    return injected
 
 
 def _scaled_callback(progress_callback, lo: float, hi: float):
@@ -423,22 +333,17 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
 
 async def _restore_ios27(back: backup.Backup, reboot: bool,
                          lockdown_client: LockdownClient, progress_callback):
-    """iOS 27+ four-phase restore: backup → tweak → reboot → restore → keychain backup.
+    """iOS 27+ three-phase restore: backup → tweak → reboot → restore.
 
-    Phase 1 (0-35%):  Selective backup of photos, Apple ID, and user
+    Phase 1 (0-40%):  Selective backup of photos, Apple ID, and user
                       settings. Non-protective data is discarded mid-stream,
                       so no multi-GB full backup ever hits the disk.
                       (KeychainDomain is skipped — enabling backup
                       encryption is slow and not needed for tweaks.)
-    Phase 2 (35-55%): Apply tweaks via sparse restore → reboot, which
+    Phase 2 (40-60%): Apply tweaks via sparse restore → reboot, which
                       triggers the iOS 27 "safe state recovery" wipe.
-    Phase 3 (55-90%): Reconnect and restore the pruned Phase 1 backup so
+    Phase 3 (60-100%): Reconnect and restore the pruned Phase 1 backup so
                       user data survives the wipe.
-    Phase 4 (90-100%): Encrypted backup of KeychainDomain + HomeDomain
-                      (Apple ID accounts, ConfigurationProfiles, preferences).
-                      This gives the user a complete encrypted backup they can
-                      restore from if anything goes wrong. Requires device
-                      passcode for encryption.
     """
     udid = lockdown_client.udid
     protective_dir = tempfile.mkdtemp(prefix="nugget_protective_")
@@ -446,29 +351,27 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
     os.makedirs(backup_root, exist_ok=True)
     backup_complete = False
     try:
-        # === Phase 1: selective protective backup (0-35%) ===
+        log_info(f"Starting iOS 27 restore for device {udid}")
+        log_info(f"Protective backup directory: {protective_dir}")
+        
+        # === Phase 1: selective protective backup (0-40%) ===
         progress_callback(0)
+        log_info("Phase 1: Starting protective backup (photos, Apple ID, settings, home screen)")
         await perform_protective_backup(
             lockdown_client, backup_root,
             progress_callback=_scaled_callback(progress_callback, 0, _PHASE_BACKUP_END),
             include_photos=True,
         )
         backup_complete = True
+        log_info("Phase 1: Protective backup completed")
 
-        # Prune Manifest.db + orphan payloads in a worker thread — a full
-        # manifest can have 100k+ rows, too heavy for the event loop.
+        # Prune Manifest.db + orphan payloads in a worker thread
         removed_rows, removed_files = await asyncio.to_thread(
             clean_backup_for_restore, backup_root, udid
         )
-        print(f"[iOS27] Protective backup pruned: "
-              f"-{removed_rows} manifest rows, -{removed_files} payload files")
+        log_info(f"Phase 1: Pruned backup: -{removed_rows} manifest rows, -{removed_files} payload files")
 
-        # Re-inject the HomeDomain tweak files into the pruned backup so Phase
-        # 3 restores their *fresh* content. The wipe can drop the copy the
-        # sparse restore (Phase 2) stages, and these paths are intentionally
-        # excluded from the backup so a stale on-device copy never overwrites
-        # the tweak — injecting the new content covers both cases. AFC cannot
-        # reach HomeDomain on iOS 27, so this is the only reliable path.
+        # Re-inject the HomeDomain tweak files into the pruned backup
         for file in back.files:
             if (isinstance(file, backup.ConcreteFile)
                     and file.domain == "HomeDomain"
@@ -486,15 +389,12 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                     file.read_contents(),
                     mode=_FileMode.S_IFREG | 0o644,
                     owner=file.owner, group=file.group)
-                print(f"[iOS27] Injected {file.domain}/{file.path} "
-                      f"into protective backup: {ok}")
-
-        for label, ok in _inject_speakeasy_disable(backup_root, udid):
-            print(f"[iOS27] Speakeasy-disable {label}: {ok}")
+                log_info(f"Injected {file.domain}/{file.path} into protective backup: {ok}")
 
         progress_callback(_PHASE_BACKUP_END)
 
-        # === Phase 2: apply tweaks → reboot (35-55%) ===
+        # === Phase 2: apply tweaks → reboot (40-60%) ===
+        log_info("Phase 2: Applying tweaks via sparse restore")
         try:
             await perform_restore(
                 backup=back, reboot=True,
@@ -505,59 +405,41 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
         except (ConnectionTerminatedError, ssl.SSLEOFError,
                 ConnectionAbortedError, ConnectionResetError):
             # Device rebooted before acknowledging — expected.
+            log_info("Phase 2: Device rebooted during sparse restore (expected)")
             pass
         progress_callback(_PHASE_TWEAK_END)
 
-        # === Phase 3: reconnect + restore protective backup (55-90%) ===
+        # === Phase 3: reconnect + restore protective backup (60-100%) ===
+        log_info("Phase 3: Waiting for device to reconnect after security recovery")
         lc = await _wait_for_device(udid, progress_callback)
         try:
-            # SpringBoard may still be launching after a fresh boot; the
-            # restore retry loop handles readiness, this just avoids an
-            # instant first failure.
-            progress_callback("Waiting for SpringBoard to finish launching...")
+            # SpringBoard may still be launching after a fresh boot
+            log_info("Phase 3: Waiting for SpringBoard to finish launching...")
             await asyncio.sleep(10)
             await _restore_protective_backup(
                 lc, backup_root, udid, reboot,
-                _scaled_callback(progress_callback, _PHASE_TWEAK_END, _PHASE_RESTORE_END))
+                _scaled_callback(progress_callback, _PHASE_TWEAK_END, 100))
+            log_info("Phase 3: Protective backup restored successfully")
         finally:
             try:
                 await lc.close()
             except Exception:
-                # Connection may already be severed by the final reboot.
                 pass
-
-        # === Phase 4: encrypted keychain + Apple ID backup (90-100%) ===
-        progress_callback(_PHASE_RESTORE_END)
-        keychain_dir = os.path.join(protective_dir, "keychain_backup")
-        os.makedirs(keychain_dir, exist_ok=True)
-        try:
-            # Reconnect for the keychain backup (Phase 3's connection is closed)
-            lc4 = await _wait_for_device(udid, progress_callback, timeout=60)
-            await perform_keychain_appleid_backup(
-                lc4, keychain_dir,
-                progress_callback=_scaled_callback(progress_callback, _PHASE_RESTORE_END, 100))
-            await lc4.close()
-            print(f"[iOS27] Phase 4 complete: encrypted keychain backup at {keychain_dir}")
-        except Exception as e:
-            # Phase 4 is best-effort — don't fail the whole restore if it fails.
-            print(f"[iOS27] Phase 4 (keychain backup) failed: {e}")
-            progress_callback("Keychain backup failed (non-fatal)")
     except Exception as e:
         if backup_complete:
-            # Phase 1 succeeded but a later phase failed: keep the backup
-            # so the user's photos/settings are recoverable, and say where.
             kept = os.path.join(protective_dir, "device_backup")
-            print(f"[iOS27] Restore failed; protective backup kept at: {kept}")
+            log_error(f"Restore failed; protective backup kept at: {kept}")
             try:
                 e.add_note(f"Protective backup kept at: {kept}")
             except AttributeError:
-                pass  # Python < 3.11 — path is still in the log.
+                pass
             raise
-        # Backup never completed — nothing worth keeping, don't leak data.
+        log_error(f"Restore failed before backup completed: {e}")
         shutil.rmtree(protective_dir, ignore_errors=True)
         raise
 
     shutil.rmtree(protective_dir, ignore_errors=True)
+    log_info("iOS 27 restore completed successfully")
     progress_callback(100)
 
 

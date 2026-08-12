@@ -231,6 +231,27 @@ class SettingsPage(Page):
         self.ui.booksContainerUUIDTxt.textEdited.connect(self.on_booksContainerUUIDTxt_textEdited)
 
         self.ui.trustStoreChk.toggled.connect(self.on_trustStoreChk_toggled)
+        # Experimental: encrypted backup option
+        if not hasattr(self.ui, 'encryptedBackupChk'):
+            from PySide6.QtWidgets import QCheckBox
+            from PySide6.QtCore import Qt, QCoreApplication
+            self.ui.encryptedBackupChk = QCheckBox(self.ui.settingsPageContent)
+            self.ui.encryptedBackupChk.setObjectName("encryptedBackupChk")
+            self.ui.encryptedBackupChk.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.ui.encryptedBackupChk.setToolTip(QCoreApplication.tr(
+                "EXPERIMENTAL: Allow encrypted backups (includes keychain). "
+                "Requires knowing backup password. If disabled, encrypted backups are rejected."))
+            self.ui.encryptedBackupChk.setText(QCoreApplication.tr(
+                "Use Encrypted Backups (Experimental)"))
+            # Insert after trustStoreChk in the layout
+            layout = self.ui._21
+            idx = layout.indexOf(self.ui.trustStoreChk)
+            if idx >= 0:
+                layout.insertWidget(idx + 1, self.ui.encryptedBackupChk)
+            else:
+                layout.addWidget(self.ui.encryptedBackupChk)
+        self.ui.encryptedBackupChk.toggled.connect(self.on_encryptedBackupChk_toggled)
+
         self.ui.skipSetupChk.toggled.connect(self.on_skipSetupChk_toggled)
         self.ui.supervisionChk.toggled.connect(self.on_supervisionChk_toggled)
         self.ui.supervisionOrganization.textEdited.connect(self.on_supervisionOrgTxt_textEdited)
@@ -319,6 +340,11 @@ class SettingsPage(Page):
         self.window.device_manager.pref_manager.restore_truststore = checked
         # save the setting
         self.window.settings.setValue("restore_truststore", checked)
+
+    # Experimental options
+    def on_encryptedBackupChk_toggled(self, checked: bool):
+        self.window.device_manager.pref_manager.use_encrypted_backup = checked
+        self.window.settings.setValue("use_encrypted_backup", checked)
 
     def on_skipSetupChk_toggled(self, checked: bool):
         self.window.device_manager.pref_manager.skip_setup = checked

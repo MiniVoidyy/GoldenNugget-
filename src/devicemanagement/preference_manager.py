@@ -20,6 +20,7 @@ class PreferenceManager:
         self.auto_refresh_posterboard = True
         self.rebuild_sb_application_state_db = False
         self.restore_truststore = False
+        self.use_encrypted_backup = False
         self.bookrestore_apply_mode = BookRestoreApplyMethod.AFC
         self.bookrestore_transfer_mode = BookRestoreFileTransferMethod.LocalHost
         self.skip_setup = True

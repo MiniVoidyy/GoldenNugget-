@@ -152,6 +152,29 @@ class DeviceManager:
             if self.pref_manager.apply_over_wifi or device.is_usb:
                 try:
                     ld = await create_using_usbmux(serial=device.serial)
+                    # Check backup encryption status if experimental option not enabled
+                    if not self.pref_manager.use_encrypted_backup:
+                        try:
+                            from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
+                            mb = Mobilebackup2Service(ld)
+                            await mb.connect()
+                            is_encrypted = await mb.get_will_encrypt()
+                            await mb.close()
+                            if is_encrypted:
+                                show_alert(ApplyAlertMessage(
+                                    txt=QCoreApplication.tr("Backup encryption is enabled on this device."),
+                                    detailed_txt=QCoreApplication.tr(
+                                        "GoldenNugget cannot work with encrypted backups unless the experimental "
+                                        "\"Use Encrypted Backups\" option is enabled in Settings.\n\n"
+                                        "Options:\n"
+                                        "1. Disable backup encryption on device: Settings → General → Transfer or Reset iPhone → Backup Password → Turn Off\n"
+                                        "2. Or enable \"Use Encrypted Backups (Experimental)\" in GoldenNugget Settings (requires knowing your backup password)."
+                                    )
+                                ))
+                                self.set_current_device(index=None)
+                                return
+                        except Exception:
+                            pass  # If we can't check, continue anyway
                     vals = ld.all_values
                     model = vals['ProductType']
                     hardware = vals['HardwareModel']
