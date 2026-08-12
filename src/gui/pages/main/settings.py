@@ -7,7 +7,7 @@ from src.qt.mainwindow_ui import Ui_Nugget
 
 from PySide6.QtCore import QCoreApplication, QLocale, QSize, Qt
 from PySide6.QtWidgets import (
-    QFrame, QHBoxLayout, QInputDialog, QLabel,
+    QFileDialog, QFrame, QHBoxLayout, QInputDialog, QLabel,
     QLineEdit, QListWidget, QMessageBox, QSizePolicy, QSpacerItem,
     QToolButton, QVBoxLayout, QWidget,
 )
@@ -92,23 +92,27 @@ class SettingsPage(Page):
         title_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         presets_layout.addLayout(title_layout)
 
-        # name input + save button
+        # name input + description + save button
         save_layout = QHBoxLayout()
         save_layout.setContentsMargins(-1, -1, -1, 0)
         self.presetNameTxt = QLineEdit(presets_widget)
         self.presetNameTxt.setObjectName("presetNameTxt")
         self.presetNameTxt.setPlaceholderText(QCoreApplication.tr("Preset name"))
-        save_layout.addWidget(self.presetNameTxt)
+        save_layout.addWidget(self.presetNameTxt, 2)
+        self.presetDescTxt = QLineEdit(presets_widget)
+        self.presetDescTxt.setObjectName("presetDescTxt")
+        self.presetDescTxt.setPlaceholderText(QCoreApplication.tr("Description (optional)"))
+        save_layout.addWidget(self.presetDescTxt, 3)
         self.presetSaveBtn = QToolButton(presets_widget)
         self.presetSaveBtn.setObjectName("presetSaveBtn")
         self.presetSaveBtn.setText(QCoreApplication.tr("Save Preset"))
         save_layout.addWidget(self.presetSaveBtn)
         presets_layout.addLayout(save_layout)
 
-        # saved presets list
+        # saved presets list with metadata
         self.presetList = QListWidget(presets_widget)
         self.presetList.setObjectName("presetList")
-        self.presetList.setMinimumSize(0, 100)
+        self.presetList.setMinimumSize(0, 140)
         self.presetList.setStyleSheet("QListWidget {\n"
                                       "\tbackground-color: #3b3b3b;\n"
                                       "\tborder: none;\n"
@@ -118,15 +122,15 @@ class SettingsPage(Page):
                                       "\tpadding: 4px;\n"
                                       "}\n"
                                       "QListWidget::item {\n"
-                                      "\tpadding: 4px;\n"
+                                      "\tpadding: 8px;\n"
                                       "}\n"
                                       "QListWidget::item:selected {\n"
                                       "\tbackground-color: #535353;\n"
                                       "\tcolor: #ffffff;\n"
                                       "}")
-        presets_layout.addWidget(self.presetList)
+        presets_layout.addWidget(self.presetList, 1)
 
-        # load / delete / refresh row
+        # load / delete / refresh / export / import row
         btns_layout = QHBoxLayout()
         btns_layout.setContentsMargins(-1, -1, -1, 0)
         self.presetLoadBtn = QToolButton(presets_widget)
@@ -141,6 +145,14 @@ class SettingsPage(Page):
         self.presetRefreshBtn.setObjectName("presetRefreshBtn")
         self.presetRefreshBtn.setText(QCoreApplication.tr("Refresh"))
         btns_layout.addWidget(self.presetRefreshBtn)
+        self.presetExportBtn = QToolButton(presets_widget)
+        self.presetExportBtn.setObjectName("presetExportBtn")
+        self.presetExportBtn.setText(QCoreApplication.tr("Export"))
+        btns_layout.addWidget(self.presetExportBtn)
+        self.presetImportBtn = QToolButton(presets_widget)
+        self.presetImportBtn.setObjectName("presetImportBtn")
+        self.presetImportBtn.setText(QCoreApplication.tr("Import"))
+        btns_layout.addWidget(self.presetImportBtn)
         presets_layout.addLayout(btns_layout)
 
         # insert the section after the PosterBoard checkboxes, before BookRestore
@@ -271,6 +283,8 @@ class SettingsPage(Page):
         self.presetLoadBtn.clicked.connect(self.on_presetLoadBtn_clicked)
         self.presetDeleteBtn.clicked.connect(self.on_presetDeleteBtn_clicked)
         self.presetRefreshBtn.clicked.connect(self.on_presetRefreshBtn_clicked)
+        self.presetExportBtn.clicked.connect(self.on_presetExportBtn_clicked)
+        self.presetImportBtn.clicked.connect(self.on_presetImportBtn_clicked)
 
         self.originalsSaveBtn.clicked.connect(self.on_originalsSaveBtn_clicked)
         self.originalsDeleteBtn.clicked.connect(self.on_originalsDeleteBtn_clicked)
@@ -386,11 +400,22 @@ class SettingsPage(Page):
     ## PRESETS
     def refresh_presets(self):
         self.presetList.clear()
-        for name in self.preset_manager.list_presets():
-            self.presetList.addItem(name)
+        for meta in self.preset_manager.list_presets_with_metadata():
+            name = meta["name"]
+            desc = meta.get("description", "")
+            model = meta.get("device_model", "Unknown")
+            ios = meta.get("ios_version", "Unknown")
+            tags = meta.get("tags", [])
+            tag_str = "  #" + " #".join(tags) if tags else ""
+            if desc:
+                item_text = f"{name}\n  {desc}  ({model} • iOS {ios}){tag_str}"
+            else:
+                item_text = f"{name}  ({model} • iOS {ios}){tag_str}"
+            self.presetList.addItem(item_text)
 
     def on_presetSaveBtn_clicked(self):
         default_name = self.presetNameTxt.text().strip()
+        default_desc = self.presetDescTxt.text().strip()
         name, ok = QInputDialog.getText(
             self.window, QCoreApplication.tr("Save Preset"),
             QCoreApplication.tr("Enter a name for this preset:"),
@@ -398,8 +423,16 @@ class SettingsPage(Page):
         )
         if not ok or name.strip() == "":
             return
-        if self.preset_manager.save_preset(name.strip()):
+        desc, ok2 = QInputDialog.getText(
+            self.window, QCoreApplication.tr("Save Preset"),
+            QCoreApplication.tr("Enter a description (optional):"),
+            text=default_desc
+        )
+        if not ok2:
+            desc = default_desc
+        if self.preset_manager.save_preset(name.strip(), desc.strip(), tags=[]):
             self.presetNameTxt.clear()
+            self.presetDescTxt.clear()
             self.refresh_presets()
             QMessageBox.information(
                 self.window, QCoreApplication.tr("Save Preset"),
@@ -418,10 +451,16 @@ class SettingsPage(Page):
                 QCoreApplication.tr("Select a preset to load first.")
             )
             return
-        name = self.presetList.currentItem().text()
+        # Extract name from the first line of the item text
+        item_text = self.presetList.currentItem().text()
+        name = item_text.split("\n")[0].strip()
+        meta = self.preset_manager.get_preset_metadata(name)
+        desc = meta.get("description", "") if meta else ""
+        model = meta.get("device_model", "Unknown") if meta else "Unknown"
+        ios = meta.get("ios_version", "Unknown") if meta else "Unknown"
         confirm = QMessageBox.question(
             self.window, QCoreApplication.tr("Load Preset"),
-            QCoreApplication.tr("Load preset \"{0}\"?\n\nThis will replace your current configuration.").format(name)
+            QCoreApplication.tr("Load preset \"{0}\"?\n\nDescription: {1}\nDevice: {2} • iOS {3}\n\nThis will replace your current configuration.").format(name, desc, model, ios)
         )
         if confirm != QMessageBox.StandardButton.Yes:
             return
@@ -448,7 +487,8 @@ class SettingsPage(Page):
                 QCoreApplication.tr("Select a preset to delete first.")
             )
             return
-        name = self.presetList.currentItem().text()
+        item_text = self.presetList.currentItem().text()
+        name = item_text.split("\n")[0].strip()
         confirm = QMessageBox.question(
             self.window, QCoreApplication.tr("Delete Preset"),
             QCoreApplication.tr("Delete preset \"{0}\"?").format(name)
@@ -465,6 +505,54 @@ class SettingsPage(Page):
 
     def on_presetRefreshBtn_clicked(self):
         self.refresh_presets()
+
+    def on_presetExportBtn_clicked(self):
+        if self.presetList.currentRow() < 0:
+            QMessageBox.warning(
+                self.window, QCoreApplication.tr("Export Preset"),
+                QCoreApplication.tr("Select a preset to export first.")
+            )
+            return
+        item_text = self.presetList.currentItem().text()
+        name = item_text.split("\n")[0].strip()
+        file_path, _ = QFileDialog.getSaveFileName(
+            self.window, QCoreApplication.tr("Export Preset"),
+            f"{name}.json",
+            QCoreApplication.tr("JSON Files (*.json)")
+        )
+        if not file_path:
+            return
+        if self.preset_manager.export_preset(name, file_path):
+            QMessageBox.information(
+                self.window, QCoreApplication.tr("Export Preset"),
+                QCoreApplication.tr("Preset exported to:\n{0}").format(file_path)
+            )
+        else:
+            QMessageBox.critical(
+                self.window, QCoreApplication.tr("Export Preset"),
+                QCoreApplication.tr("Failed to export preset.")
+            )
+
+    def on_presetImportBtn_clicked(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self.window, QCoreApplication.tr("Import Preset"),
+            "",
+            QCoreApplication.tr("JSON Files (*.json)")
+        )
+        if not file_path:
+            return
+        success, result = self.preset_manager.import_preset(file_path)
+        if success:
+            self.refresh_presets()
+            QMessageBox.information(
+                self.window, QCoreApplication.tr("Import Preset"),
+                QCoreApplication.tr("Preset \"{0}\" imported successfully.").format(result)
+            )
+        else:
+            QMessageBox.critical(
+                self.window, QCoreApplication.tr("Import Preset"),
+                QCoreApplication.tr("Failed to import preset:\n{0}").format(result)
+            )
 
     ## ORIGINAL PLISTS
     def update_originals_status(self):

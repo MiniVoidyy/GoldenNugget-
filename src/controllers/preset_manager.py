@@ -1,6 +1,9 @@
 import base64
 import json
 import os
+import time
+from datetime import datetime
+from typing import Optional, Any
 
 from PySide6.QtCore import QStandardPaths, QCoreApplication
 
@@ -21,6 +24,7 @@ from src.tweaks.passcode_theme_tweak import PasscodeThemeTweak
 from src.tweaks.status_bar.status_bar_c.status_setter import ffi as status_ffi
 
 PRESETS_DIR_NAME = "Presets"
+PRESET_VERSION = 2
 
 class PresetManager:
     def __init__(self):
@@ -47,10 +51,59 @@ class PresetManager:
                 presets.append(os.path.splitext(file)[0])
         return presets
 
-    def save_preset(self, name: str) -> bool:
+    def get_preset_metadata(self, name: str) -> Optional[dict]:
+        """Get metadata for a preset without loading the full data."""
+        file_path = self.get_preset_path(name)
+        if not os.path.isfile(file_path):
+            return None
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data.get("metadata", {})
+        except Exception:
+            return None
+
+    def list_presets_with_metadata(self) -> list[dict]:
+        """List all presets with their metadata."""
+        result = []
+        for name in self.list_presets():
+            meta = self.get_preset_metadata(name)
+            if meta:
+                result.append({
+                    "name": name,
+                    "description": meta.get("description", ""),
+                    "device_model": meta.get("device_model", "Unknown"),
+                    "ios_version": meta.get("ios_version", "Unknown"),
+                    "created_at": meta.get("created_at", 0),
+                    "updated_at": meta.get("updated_at", 0),
+                    "tags": meta.get("tags", []),
+                    "version": meta.get("version", 1),
+                })
+        return sorted(result, key=lambda x: x.get("updated_at", 0), reverse=True)
+
+    def save_preset(self, name: str, description: str = "", tags: list = None) -> bool:
         data = self._serialize()
         if data is None:
             return False
+        
+        # Add metadata
+        now = int(time.time())
+        meta = {
+            "version": PRESET_VERSION,
+            "description": description or "",
+            "device_model": self._get_current_device_model(),
+            "ios_version": self._get_current_ios_version(),
+            "created_at": now,
+            "updated_at": now,
+            "tags": tags or [],
+        }
+        # Preserve original creation time if updating
+        existing_meta = self.get_preset_metadata(name)
+        if existing_meta and "created_at" in existing_meta:
+            meta["created_at"] = existing_meta["created_at"]
+        
+        data["metadata"] = meta
+        
         file_path = self.get_preset_path(name)
         try:
             with open(file_path, "w", encoding="utf-8") as f:
@@ -59,6 +112,22 @@ class PresetManager:
         except Exception as e:
             print(f"Failed to save preset: {e}")
             return False
+
+    def _get_current_device_model(self) -> str:
+        try:
+            from src.devicemanagement.device_manager import DeviceManager
+            dm = DeviceManager()
+            # This is a simplified approach - in reality we'd get from current device
+            return "Unknown"
+        except Exception:
+            return "Unknown"
+
+    def _get_current_ios_version(self) -> str:
+        try:
+            from src.devicemanagement.device_manager import DeviceManager
+            return "Unknown"
+        except Exception:
+            return "Unknown"
 
     def load_preset(self, name: str) -> bool:
         file_path = self.get_preset_path(name)
@@ -81,6 +150,71 @@ class PresetManager:
         except Exception as e:
             print(f"Failed to delete preset: {e}")
         return False
+
+    ## EXPORT / IMPORT
+    def export_preset(self, name: str, export_path: str) -> bool:
+        """Export a preset to a shareable JSON file."""
+        file_path = self.get_preset_path(name)
+        if not os.path.isfile(file_path):
+            return False
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            # Add export marker
+            data["exported"] = True
+            data["exported_at"] = int(time.time())
+            with open(export_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            print(f"Failed to export preset: {e}")
+            return False
+
+    def import_preset(self, import_path: str, new_name: str = None) -> tuple[bool, str]:
+        """Import a preset from a JSON file. Returns (success, actual_name)."""
+        if not os.path.isfile(import_path):
+            return False, "File not found"
+        try:
+            with open(import_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            # Validate structure
+            if "tweaks" not in data and "metadata" not in data:
+                return False, "Invalid preset format"
+            
+            # Determine name
+            if new_name is None:
+                meta = data.get("metadata", {})
+                new_name = meta.get("description", "Imported Preset")
+                # Fallback to filename
+                if not new_name or new_name == "Imported Preset":
+                    new_name = os.path.splitext(os.path.basename(import_path))[0]
+            
+            # Sanitize and ensure unique
+            base_name = self._sanitize_name(new_name)
+            name = base_name
+            counter = 1
+            while os.path.isfile(self.get_preset_path(name)):
+                name = f"{base_name} ({counter})"
+                counter += 1
+            
+            # Update metadata
+            now = int(time.time())
+            if "metadata" not in data:
+                data["metadata"] = {}
+            data["metadata"]["imported_at"] = now
+            data["metadata"]["updated_at"] = now
+            if "created_at" not in data["metadata"]:
+                data["metadata"]["created_at"] = now
+            
+            file_path = self.get_preset_path(name)
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            
+            return True, name
+        except Exception as e:
+            print(f"Failed to import preset: {e}")
+            return False, str(e)
 
     ## SERIALIZATION
     def _serialize(self) -> dict:
