@@ -472,13 +472,9 @@ def load_daemons():
     tweaks.update(additional_tweaks)
 
 def load_all_tweaks(version: str):
-    parsed_ver = Version(version)
-    if parsed_ver <= Version("18.2"):
-        # load mobilegestalt + eligibility tweaks
-        load_mobilegestalt()
-        load_eligibility()
-    if parsed_ver < Version("18.1"):
-        # load feature flags
-        load_featureflags()
+    # iOS 26.2+ (iOS 27 era) - all tweaks available
+    load_mobilegestalt()
+    load_eligibility()
+    load_featureflags()
     load_internal()
     load_daemons()

@@ -15,6 +15,7 @@ Manifest.db is then used to map ``(domain, relativePath)`` back to the
 payload files.
 """
 
+import asyncio
 import plistlib
 import sqlite3
 import traceback
@@ -163,6 +164,7 @@ async def psysbackup(
     paths: list[str],
     update_label=lambda x: None,
     update_progress=lambda x: None,
+    backup_password: str = "",
 ) -> dict[str, bytes]:
     """Capture and template the given absolute plist paths from the device.
 
@@ -173,29 +175,92 @@ async def psysbackup(
     device abort with ``Manifest references files not in backup``), then reads
     the wanted payloads straight from the on-device Manifest.db. The backup is
     kept in a temporary directory that is removed when done.
+
+    If backup_password is provided and the device has encryption enabled,
+    it will be used to decrypt the backup manifest.
     """
+    def _is_device_locked_error(exc: Exception) -> bool:
+        msg = str(exc)
+        return "ErrorCode" in msg and ("208" in msg or "Device locked" in msg or "MBErrorDomain" in msg)
+
+    def _is_connection_error(exc: Exception) -> bool:
+        msg = str(exc).lower()
+        return isinstance(exc, (
+            ConnectionError,
+            OSError,
+            asyncio.TimeoutError,
+        )) or "connection" in msg or "incomplete" in msg or "terminated" in msg
+
     update_label("Backing up device to capture original plists...")
-    ld = await create_using_usbmux(serial=udid)
-    try:
-        with TemporaryDirectory() as tmp_dir:
-            async with Mobilebackup2Service(ld) as backup_client:
-                await backup_client.backup(
-                    full=True,
-                    backup_directory=tmp_dir,
-                    progress_callback=update_progress,
-                )
-            return _read_originals(Path(tmp_dir) / udid, paths)
-    finally:
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        ld = await create_using_usbmux(serial=udid)
         try:
-            await ld.close()
-        except Exception:
-            pass
+            # Check if backup encryption is enabled on device
+            is_encrypted = False
+            try:
+                async with Mobilebackup2Service(ld) as backup_client:
+                    is_encrypted = await backup_client.get_will_encrypt()
+            except Exception:
+                pass
+
+            if is_encrypted:
+                if backup_password:
+                    update_label("Backup encryption enabled — using provided password to decrypt manifest...")
+                    print("[psysbackup] Backup encryption enabled, using provided password to decrypt manifest")
+                else:
+                    # Can't read encrypted manifest without password - skip snapshot
+                    update_label("Backup encryption enabled — skipping pre-apply snapshot (auto-revert unavailable).")
+                    print("[psysbackup] Backup encryption enabled on device, skipping pre-apply snapshot (cannot read encrypted manifest without password)")
+                    return {}
+
+            with TemporaryDirectory() as tmp_dir:
+                async with Mobilebackup2Service(ld) as backup_client:
+                    try:
+                        await backup_client.backup(
+                            full=True,
+                            backup_directory=tmp_dir,
+                            progress_callback=update_progress,
+                            password=backup_password,
+                        )
+                    except Exception as e:
+                        if _is_device_locked_error(e):
+                            update_label("Device locked during backup. Please unlock your device and keep it awake (tap screen periodically), then click Retry.")
+                            raise NuggetException("Device locked during backup. Please unlock your device, keep it awake, and try again.")
+                        if _is_connection_error(e) and attempt < max_retries:
+                            delay = min(2 ** attempt, 15)
+                            update_label(f"Connection lost, retrying in {delay}s... (attempt {attempt}/{max_retries})")
+                            await asyncio.sleep(delay)
+                            raise  # Continue to next retry
+                        raise
+                return _read_originals(Path(tmp_dir) / udid, paths)
+        finally:
+            try:
+                await ld.close()
+            except Exception:
+                pass
+        break  # Success
+
+
+def _validate_sqlite_db(db_path: Path) -> bool:
+    """Check if a file is a valid SQLite database."""
+    if not db_path.exists() or db_path.stat().st_size < 100:
+        return False
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
+        conn.close()
+        return True
+    except sqlite3.DatabaseError:
+        return False
 
 
 def _read_originals(device_dir: Path, paths: list[str]) -> dict[str, bytes]:
     manifest = device_dir / "Manifest.db"
     if not manifest.exists():
         raise NuggetException("Could not find the backup manifest (Manifest.db).")
+    if not _validate_sqlite_db(manifest):
+        raise NuggetException("Backup manifest (Manifest.db) is not a valid SQLite database. The backup may have failed or been interrupted.")
     conn = sqlite3.connect(str(manifest))
     try:
         rows = conn.execute("SELECT fileID, domain, relativePath FROM Files").fetchall()

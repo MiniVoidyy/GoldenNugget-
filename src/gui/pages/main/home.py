@@ -1,10 +1,11 @@
-import webbrowser
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtGui import QFont, QFontDatabase
 
 from ..page import Page
 from src.qt.mainwindow_ui import Ui_Nugget
 
 from src.devicemanagement.constants import Version
+
 
 class HomePage(Page):
     def __init__(self, window, ui: Ui_Nugget):
@@ -12,32 +13,14 @@ class HomePage(Page):
         self.window = window
         self.ui = ui
         self.show_uuid = False
+        
+        # Load Unbounded font
+        self.unbounded_font_id = QFontDatabase.addApplicationFont(":/fonts/Unbounded-VariableFont_wght.ttf")
+        self.unbounded_family = QFontDatabase.applicationFontFamilies(self.unbounded_font_id)[0] if self.unbounded_font_id != -1 else "Unbounded"
 
     def load_page(self):
         ## HOME PAGE ACTIONS
         self.ui.phoneVersionLbl.linkActivated.connect(self.toggle_version_label)
-
-        ## HOME PAGE LINKS
-        self.ui.bigNuggetBtn.clicked.connect(self.on_bigNuggetBtn_clicked)
-        self.ui.starOnGithubBtn.clicked.connect(self.on_githubBtn_clicked)
-
-        self.ui.mainDevBtn.clicked.connect(self.on_mainDevBtn_clicked)
-        self.ui.wind0ws11AeroBtn.clicked.connect(self.on_wind0ws11AeroBtn_clicked)
-
-        self.ui.leminGithubBtn.clicked.connect(self.on_leminGitHubBtn_clicked)
-        self.ui.leminTwitterBtn.clicked.connect(self.on_leminTwitterBtn_clicked)
-        self.ui.leminKoFiBtn.clicked.connect(self.on_leminKoFiBtn_clicked)
-        
-        self.ui.posterRestoreBtn.clicked.connect(self.on_posterRestoreBtn_clicked)
-        self.ui.snoolieBtn.clicked.connect(self.on_snoolieBtn_clicked)
-        self.ui.disfordottieBtn.clicked.connect(self.on_disfordottieBtn_clicked)
-        self.ui.mikasaBtn.clicked.connect(self.on_mikasaBtn_clicked)
-
-        self.ui.libiBtn.clicked.connect(self.on_libiBtn_clicked)
-        self.ui.duyBtn.clicked.connect(self.on_duyBtn_clicked)
-        self.ui.jjtechBtn.clicked.connect(self.on_jjtechBtn_clicked)
-        self.ui.qtBtn.clicked.connect(self.on_qtBtn_clicked)
-        self.ui.translatorsBtn.clicked.connect(self.on_translatorsBtn_clicked)
 
     ## ACTIONS
     def updatePhoneInfo(self):
@@ -67,49 +50,6 @@ class HomePage(Page):
 
     def show_version_text(self, version: str, build: str):
         support_str: str = "<span style=\"color: #32d74b;\">" + QCoreApplication.tr("Supported!") + "</span></a>"
-        if Version(version) < Version("17.0"):
-            support_str = "<span style=\"color: #ff0000;\">" + QCoreApplication.tr("Not Supported.") + "</span></a>"
-        elif not self.window.device_manager.get_current_device_is_supported_by_fork():
+        if not self.window.device_manager.get_current_device_is_supported_by_fork():
             support_str = "<span style=\"color: #ff0000;\">" + QCoreApplication.tr("Not Supported.") + "</span></a>"
         self.ui.phoneVersionLbl.setText(f"<a style=\"text-decoration:none; color: white;\" href=\"#\">iOS {version} ({build}) {support_str}")
-
-    ## HOME PAGE LINKS
-    def on_bigMilkBtn_clicked(self):
-        webbrowser.open_new_tab("https://cowabun.ga")
-
-    def on_leminGitHubBtn_clicked(self):
-        webbrowser.open_new_tab("https://github.com/leminlimez")
-    def on_leminTwitterBtn_clicked(self):
-        webbrowser.open_new_tab("https://twitter.com/LeminLimez")
-    def on_leminKoFiBtn_clicked(self):
-        webbrowser.open_new_tab("https://ko-fi.com/leminlimez")
-
-    def on_mainDevBtn_clicked(self):
-        webbrowser.open_new_tab("https://github.com/awesomenull-dev")
-    def on_wind0ws11AeroBtn_clicked(self):
-        webbrowser.open_new_tab("https://github.com/Wind0ws11Aero")
-
-    def on_posterRestoreBtn_clicked(self):
-        webbrowser.open_new_tab("https://discord.gg/gWtzTVhMvh")
-    def on_snoolieBtn_clicked(self):
-        webbrowser.open_new_tab("https://github.com/0xilis/python-aar-stuff")
-    def on_disfordottieBtn_clicked(self):
-        webbrowser.open_new_tab("https://twitter.com/disfordottie")
-    def on_mikasaBtn_clicked(self):
-        webbrowser.open_new_tab("https://github.com/Mikasa-san/QuietDaemon")
-
-    def on_libiBtn_clicked(self):
-        webbrowser.open_new_tab("https://github.com/doronz88/pymobiledevice3")
-    def on_jjtechBtn_clicked(self):
-        webbrowser.open_new_tab("https://github.com/JJTech0130/TrollRestore")
-    def on_duyBtn_clicked(self):
-        webbrowser.open_new_tab("https://github.com/khanhduytran0/bl_sbx")
-    def on_qtBtn_clicked(self):
-        webbrowser.open_new_tab("https://www.qt.io/product/development-tools")
-    def on_translatorsBtn_clicked(self):
-        webbrowser.open_new_tab("https://poeditor.com/join/project/UTqpVSE2UD")
-
-    def on_githubBtn_clicked(self):
-        webbrowser.open_new_tab("https://github.com/awesomenull-dev/GoldenNugget")
-    def on_bigNuggetBtn_clicked(self):
-        webbrowser.open_new_tab("https://cowabun.ga")

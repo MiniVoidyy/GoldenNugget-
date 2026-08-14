@@ -1,6 +1,20 @@
 import asyncio
 import sqlite3
 
+
+def _validate_sqlite_db(db_path: str) -> bool:
+    """Check if a file is a valid SQLite database."""
+    if not path.exists(db_path) or path.getsize(db_path) < 100:
+        return False
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
+        conn.close()
+        return True
+    except sqlite3.DatabaseError:
+        return False
+
+
 from PySide6.QtWidgets import QWizard, QWizardPage, QLabel, QVBoxLayout, QProgressBar, QSizePolicy, QCheckBox
 from PySide6.QtCore import QSize, Qt, QStandardPaths
 
@@ -17,6 +31,18 @@ from src.tweaks.tweaks import tweaks, TweakID
 
 async def backup_posterboard_database(udid: str, update_label=lambda x: None, update_progress=lambda x: None) -> str:
     """Back up the device and return the extracted PosterBoard sqlite db path."""
+    def _is_device_locked_error(exc: Exception) -> bool:
+        msg = str(exc)
+        return "ErrorCode" in msg and ("208" in msg or "Device locked" in msg or "MBErrorDomain" in msg)
+
+    def _is_connection_error(exc: Exception) -> bool:
+        msg = str(exc).lower()
+        return isinstance(exc, (
+            ConnectionError,
+            OSError,
+            asyncio.TimeoutError,
+        )) or "connection" in msg or "incomplete" in msg or "terminated" in msg
+
     app_data_path = path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), 'Backups')
     if not path.exists(app_data_path):
         makedirs(app_data_path)
@@ -29,22 +55,38 @@ async def backup_posterboard_database(udid: str, update_label=lambda x: None, up
             if not path.exists(path.join(backup_folder, file)):
                 needs_full = True
                 break
-    service_provider = await create_using_usbmux(serial=udid)
-    try:
-        # hard-block fetching the database from an unsupported (old) iOS version
-        if not is_supported_by_fork(service_provider.all_values.get("ProductVersion", "0.0")):
-            raise NuggetException(
-                "This version of iOS is not supported by this fork.\n\n"
-                "GoldenNugget only supports iOS 26.2 and newer. "
-                "Please use the original Nugget for iOS 26.1 and earlier.")
-        async with Mobilebackup2Service(service_provider) as backup_client:
-            await backup_client.backup(full=needs_full, backup_directory=app_data_path, progress_callback=update_progress)
-    finally:
-        await service_provider.close()
+
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        service_provider = await create_using_usbmux(serial=udid)
+        try:
+            # hard-block fetching the database from an unsupported (old) iOS version
+            if not is_supported_by_fork(service_provider.all_values.get("ProductVersion", "0.0")):
+                raise NuggetException(
+                    "This version of iOS is not supported by this fork.\n\n"
+                    "GoldenNugget only supports iOS 26.2 and newer. "
+                    "Please use the original Nugget for iOS 26.1 and earlier.")
+            async with Mobilebackup2Service(service_provider) as backup_client:
+                try:
+                    await backup_client.backup(full=needs_full, backup_directory=app_data_path, progress_callback=update_progress)
+                except Exception as e:
+                    if _is_device_locked_error(e):
+                        raise NuggetException("Device locked during backup. Please unlock your device, keep it awake (tap screen periodically), and try again.")
+                    if _is_connection_error(e) and attempt < max_retries:
+                        delay = min(2 ** attempt, 15)
+                        update_label(f"Connection lost, retrying in {delay}s... (attempt {attempt}/{max_retries})")
+                        await asyncio.sleep(delay)
+                        continue
+                    raise
+            break  # Success
+        finally:
+            await service_provider.close()
 
     # get the file, reading the sqlite db first to get the file id
     update_label("Getting the file...")
     db_path = path.join(backup_folder, "Manifest.db")
+    if not _validate_sqlite_db(db_path):
+        raise NuggetException("Backup manifest (Manifest.db) is not a valid SQLite database. The backup may have failed or been interrupted.")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(

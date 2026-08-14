@@ -6,7 +6,6 @@ from os import remove as rmfile
 from shutil import copyfile
 from typing import Optional
 
-from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreApplyMethod
 from src.tweaks.posterboard.pb_config_item import PBConfigItem
 from src.controllers.settings import Settings
 
@@ -21,8 +20,6 @@ class PreferenceManager:
         self.rebuild_sb_application_state_db = False
         self.restore_truststore = False
         self.use_encrypted_backup = False
-        self.bookrestore_apply_mode = BookRestoreApplyMethod.AFC
-        self.bookrestore_transfer_mode = BookRestoreFileTransferMethod.LocalHost
         self.skip_setup = True
         self.supervised = False
         self.organization_name = ""

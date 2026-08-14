@@ -22,12 +22,13 @@ def set_sudo_pwd(pwd: Optional[str]):
     sudo_pwd = pwd
 
 class ApplyAlertMessage:
-    def __init__(self, txt: str, title: str = "Error!", icon = QMessageBox.Critical, detailed_txt: str = None, is_revert: bool = False):
+    def __init__(self, txt: str, title: str = "Error!", icon = QMessageBox.Critical, detailed_txt: str = None, is_revert: bool = False, backup_path: str = None):
         self.txt = txt
         self.title = title
         self.icon = icon
         self.detailed_txt = detailed_txt
         self.is_revert = is_revert
+        self.backup_path = backup_path
 
 class ApplyThread(QThread):
     progress = Signal(str)

@@ -12,16 +12,25 @@ from cryptography import x509
 from cryptography.hazmat.primitives.serialization import Encoding
 from uuid import uuid4
 
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QInputDialog, QLineEdit
 from PySide6.QtCore import QSettings, QCoreApplication
+
+from packaging.version import Version
 
 from pymobiledevice3 import usbmux
 from pymobiledevice3.ca import create_keybag_file
 from pymobiledevice3.services.mobile_config import MobileConfigService
 from pymobiledevice3.lockdown import create_using_usbmux
-from pymobiledevice3.exceptions import MuxException, PasswordRequiredError, ConnectionTerminatedError, AccessDeniedError, InvalidServiceError
+from pymobiledevice3.exceptions import MuxException, PasswordRequiredError, ConnectionTerminatedError, AccessDeniedError, InvalidServiceError, PyMobileDevice3Exception
 from pymobiledevice3.services.afc import AfcService
+from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 import pymobiledevice3.service_connection as _sc
+
+
+def _is_device_locked_error(exc: Exception) -> bool:
+    """Check if an exception indicates the device is locked (ErrorCode 208)."""
+    msg = str(exc)
+    return "ErrorCode" in msg and ("208" in msg or "Device locked" in msg or "MBErrorDomain" in msg)
 
 # Bump SSL handshake timeout from 10s to 60s for all lockdown services.
 _sc.DEFAULT_SSL_HANDSHAKE_TIMEOUT = 60
@@ -56,7 +65,7 @@ from src.controllers.files_handler import get_bundle_files
 
 from src.exceptions.nugget_exception import NuggetException
 
-from src.tweaks.tweaks import tweaks, TweakID, FeatureFlagTweak, EligibilityTweak, AITweak, BookRestoreFileTweak, BasicPlistTweak, AdvancedPlistTweak, RdarFixTweak, NullifyFileTweak, StatusBarTweak, PasscodeThemeTweak
+from src.tweaks.tweaks import tweaks, TweakID, FeatureFlagTweak, EligibilityTweak, AITweak, BasicPlistTweak, AdvancedPlistTweak, RdarFixTweak, NullifyFileTweak, StatusBarTweak, PasscodeThemeTweak
 from src.tweaks.custom_gestalt_tweaks import CustomGestaltTweaks
 from src.tweaks.posterboard.posterboard_tweak import PosterboardTweak
 from src.tweaks.posterboard.template_options.templates_tweak import TemplatesTweak
@@ -65,8 +74,6 @@ from src.tweaks.basic_plist_locations import FileLocation
 from src.restore import reboot_device
 from src.restore.restore import restore_files, FileToRestore
 from src.restore.original_plist import psysbackup, materialize_plist, is_empty_plist, mobile_user_fallback_path
-from src.restore.bookrestore import perform_bookrestore, create_server_folder, create_local_server, cleanup_server_folder, close_dl_connection, generate_bldbmanager, br_files
-from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreApplyMethod
 from src.restore.mbdb import _FileMode
 
 def show_error_msg(txt: str, title: str = "Error!", icon = QMessageBox.Critical, detailed_txt: str = None):
@@ -117,7 +124,20 @@ def show_apply_error(e: Exception, update_label=lambda x: None, files_list: list
         return ApplyAlertMessage(str(e), detailed_txt=e.detailed_text)
     else:
         files_str: str = get_files_list_str(files_list)
-        return ApplyAlertMessage(type(e).__name__ + ": " + repr(e), detailed_txt=files_str + "TRACEBACK:\n\n" + str(traceback.format_exc()))
+        error_msg = type(e).__name__ + ": " + repr(e)
+        # Check if this is a protective backup failure with a backup path
+        backup_path = None
+        error_str = str(e)
+        if "protective backup kept at:" in error_str:
+            import re
+            match = re.search(r'protective backup kept at:\s*(\S+)', error_str)
+            if match:
+                backup_path = match.group(1)
+        return ApplyAlertMessage(
+            error_msg, 
+            detailed_txt=files_str + "TRACEBACK:\n\n" + str(traceback.format_exc()),
+            backup_path=backup_path
+        )
 
 class DeviceManager:
     ## Class Functions
@@ -162,13 +182,13 @@ class DeviceManager:
                             await mb.close()
                             if is_encrypted:
                                 show_alert(ApplyAlertMessage(
-                                    txt=QCoreApplication.tr("Backup encryption is enabled on this device."),
+                                    txt=QCoreApplication.tr("Backup encryption is enabled on your iPhone."),
                                     detailed_txt=QCoreApplication.tr(
-                                        "GoldenNugget cannot work with encrypted backups unless the experimental "
-                                        "\"Use Encrypted Backups\" option is enabled in Settings.\n\n"
-                                        "Options:\n"
-                                        "1. Disable backup encryption on device: Settings → General → Transfer or Reset iPhone → Backup Password → Turn Off\n"
-                                        "2. Or enable \"Use Encrypted Backups (Experimental)\" in GoldenNugget Settings (requires knowing your backup password)."
+                                        "GoldenNugget needs to temporarily disable backup encryption to apply tweaks safely.\n\n"
+                                        "Please choose one:\n"
+                                        "1. Disable encryption on your iPhone: Settings → General → Transfer or Reset iPhone → Backup Password → Turn Off\n"
+                                        "2. Or enable \"Use Encrypted Backups (Experimental)\" in GoldenNugget Settings → enter your backup password when prompted.\n\n"
+                                        "Tip: Option 1 is simpler if you don't know your backup password."
                                     )
                                 ))
                                 self.set_current_device(index=None)
@@ -481,18 +501,12 @@ class DeviceManager:
                 domain="ManagedPreferencesDomain"
             ))
 
-    def get_domain_for_path(self, path: str, owner: int = 501, use_bookrestore: bool = False) -> str:
+    def get_domain_for_path(self, path: str, owner: int = 501) -> str:
         # returns Domain: str?, Path: str
-        if ((self.get_current_device_supported() and not path.startswith("/var/mobile/")) or (not self.data_singleton.current_device.has_partial_sparserestore() and self.get_current_device_uses_bookrestore() and use_bookrestore)) and not owner == 0:
-            # don't do anything on sparserestore versions
-            return path, ""
-        fully_patched = not self.data_singleton.current_device.has_partial_sparserestore()
+        fully_patched = True
         # just make the Sys Containers to use the regular way (won't work for mga)
         sysSharedContainer = "SysSharedContainerDomain-"
         sysContainer = "SysContainerDomain-"
-        if not fully_patched:
-            sysSharedContainer += "."
-            sysContainer += "."
         mappings: dict = {
             "/var/Managed Preferences/": "ManagedPreferencesDomain",
             "/var/root/": "RootDomain",
@@ -515,9 +529,9 @@ class DeviceManager:
                 return new_path, new_domain
         return path, ""
     
-    def concat_file(self, contents: str, path: str, files_to_restore: list[FileToRestore], owner: int = 501, group: int = 501, use_bookrestore: bool = False):
+    def concat_file(self, contents: str, path: str, files_to_restore: list[FileToRestore], owner: int = 501, group: int = 501):
         # TODO: try using inodes here instead
-        file_path, domain = self.get_domain_for_path(path, owner=owner, use_bookrestore=use_bookrestore)
+        file_path, domain = self.get_domain_for_path(path, owner=owner)
         files_to_restore.append(FileToRestore(
             contents=contents,
             restore_path=file_path,
@@ -533,7 +547,7 @@ class DeviceManager:
                 "GoldenNugget only supports iOS 26.2 and newer. "
                 "Please use the original Nugget for iOS 26.1 and earlier."))
 
-    async def start_restore(self, files_to_restore: list[FileToRestore], use_bookrestore: bool, update_label=lambda x: None, skips_br_for_folders: bool=False, reboot_for_br: bool=False):
+    async def start_restore(self, files_to_restore: list[FileToRestore], update_label=lambda x: None, skips_br_for_folders: bool=False, reboot_for_br: bool=False, backup_password: str = ""):
         # hard-block any restore on an unsupported (old) iOS version
         self._raise_if_unsupported()
         # if skips_br_for_folders is True, the message will be added to the result letting them know that they can apply feature flags now
@@ -541,82 +555,22 @@ class DeviceManager:
         self.do_not_unplug = ""
         if self.data_singleton.current_device.connected_via_usb:
             self.do_not_unplug = "\n" + QCoreApplication.tr("DO NOT UNPLUG")
-        restore_bookrestore = use_bookrestore and not self.data_singleton.current_device.has_partial_sparserestore()
         # Use manual try/finally instead of async with so that ld.close()
         # errors (e.g. ConnectionTerminatedError after device reboot) do not
         # propagate as a misleading "Connection Lost" error to the UI.
         ld = await create_using_usbmux(serial=self.data_singleton.current_device.udid)
         try:
-            if restore_bookrestore:
-                if self.pref_manager.bookrestore_apply_mode == BookRestoreApplyMethod.AFC:
-                    # BookRestore AFC method (for both localhost and on-device)
-                    update_label(QCoreApplication.tr("Creating connection to device...") + self.do_not_unplug)
-                    await perform_bookrestore(files=files_to_restore, lockdown_client=ld, current_device_books_uuid_callback=self.current_device_books_container_uuid_callback, progress_callback=self.update_label, transfer_mode=self.pref_manager.bookrestore_transfer_mode, do_full_reboot=reboot_for_br)
-                else:
-                    update_label(QCoreApplication.tr("Generating BookRestore database...") + self.do_not_unplug)
-                    afc = AfcService(ld)
-                    server_folder = create_server_folder()
-                    if self.pref_manager.bookrestore_transfer_mode == BookRestoreFileTransferMethod.LocalHost:
-                        server_prefix = create_local_server()
-                    else:
-                        server_prefix = None
-                    db_path = os.path.join(server_folder, "tmp.BLDatabaseManager.sqlite")
-                    await generate_bldbmanager(files_to_restore, db_path, afc, server_prefix)
-                    # remove the files that dont have a domain from files
-                    files_to_restore = [file for file in files_to_restore if (file.domain != "" and file.domain != None)]
-                    # Add the dbs to the files to restore
-                    db_restore_path = "Documents/BLDatabaseManager/BLDatabaseManager.sqlite"
-                    db_restore_domain = "SysSharedContainerDomain-systemgroup.com.apple.media.shared.books"
-                    print(db_path)
-                    files_to_restore.append(FileToRestore(
-                        contents=None, restore_path=db_restore_path,
-                        contents_path=db_path,
-                        domain=db_restore_domain
-                    ))
-                    files_to_restore.append(FileToRestore(
-                        contents=None, restore_path=f"{db_restore_path}-shm",
-                        contents_path=f"{db_path}-shm",
-                        domain=db_restore_domain
-                    ))
-                    files_to_restore.append(FileToRestore(
-                        contents=None, restore_path=f"{db_restore_path}-wal",
-                        contents_path=f"{db_path}-shm",
-                        domain=db_restore_domain
-                    ))
-                msg = ""
-
-            if not restore_bookrestore or self.pref_manager.bookrestore_apply_mode == BookRestoreApplyMethod.Restore:
-                update_label(QCoreApplication.tr("Preparing to restore...") + self.do_not_unplug)
-                await restore_files(
-                    files=files_to_restore, reboot=self.pref_manager.auto_reboot,
-                    lockdown_client=ld,
-                    progress_callback=self.progress_callback
-                )
-                if restore_bookrestore:
-                    # wait for device reconnect and then reboot again after download (ie. specified timeout)
-                    update_label(QCoreApplication.tr("Waiting for device to reconnect...") + "\n" + QCoreApplication.tr("Please complete the setup on your device."))
-                    max_timeout = time.time() + 180
-                    connected = False
-                    while not connected and max_timeout >= time.time():
-                        try:
-                            new_ld = await create_using_usbmux(serial=self.get_current_device_udid(), pair_timeout=180)
-                            connected = True
-                        except Exception:
-                            pass
-                    cleanup_server_folder()
-                    if not connected:
-                        raise NuggetException("Failed to reconnect to the device. Please reboot it manually after the restore.")
-                    update_label(QCoreApplication.tr("Waiting for changes to apply..."))
-                    time.sleep(20)
-                    update_label(QCoreApplication.tr("Rebooting to apply changes..."))
-                    cleanup_server_folder()
-                    await reboot_device(reboot=True, lockdown_client=new_ld)
-                tweaks[TweakID.PosterBoard].config_manager.save_staged_ids(self.get_current_device_udid())
-                msg = QCoreApplication.tr("Your device will now restart.\n\nRemember to turn Find My back on!")
-                if not self.pref_manager.auto_reboot:
-                    msg = QCoreApplication.tr("Please restart your device to see changes.")
-                if skips_br_for_folders:
-                    msg += QCoreApplication.tr("\n\nYou should now be able to apply Feature Flags with BookRestore.")
+            update_label(QCoreApplication.tr("Preparing to restore...") + self.do_not_unplug)
+            await restore_files(
+                files=files_to_restore, reboot=self.pref_manager.auto_reboot,
+                lockdown_client=ld,
+                progress_callback=self.progress_callback,
+                backup_password=backup_password
+            )
+            tweaks[TweakID.PosterBoard].config_manager.save_staged_ids(self.get_current_device_udid())
+            msg = QCoreApplication.tr("Your device will now restart.\n\nRemember to turn Find My back on!")
+            if not self.pref_manager.auto_reboot:
+                msg = QCoreApplication.tr("Please restart your device to see changes.")
             return ApplyAlertMessage(txt=QCoreApplication.tr("All done! ") + msg, title=QCoreApplication.tr("Success!"), icon=QMessageBox.Information)
         finally:
             # Safely close the lockdown client — after a device reboot the
@@ -627,6 +581,7 @@ class DeviceManager:
                 await ld.close()
             except Exception:
                 pass
+
     def progress_callback(self, progress):
         if self.update_label == None:
             return
@@ -668,55 +623,23 @@ class DeviceManager:
                 await self._snapshot_last_apply(update_label)
             device_values = await self._get_lockdown_values()
 
-            if Version(self.get_current_device_version()) >= Version("27.0"):
-                # iOS 27 uses the heavy three-phase protective restore, so all
-                # selected tendies are written in a single restore (capped at
-                # MAX_TENDIES_PER_RESTORE to keep the restore small).
-                pb.tendies = original_tendies[:MAX_TENDIES_PER_RESTORE]
-                # fetch a fresh copy of the PosterBoard database before the
-                # restore so the config manager builds on the current on-device
-                # state. GOLDENNUGGET_SKIP_PB_BACKUP=1 skips the backup.
-                if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
-                    await self._backup_posterboard_database(update_label, force=True)
-                final_alert, files_to_restore = await self._apply_tweak_pass(
-                    update_label,
-                    templates=tweaks[TweakID.Templates].templates,
-                    device_values=device_values,
-                )
-                update_label(QCoreApplication.tr("Success!"))
-            else:
-                # iOS 26 and older: apply one tendie per restore (the old
-                # method). Applying several tendies in a single restore can race
-                # PosterBoard's sqlite regeneration, so each tendie gets its own
-                # restore with a wait in between for PosterBoard to regenerate.
-                if len(original_tendies) > 1:
-                    passes = [[tendie] for tendie in original_tendies]
-                else:
-                    passes = [original_tendies]
-                for pass_idx, tendie_subset in enumerate(passes):
-                    if pass_idx > 0:
-                        update_label(QCoreApplication.tr("Waiting for PosterBoard to regenerate..."))
-                        await asyncio.sleep(50)
-                    # fetch a fresh copy of the PosterBoard database before each
-                    # tendie so the config manager builds on the current
-                    # on-device state.
-                    if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
-                        await self._backup_posterboard_database(update_label, force=True)
-                    pb.tendies = tendie_subset
-                    # PosterBoard templates are only applied with the first
-                    # tendie — re-applying them in every split pass would
-                    # duplicate them.
-                    final_alert, files_to_restore = await self._apply_tweak_pass(
-                        update_label,
-                        templates=tweaks[TweakID.Templates].templates if pass_idx == 0 else [],
-                        device_values=device_values,
-                    )
-                    update_label(QCoreApplication.tr("Success!"))
+            # iOS 26.2+ (iOS 27 era) uses the heavy three-phase protective restore
+            pb.tendies = original_tendies[:MAX_TENDIES_PER_RESTORE]
+            # fetch a fresh copy of the PosterBoard database before the
+            # restore so the config manager builds on the current on-device
+            # state. GOLDENNUGGET_SKIP_PB_BACKUP=1 skips the backup.
+            if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
+                await self._backup_posterboard_database(update_label, force=True)
+            final_alert, files_to_restore = await self._apply_tweak_pass(
+                update_label,
+                templates=tweaks[TweakID.Templates].templates,
+                device_values=device_values,
+            )
+            update_label(QCoreApplication.tr("Success!"))
         except Exception as e:
             final_alert = show_apply_error(e, update_label, files_list=files_to_restore)
         finally:
             pb.tendies = original_tendies
-            close_dl_connection()
             show_alert(final_alert)
 
     async def _backup_posterboard_database(self, update_label=lambda x: None, force: bool = False):
@@ -761,7 +684,10 @@ class DeviceManager:
         except Exception as e:
             print(f"Failed to back up PosterBoard database: {e}")
             print(traceback.format_exc())
-            update_label(QCoreApplication.tr("Warning: could not back up the PosterBoard database automatically."))
+            if _is_device_locked_error(e):
+                update_label(QCoreApplication.tr("Warning: could not back up PosterBoard database — device is locked. Please unlock your device and try again."))
+            else:
+                update_label(QCoreApplication.tr("Warning: could not back up the PosterBoard database automatically."))
 
     ## ORIGINAL PLIST SAVING
     async def _snapshot_last_apply(self, update_label=lambda x: None):
@@ -778,14 +704,17 @@ class DeviceManager:
             update_label(QCoreApplication.tr("Capturing pre-apply state..."))
             captured = await psysbackup(
                 udid, self._get_original_plist_paths(), update_label,
-                self._backup_progress(update_label))
+                self._backup_progress(update_label), backup_password)
             self.pref_manager.save_last_apply(udid, captured)
         except Exception as e:
             print(f"Failed to snapshot pre-apply state: {e}")
             print(traceback.format_exc())
-            update_label(QCoreApplication.tr(
-                "Warning: could not snapshot the pre-apply state. "
-                "Reverting the last apply may not be possible."))
+            if _is_device_locked_error(e):
+                update_label(QCoreApplication.tr("Warning: could not snapshot pre-apply state — device is locked. Please unlock your device and try again. Reverting the last apply may not be possible."))
+            else:
+                update_label(QCoreApplication.tr(
+                    "Warning: could not snapshot the pre-apply state. "
+                    "Reverting the last apply may not be possible."))
 
     def revert_last_apply(self, update_label=lambda x: None, show_alert=lambda x: None):
         asyncio.run(self._revert_last_apply(update_label, show_alert))
@@ -803,11 +732,10 @@ class DeviceManager:
                 raise NuggetException(QCoreApplication.tr(
                     "No saved state to revert. Apply tweaks first to create a revert point."))
             update_label(QCoreApplication.tr("Reverting last apply..."))
-            use_bookrestore = self.get_current_device_uses_bookrestore()
             device_values = await self._get_lockdown_values()
             uses_domains = False
             for path, contents in snapshot.items():
-                file_path, domain = self.get_domain_for_path(path, use_bookrestore=use_bookrestore)
+                file_path, domain = self.get_domain_for_path(path)
                 try:
                     # Re-materialize the templated snapshot so device-specific
                     # placeholders (<DeviceName>, ...) get the current values.
@@ -818,9 +746,8 @@ class DeviceManager:
                     contents=contents, restore_path=file_path, domain=domain))
                 if domain != "":
                     uses_domains = True
-            if not use_bookrestore:
-                await self.add_skip_setup(files_to_restore, uses_domains)
-            await self.start_restore(files_to_restore, use_bookrestore, update_label)
+            await self.add_skip_setup(files_to_restore, uses_domains)
+            await self.start_restore(files_to_restore, update_label)
             self.pref_manager.remove_last_apply(udid)
             update_label(QCoreApplication.tr("Success!"))
             msg = QCoreApplication.tr("Your tweaks were reverted to the state before the last apply.")
@@ -904,7 +831,7 @@ class DeviceManager:
         fallbacks = [mobile_user_fallback_path(p) for p in paths]
         fallbacks = [f for f in fallbacks if f is not None and f not in paths]
         captured = await psysbackup(
-            udid, paths + fallbacks, update_label, self._backup_progress(update_label))
+            udid, paths + fallbacks, update_label, self._backup_progress(update_label), backup_password)
         originals = {}
         for path in paths:
             data = None
@@ -1071,7 +998,6 @@ class DeviceManager:
         basic_plists_ownership: dict = {}
         files_data: dict = {}
         uses_domains: bool = False
-        use_bookrestore: bool = False
         # create the restore file list
         files_to_restore: list[FileToRestore] = [
         ]
@@ -1083,27 +1009,17 @@ class DeviceManager:
                 tweak = tweaks[tweak_name]
                 if isinstance(tweak, FeatureFlagTweak):
                     flag_plist = tweak.apply_tweak(flag_plist)
-                    if tweak.enabled:
-                        use_bookrestore = True
                 elif isinstance(tweak, PasscodeThemeTweak):
-                    # must use bookrestore
                     passcode_files = tweak.apply_tweak()
                     if passcode_files is not None and len(passcode_files) > 0:
                         files_to_restore.extend(passcode_files)
-                        use_bookrestore = True
                 elif isinstance(tweak, EligibilityTweak):
                     eligibility_files = tweak.apply_tweak()
-                    if tweak.enabled:
-                        use_bookrestore = True
                 elif isinstance(tweak, AITweak):
                     ai_file = tweak.apply_tweak()
-                    if tweak.enabled:
-                        use_bookrestore = True
                 elif isinstance(tweak, BasicPlistTweak) or isinstance(tweak, RdarFixTweak) or isinstance(tweak, AdvancedPlistTweak):
                     basic_plists = tweak.apply_tweak(basic_plists)
                     basic_plists_ownership[tweak.file_location] = tweak.owner
-                    if tweak.enabled and isinstance(tweak, RdarFixTweak) and Version(self.get_current_device_version()) >= Version("26.0"):
-                        use_bookrestore = True
                 elif isinstance(tweak, NullifyFileTweak):
                     tweak.apply_tweak(files_data)
                     if tweak.enabled and tweak.file_location.value.startswith("/var/mobile/"):
@@ -1120,27 +1036,14 @@ class DeviceManager:
                     )
                     if tweak.uses_domains():
                         uses_domains = True
-                    elif not tweak.is_empty():
-                        use_bookrestore = True
                 elif isinstance(tweak, StatusBarTweak):
-                    if Version(self.get_current_device_version()) >= Version("27.0"):
-                        # iOS 27: the status bar is Speakeasy, a SpringBoard
-                        # feature flag — the classic statusBarOverrides file
-                        # is no longer read, so write the FeatureFlags plist.
-                        flag_plist = tweak.apply_tweak(flag_plist)
-                        if tweak.enabled:
-                            use_bookrestore = True
-                    else:
-                        tweak.apply_classic_tweak(files_to_restore=files_to_restore)
-                        if tweak.enabled:
-                            uses_domains = True
-                elif isinstance(tweak, BookRestoreFileTweak):
-                    continue
+                    # iOS 27: the status bar is Speakeasy, a SpringBoard
+                    # feature flag — writing fails due to no write permissions.
+# The feature is disabled on iOS 27+.
+                    flag_plist = tweak.apply_tweak(flag_plist, version=self.get_current_device_version())
                 else:
                     if gestalt_plist != None:
                         gestalt_plist = tweak.apply_tweak(gestalt_plist)
-                        if tweak.enabled:
-                            use_bookrestore = True
                     elif tweak.enabled:
                         # no mobilegestalt file provided but applying mga tweaks, give warning
                         update_label("Failed.")
@@ -1148,8 +1051,6 @@ class DeviceManager:
             # set the custom gestalt keys
             if gestalt_plist != None:
                 gestalt_plist = CustomGestaltTweaks.apply_tweaks(gestalt_plist)
-                if len(CustomGestaltTweaks.custom_tweaks) > 0:
-                    use_bookrestore = True
             
             gestalt_data = None
             if gestalt_plist != None:
@@ -1178,18 +1079,16 @@ class DeviceManager:
                 self.concat_file(
                     contents=plistlib.dumps(flag_plist),
                     path=FileLocation.featureflags.value,
-                    files_to_restore=files_to_restore, use_bookrestore=True
+                    files_to_restore=files_to_restore
                 )
-                
-            self.add_rebuild_sb_application_state_db(files_to_restore)
-            await self.add_skip_setup(files_to_restore, uses_domains and (not use_bookrestore or self.pref_manager.bookrestore_apply_mode == BookRestoreApplyMethod.Restore))
             
-            # self.add_skip_setup(files_to_restore, uses_domains and (not use_bookrestore or self.pref_manager.bookrestore_apply_mode == BookRestoreApplyMethod.Restore))
-            if gestalt_data != None and use_bookrestore:
+            self.add_rebuild_sb_application_state_db(files_to_restore)
+            await self.add_skip_setup(files_to_restore, uses_domains)
+            if gestalt_data != None:
                 self.concat_file(
                     contents=gestalt_data,
                     path=FileLocation.mga.value,
-                    files_to_restore=files_to_restore, use_bookrestore=True
+                    files_to_restore=files_to_restore
                 )
             if eligibility_files:
                 new_eligibility_files: dict[FileToRestore] = []
@@ -1199,7 +1098,7 @@ class DeviceManager:
                         self.concat_file(
                             contents=file.contents,
                             path=file.restore_path,
-                            files_to_restore=new_eligibility_files, use_bookrestore=use_bookrestore
+                            files_to_restore=new_eligibility_files
                         )
                 else:
                     new_eligibility_files = eligibility_files
@@ -1208,7 +1107,7 @@ class DeviceManager:
                 self.concat_file(
                     contents=ai_file.contents,
                     path=ai_file.restore_path,
-                    files_to_restore=files_to_restore, use_bookrestore=use_bookrestore
+                    files_to_restore=files_to_restore
                 )
             for location, plist in basic_plists.items():
                 if location in basic_plists_ownership:
@@ -1219,7 +1118,7 @@ class DeviceManager:
                     contents=plistlib.dumps(plist),
                     path=location.value,
                     files_to_restore=files_to_restore,
-                    owner=ownership, group=ownership, use_bookrestore=use_bookrestore
+                    owner=ownership, group=ownership
                 )
             # iOS 27+: Also write .GlobalPreferences.plist to HomeDomain so
             # tweaks that depend on it survive the Phase 3 protective backup restore.
@@ -1228,18 +1127,17 @@ class DeviceManager:
             # the device's current on-device plist so the user's region, language
             # and appearance settings survive the "safe state recovery" wipe too
             # (Phase 3 skips this file to avoid overwriting the tweak copy).
-            if Version(self.get_current_device_version()) >= Version("27.0"):
-                home_plist = basic_plists.get(FileLocation.globalPreferences, {})
-                current = await self._get_current_global_preferences_plist()
-                if current:
-                    current.update(home_plist)
-                    home_plist = current
-                self.concat_file(
-                    contents=plistlib.dumps(home_plist),
-                    path=FileLocation.globalPreferencesHomeDomain.value,
-                    files_to_restore=files_to_restore,
-                    owner=501, group=501, use_bookrestore=use_bookrestore
-                )
+            home_plist = basic_plists.get(FileLocation.globalPreferences, {})
+            current = await self._get_current_global_preferences_plist()
+            if current:
+                current.update(home_plist)
+                home_plist = current
+            self.concat_file(
+                contents=plistlib.dumps(home_plist),
+                path=FileLocation.globalPreferencesHomeDomain.value,
+                files_to_restore=files_to_restore,
+                owner=501, group=501
+            )
 
             for location, data in files_data.items():
                 if isinstance(data, NullifyFileTweak):
@@ -1250,7 +1148,7 @@ class DeviceManager:
                     contents=data,
                     path=location.value,
                     files_to_restore=files_to_restore,
-                    owner=ownership, group=ownership, use_bookrestore=use_bookrestore
+                    owner=ownership, group=ownership
                 )
 
             # Restore Mobileconfig Profiles
@@ -1282,11 +1180,57 @@ class DeviceManager:
                 ))
 
             if tweaks[TweakID.CreateBRFolders].enabled == True:
-                use_bookrestore = False
                 files_to_restore.extend(tweaks[TweakID.CreateBRFolders].apply_tweak())
 
+# Check if backup encryption is enabled and handle it
+            backup_password = ""
+            if Version(self.get_current_device_version()) >= Version("27.0"):
+                # Check if backup encryption is enabled on device
+                check_ld = await create_using_usbmux(serial=self.get_current_device_udid())
+                try:
+                    async with Mobilebackup2Service(check_ld) as mb:
+                        is_encrypted = await mb.get_will_encrypt()
+                    if is_encrypted:
+                        from PySide6.QtWidgets import QInputDialog
+                        if self.pref_manager.use_encrypted_backup:
+                            # User wants to keep encryption - ask for password to use it
+                            update_label(QCoreApplication.tr("Backup encryption is enabled. We'll use it for the restore."))
+                            update_label(QCoreApplication.tr("Please enter your iTunes/Finder backup password:"))
+                            password, ok = QInputDialog.getText(
+                                None,
+                                QCoreApplication.tr("Backup Encryption Password"),
+                                QCoreApplication.tr("Enter your iTunes/Finder backup password (required for encrypted restore):"),
+                                QLineEdit.Password
+                            )
+                            if ok and password:
+                                backup_password = password
+                                log_info("Using existing backup encryption with provided password")
+                                update_label(QCoreApplication.tr("Password accepted. Proceeding with encrypted restore..."))
+                            else:
+                                raise NuggetException(QCoreApplication.tr("Backup password is required for encrypted restore. Please provide the password or disable encryption in iTunes/Finder."))
+                        else:
+                            # User doesn't want encryption - show friendly error
+                            raise NuggetException(QCoreApplication.tr(
+                                "Backup encryption is enabled on your iPhone.\n\n"
+                                "GoldenNugget needs to temporarily disable it to apply tweaks safely.\n\n"
+                                "Please choose one:\n"
+                                "1. Disable encryption on your iPhone: Settings → General → Transfer or Reset iPhone → Backup Password → Turn Off\n"
+                                "2. Or enable \"Use Encrypted Backups (Experimental)\" in GoldenNugget Settings → enter your backup password when prompted.\n\n"
+                                "Tip: Option 1 is simpler if you don't know your backup password."
+                            ))
+                except Exception as e:
+                    if isinstance(e, NuggetException):
+                        raise
+                    from src.restore.protective import log_warn
+                    log_warn(f"Failed to check backup encryption status: {e}")
+                finally:
+                    try:
+                        await check_ld.close()
+                    except Exception:
+                        pass
+
             # restore to the device
-            final_alert = await self.start_restore(files_to_restore, use_bookrestore, update_label, skips_br_for_folders=tweaks[TweakID.CreateBRFolders].enabled, reboot_for_br=(len(flag_plist) > 0))
+            final_alert = await self.start_restore(files_to_restore, update_label, skips_br_for_folders=tweaks[TweakID.CreateBRFolders].enabled, reboot_for_br=(len(flag_plist) > 0), backup_password=backup_password)
             return final_alert, files_to_restore
         finally:
             if len(tmp_dirs) > 0:
@@ -1312,7 +1256,6 @@ class DeviceManager:
                 all_values.get("ProductType", ""), all_values.get("BuildVersion", ""))
             files_to_null: list[str] = []
             uses_domains = False
-            use_bookrestore = False
 
             # use if-statements instead of match (switch) statements for compatibility with Python 3.9
             for page in reset_pages:
@@ -1323,51 +1266,34 @@ class DeviceManager:
                     settings.setValue(self.data_singleton.current_device.udid + "_hardware", "")
                     settings.setValue(self.data_singleton.current_device.udid + "_cpu", "")
                     files_to_null.append(FileLocation.mga.value)
-                    if self.get_current_device_uses_bookrestore():
-                        use_bookrestore = True
                 elif page == Page.FeatureFlags:
                     ## FEATURE FLAGS
-                    if self.get_current_device_uses_bookrestore():
-                        use_bookrestore = True
-                        self.concat_file(
-                            contents=plistlib.dumps({
-                                "Nugget": {
-                                    'Enabled': False
-                                }
-                            }),
-                            path=FileLocation.featureflags.value,
-                            files_to_restore=files_to_restore,
-                            use_bookrestore=use_bookrestore
-                        )
-                    else:
-                        files_to_null.append(FileLocation.featureflags.value)
+                    self.concat_file(
+                        contents=plistlib.dumps({
+                            "Nugget": {
+                                'Enabled': False
+                            }
+                        }),
+                        path=FileLocation.featureflags.value,
+                        files_to_restore=files_to_restore
+                    )
                 elif page == Page.StatusBar:
                     ## STATUS BAR
-                    if Version(self.get_current_device_version()) >= Version("27.0"):
-                        # iOS 27: the status bar is Speakeasy, a SpringBoard
-                        # feature flag — disable it instead of writing the
-                        # unread classic statusBarOverrides file. An empty flag
-                        # dict (no "Enabled" key) keeps SpringBoard's default
-                        # behavior — {"Enabled": False} could be read as
-                        # disabling the whole Speakeasy status bar.
-                        use_bookrestore = True
-                        self.concat_file(
-                            contents=plistlib.dumps({
-                                "SpringBoard": {
-                                    "SpeakeasyNewStatusBar": {}
-                                }
-                            }),
-                            path=FileLocation.featureflags.value,
-                            files_to_restore=files_to_restore,
-                            use_bookrestore=use_bookrestore
-                        )
-                    else:
-                        files_to_restore.append(FileToRestore(
-                            contents=b"",
-                            restore_path="/Library/SpringBoard/statusBarOverrides",
-                            domain="HomeDomain"
-                        ))
-                        uses_domains = True
+                    # iOS 26.2+ (iOS 27 era): the status bar is Speakeasy, a SpringBoard
+                    # feature flag — disable it instead of writing the
+                    # unread classic statusBarOverrides file. An empty flag
+                    # dict (no "Enabled" key) keeps SpringBoard's default
+                    # behavior — {"Enabled": False} could be read as
+                    # disabling the whole Speakeasy status bar.
+                    self.concat_file(
+                        contents=plistlib.dumps({
+                            "SpringBoard": {
+                                "SpeakeasyNewStatusBar": {}
+                            }
+                        }),
+                        path=FileLocation.featureflags.value,
+                        files_to_restore=files_to_restore
+                    )
                 elif page == Page.Springboard:
                     ## SPRINGBOARD
                     files_to_null.append(FileLocation.springboard.value)
@@ -1431,15 +1357,13 @@ class DeviceManager:
                 self.concat_file(
                     contents=contents,
                     path=file_path,
-                    files_to_restore=files_to_restore,
-                    use_bookrestore=use_bookrestore
+                    files_to_restore=files_to_restore
                 )
             
-            if not use_bookrestore:
-                await self.add_skip_setup(files_to_restore, uses_domains)
+            await self.add_skip_setup(files_to_restore, uses_domains)
 
             # restore to the device
-            final_alert = await self.start_restore(files_to_restore, use_bookrestore, update_label)
+            final_alert = await self.start_restore(files_to_restore, update_label)
             update_label(QCoreApplication.tr("Success!"))
         except Exception as e:
             final_alert = show_apply_error(e, update_label, files_list=files_to_restore)

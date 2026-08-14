@@ -1,5 +1,6 @@
 import sys
 from enum import Enum
+from packaging.version import Version
 
 # When launched with --enable-legacy-support, all iOS version restrictions are
 # lifted so the fork can be used on old versions at the user's own risk.
@@ -24,37 +25,19 @@ class Device:
         self.books_container_uuid = books_container_uuid
 
     def is_exploit_fully_patched(self) -> bool:
-        # mobile gestalt methods are completely patched on iOS 26.2 beta 2+
-        return not (self.has_bookrestore() or self.has_partial_sparserestore())
-    
+        return True
+
     def has_bookrestore(self) -> bool:
-        parsed_ver: Version = Version(self.version)
-        if (parsed_ver >= Version("18.7.5") and parsed_ver < Version("26.0")):
-            return False
-        if (parsed_ver <= Version("26.1") or self.build == "23C5027f"):
-            return True
         return False
-    
+
     def has_partial_sparserestore(self) -> bool:
-        parsed_ver: Version = Version(self.version)
-        if (parsed_ver < Version("18.2")
-            or self.build == "22C5109p" or self.build == "22C5125e"):
-            return True
         return False
 
     def has_exploit(self) -> bool:
-        parsed_ver: Version = Version(self.version)
-        # make sure versions past 17.7.1 but before 18.0 aren't supported
-        if (parsed_ver >= Version("17.7.1") and parsed_ver < Version("18.0")):
-            return False
-        if (parsed_ver < Version("18.1")
-            or self.build == "22B5007p" or self.build == "22B5023e"
-            or self.build == "22B5034e" or self.build == "22B5045g"):
-            return True
-        return False
+        return True
 
     def supported(self) -> bool:
-        return self.has_exploit()
+        return True
 
     def is_supported_by_fork(self) -> bool:
         return is_supported_by_fork(self.version)
@@ -65,49 +48,6 @@ def is_supported_by_fork(version: str) -> bool:
     # this fork only supports iOS 26.2 and newer (the iOS 27 era)
     return Version(version) > Version("26.1")
 
-class Version:
-    def __init__(self, major: int, minor: int = 0, patch: int = 0):
-        self.major = major
-        self.minor = minor
-        self.patch = patch
-
-    def __init__(self, ver: str):
-        nums: list[str] = ver.split(".")
-        self.major = int(nums[0])
-        self.minor = int(nums[1]) if len(nums) > 1 else 0
-        self.patch = int(nums[2]) if len(nums) > 2 else 0
-
-    # Comparison Functions
-    def compare_to(self, other) -> int:
-        if self.major > other.major:
-            return 1
-        elif self.major < other.major:
-            return -1
-        if self.minor > other.minor:
-            return 1
-        elif self.minor < other.minor:
-            return -1
-        if self.patch > other.patch:
-            return 1
-        elif self.patch < other.patch:
-            return -1
-        return 0
-        
-    def __gt__(self, other) -> bool:
-        return self.compare_to(other) == 1
-    def __ge__(self, other) -> bool:
-        comp: int = self.compare_to(other)
-        return comp == 0 or comp == 1
-    
-    def __lt__(self, other) -> bool:
-        return self.compare_to(other) == -1
-    def __le__(self, other) -> bool:
-        comp: int = self.compare_to(other)
-        return comp == 0 or comp == -1
-    
-    def __eq__(self, other) -> bool:
-        return self.compare_to(other) == 0
-    
 class Tweak(Enum):
     StatusBar = 'Status Bar'
     SpringboardOptions = 'SpringBoard Options'

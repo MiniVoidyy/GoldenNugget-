@@ -252,7 +252,10 @@ class SettingsPage(Page):
             self.ui.encryptedBackupChk.setCursor(Qt.CursorShape.PointingHandCursor)
             self.ui.encryptedBackupChk.setToolTip(QCoreApplication.tr(
                 "EXPERIMENTAL: Allow encrypted backups (includes keychain). "
-                "Requires knowing backup password. If disabled, encrypted backups are rejected."))
+                "Requires knowing your iTunes/Finder backup password. "
+                "If disabled, GoldenNugget will ask you to either disable encryption on your iPhone "
+                "or enable this option and enter your password."
+            ))
             self.ui.encryptedBackupChk.setText(QCoreApplication.tr(
                 "Use Encrypted Backups (Experimental)"))
             # Insert after trustStoreChk in the layout

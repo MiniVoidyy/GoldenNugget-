@@ -194,12 +194,30 @@ _SYSTEM_PREFERENCES_TWEAK_PATHS = (
 )
 
 
+def _validate_sqlite_db(db_path: str) -> bool:
+    """Check if a file is a valid SQLite database."""
+    if not os.path.exists(db_path) or os.path.getsize(db_path) < 100:
+        return False
+    try:
+        import sqlite3 as _sqlite3
+        conn = _sqlite3.connect(db_path)
+        conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
+        conn.close()
+        return True
+    except _sqlite3.DatabaseError:
+        return False
+
+
 def _read_manifest_plist(device_dir: str, domain: str, rel_path: str):
     """Load a plist the way the fresh backup stored it (payload <aa>/<fileID>)."""
     import sqlite3 as _sqlite3
+    manifest_path = os.path.join(device_dir, "Manifest.db")
+    if not _validate_sqlite_db(manifest_path):
+        log_error(f"Manifest.db at {manifest_path} is not a valid SQLite database.")
+        return {}
     file_id = hashlib.sha1(f"{domain}-{rel_path}".encode("utf-8")).hexdigest()
     payload = os.path.join(device_dir, file_id[:2], file_id)
-    conn = _sqlite3.connect(os.path.join(device_dir, "Manifest.db"))
+    conn = _sqlite3.connect(manifest_path)
     try:
         row = conn.execute(
             "SELECT file FROM Files WHERE fileID = ?", (file_id,)
@@ -300,8 +318,8 @@ def _is_transient_restore_error(error) -> bool:
 
 
 async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
-                                     udid: str, reboot: bool,
-                                     progress_callback) -> None:
+                                      udid: str, reboot: bool,
+                                      progress_callback, backup_password: str = "") -> None:
     """Phase 3: restore the pruned protective backup.
 
     Retries while SpringBoard / mobilebackup2 are still coming up after the
@@ -319,6 +337,7 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
                     reboot=reboot, source=udid,
                     skip_apps=True,
                     progress_callback=progress_callback,
+                    password=backup_password,
                 )
             return
         except (PyMobileDevice3Exception, ConnectionTerminatedError,
@@ -332,7 +351,8 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
 
 
 async def _restore_ios27(back: backup.Backup, reboot: bool,
-                         lockdown_client: LockdownClient, progress_callback):
+                          lockdown_client: LockdownClient, progress_callback,
+                          backup_password: str = ""):
     """iOS 27+ three-phase restore: backup → tweak → reboot → restore.
 
     Phase 1 (0-40%):  Selective backup of photos, Apple ID, and user
@@ -415,10 +435,11 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
         try:
             # SpringBoard may still be launching after a fresh boot
             log_info("Phase 3: Waiting for SpringBoard to finish launching...")
-            await asyncio.sleep(10)
+            await asyncio.sleep(30)
             await _restore_protective_backup(
                 lc, backup_root, udid, reboot,
-                _scaled_callback(progress_callback, _PHASE_TWEAK_END, 100))
+                _scaled_callback(progress_callback, _PHASE_TWEAK_END, 100),
+                backup_password=backup_password)
             log_info("Phase 3: Protective backup restored successfully")
         finally:
             try:
@@ -438,13 +459,14 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
         shutil.rmtree(protective_dir, ignore_errors=True)
         raise
 
-    shutil.rmtree(protective_dir, ignore_errors=True)
+    kept = os.path.join(protective_dir, "device_backup")
+    log_info(f"Protective backup kept at: {kept}")
     log_info("iOS 27 restore completed successfully")
     progress_callback(100)
 
 
 # files is a list of FileToRestore objects
-async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdown_client: LockdownClient = None, progress_callback = lambda x: None):
+async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdown_client: LockdownClient = None, progress_callback = lambda x: None, backup_password: str = ""):
     # create the files to be backed up
     files_list = [
     ]
@@ -496,76 +518,20 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
                         active_bundle_ids.append(bundle_id)
 
     # crash the restore to skip the setup (only works for exploit files, NOT on iOS 27+)
-    ios_major = 0
-    if lockdown_client is not None:
-        try:
-            ios_major = int(lockdown_client.product_version.split(".")[0])
-        except (ValueError, IndexError, AttributeError):
-            ios_major = 0
-    if exploit_only and (lockdown_client is None or ios_major < 27):
-        files_list.append(backup.ConcreteFile("", "SysContainerDomain-../../../../../../../.." + "/crash_on_purpose", contents=b""))
+    # iOS 26.2+ (iOS 27 era) doesn't need this
 
     # create the backup
     back = backup.Backup(files=files_list, apps=apps_list)
 
-    # iOS 27+: use three-phase protective backup + restore
-    if ios_major >= 27:
-        await _restore_ios27(back, reboot, lockdown_client, progress_callback)
-        return
-
-    for fi in files_list:
-        print(f"{fi.domain}, {fi.path}")
-
-    try:
-        await perform_restore(backup=back, reboot=reboot, lockdown_client=lockdown_client, progress_callback=progress_callback)
-    except (ConnectionTerminatedError, ssl.SSLEOFError, ConnectionAbortedError, ConnectionResetError):
-        # These errors usually mean the device rebooted successfully before acknowledging the restore.
-        # We catch them and treat the process as successful.
-        print("Device disconnected during restore - this is expected as the device reboots.")
-        # The device severing the connection mid-restore is treated as a
-        # reboot (system/exploit files reboot on their own). But PosterBoard
-        # (AppDomain-*) restores do NOT reboot the device, so if a reboot was
-        # requested and the device is still reachable, reboot it explicitly
-        # now. If it already rebooted, the reconnect fails and we continue.
-        if reboot and lockdown_client is not None:
-            await _reboot_device_after_disconnect(lockdown_client.udid)
-        if progress_callback:
-            progress_callback(100)
-            
-    except Exception as e:
-        # If it's a different error, we still want to see it
-        raise e
-
-
-async def _reboot_device_after_disconnect(udid: str):
-    """Reboot the device after a mid-restore disconnect, unless it already
-    rebooted on its own. The connection was severed, so reconnect first:
-    if the device already rebooted (system/exploit files) lockdown is down
-    and the reconnect fails — that is expected, and we just continue."""
-    try:
-        new_ld = await create_using_usbmux(serial=udid, pair_timeout=15)
-    except Exception:
-        print("Device already rebooted (no lockdown service) - skipping explicit reboot.")
-        return
-    try:
-        await reboot_device(reboot=True, lockdown_client=new_ld)
-    except Exception as e:
-        print(f"Failed to reboot device after disconnect: {e}")
-    finally:
-        try:
-            await new_ld.close()
-        except Exception:
-            pass
+    # iOS 26.2+ (iOS 27 era) uses three-phase protective backup + restore
+    await _restore_ios27(back, reboot, lockdown_client, progress_callback, backup_password=backup_password)
 
 
 def restore_file(fp: str, restore_path: str, restore_name: str, reboot: bool = False, lockdown_client: LockdownClient = None):
     # open the file and read the contents
     contents = open(fp, "rb").read()
 
-    base_path = "/var/backup"
-    if restore_path.startswith("/var/mobile/"):
-        # required on iOS 17.0+ since /var/mobile is on a separate partition
-        base_path = "/var/mobile/backup"
+    base_path = "/var/mobile/backup"
 
     # create the backup
     back = backup.Backup(files=[
@@ -587,7 +553,6 @@ def restore_file(fp: str, restore_path: str, restore_name: str, reboot: bool = F
                 contents=contents#b"",
                 # inode=0
             ),
-            backup.ConcreteFile("", "SysContainerDomain-../../../../../../../.." + "/crash_on_purpose", contents=b""),
     ])
 
     try:

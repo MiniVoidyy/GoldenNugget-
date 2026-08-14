@@ -44,6 +44,8 @@ import pymobiledevice3.service_connection as _sc
 from pymobiledevice3.lockdown import LockdownClient
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 
+from src.exceptions.nugget_exception import NuggetException
+
 # Bump SSL handshake timeout — the default 10 seconds is too short for
 # mobilebackup2 service startup on busy or post-reboot devices (iOS 27+).
 # Importing this module applies it process-wide.
@@ -120,6 +122,16 @@ APPLE_ID_PATH_PREFIXES = (
     "Library/Preferences",           # User settings (dark mode, wallpaper, etc.)
 )
 
+# Path prefixes in ManagedPreferencesDomain for profiles
+MANAGED_PROFILE_PATH_PREFIXES = (
+    "Library/ConfigurationProfiles",
+)
+
+# Path prefixes in SystemPreferencesDomain for profiles
+SYSTEM_PROFILE_PATH_PREFIXES = (
+    "Library/ConfigurationProfiles",
+)
+
 # Path prefixes within HomeDomain that hold SpringBoard's home screen layout
 # and icon state. Restoring these keeps the home screen (icon layout, folders,
 # dock) intact after the iOS 27 "safe state recovery" wipe.
@@ -161,6 +173,10 @@ def _is_protective_file(domain: str, relative_path: str, include_photos: bool = 
         return (relative_path.startswith(APPLE_ID_PATH_PREFIXES)
                 or relative_path.startswith(SPRINGBOARD_PATH_PREFIXES)
                 or relative_path.startswith(CONTROL_CENTER_PATH_PREFIXES))
+    if domain == "ManagedPreferencesDomain":
+        return relative_path.startswith(MANAGED_PROFILE_PATH_PREFIXES)
+    if domain == "SystemPreferencesDomain":
+        return relative_path.startswith(SYSTEM_PROFILE_PATH_PREFIXES)
     if include_photos and domain in PROTECTIVE_DOMAINS:
         return True
     return False
@@ -502,36 +518,63 @@ async def perform_protective_backup(
     if progress_callback is None:
         progress_callback = lambda x: None
 
+    def _is_device_locked_error(exc: Exception) -> bool:
+        msg = str(exc)
+        return "ErrorCode" in msg and ("208" in msg or "Device locked" in msg or "MBErrorDomain" in msg)
+
+    def _is_connection_error(exc: Exception) -> bool:
+        msg = str(exc).lower()
+        return isinstance(exc, (
+            _pm3_exc.ConnectionTerminatedError,
+            ConnectionError,
+            OSError,
+            asyncio.TimeoutError,
+        )) or "connection" in msg or "incomplete" in msg or "terminated" in msg
+
     is_encrypted = False
-    """     try:
-        preserve = _create_preserve_callback(include_photos)
-        async with ProtectiveBackupService(lockdown_client, preserve_file=preserve) as mb:
-            is_encrypted = await mb.get_will_encrypt()
-            progress_callback(
-                "Creating protective backup (photos, Apple ID, settings, home screen)"
-                + (" — encrypted" if is_encrypted else "") + "..."
-            )
-            await mb.backup(full=True, backup_directory=backup_root,
-                            progress_callback=progress_callback)
-        return is_encrypted
-    except Exception as e:
-        traceback.print_exception(e)
-        print(
-            f"[ProtectiveBackup] Selective backup failed "
-            f"({type(e).__name__}: {e}); falling back to full backup"
-        )
-        progress_callback("Selective backup failed, retrying with full backup...")
-    """
-    # --- Full-backup fallback: no filtering, plain DeviceLink behavior ---
+
     shutil.rmtree(backup_root, ignore_errors=True)
     Path(backup_root).mkdir(parents=True, exist_ok=True)
-    async with ProtectiveBackupService(lockdown_client) as mb:
+
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
         try:
-            is_encrypted = await mb.get_will_encrypt()
-        except Exception:
-            pass  # Non-fatal — encryption state only feeds the status label.
-        await mb.backup(full=True, backup_directory=backup_root,
-                        progress_callback=progress_callback)
+            async with ProtectiveBackupService(lockdown_client) as mb:
+                # Check if encryption is already enabled (don't enable it ourselves)
+                try:
+                    is_encrypted = await mb.get_will_encrypt()
+                except Exception:
+                    pass  # Non-fatal — encryption state only feeds the status label.
+
+                if is_encrypted:
+                    log_info("Backup encryption already enabled on device. Using existing encryption.")
+                    progress_callback("Using existing backup encryption...")
+                else:
+                    log_info("Backup encryption not enabled — local manifest pruning will be used.")
+                    progress_callback("Creating protective backup (unencrypted)...")
+
+                try:
+                    await mb.backup(full=True, backup_directory=backup_root,
+                                    progress_callback=progress_callback)
+                    break  # Success
+                except Exception as e:
+                    if _is_device_locked_error(e):
+                        log_error("Protective backup failed: Device is locked. Please unlock your device and try again.")
+                        raise NuggetException("Device is locked. Please unlock your device (enter passcode, be on home screen) and try again.")
+                    if _is_connection_error(e) and attempt < max_retries:
+                        delay = min(2 ** attempt, 15)
+                        log_warn(f"Connection error during backup (attempt {attempt}/{max_retries}), retrying in {delay}s: {e}")
+                        progress_callback(f"Connection lost, retrying in {delay}s... (attempt {attempt}/{max_retries})")
+                        await asyncio.sleep(delay)
+                        continue
+                    raise
+        except Exception as e:
+            if _is_device_locked_error(e):
+                raise
+            if _is_connection_error(e) and attempt < max_retries:
+                continue
+            raise
+
     return is_encrypted
 
 
@@ -896,8 +939,30 @@ def _iter_payload_files(device_dir: Path):
             yield from _iter_payload_files(entry)
 
 
+def _is_encrypted_backup(device_dir: Path) -> bool:
+    """Check if a backup directory has an encrypted Manifest.db."""
+    try:
+        from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
+        return Mobilebackup2Service._is_encrypted_backup(device_dir)
+    except Exception:
+        return False
+
+
+def _validate_sqlite_db(db_path: Path) -> bool:
+    """Check if a file is a valid SQLite database."""
+    if not db_path.exists() or db_path.stat().st_size < 100:
+        return False
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
+        conn.close()
+        return True
+    except sqlite3.DatabaseError:
+        return False
+
+
 def clean_backup_for_restore(backup_dir: "str | Path", udid: str,
-                             include_photos: bool = True) -> tuple:
+                              include_photos: bool = True) -> tuple:
     """Prune a backup directory down to its protective payload.
 
     1. Deletes every non-protective row from Manifest.db in a single DELETE
@@ -918,6 +983,16 @@ def clean_backup_for_restore(backup_dir: "str | Path", udid: str,
 
     manifest_db = device_dir / "Manifest.db"
     if not manifest_db.exists():
+        return 0, 0
+
+    # If backup is encrypted, we can't read the manifest locally to prune it.
+    # The device can restore encrypted backups directly, so skip local pruning.
+    if _is_encrypted_backup(device_dir):
+        log_info("Backup is encrypted — skipping local manifest pruning (device will handle it)")
+        return 0, 0
+
+    if not _validate_sqlite_db(manifest_db):
+        log_error(f"Manifest.db at {manifest_db} is not a valid SQLite database. Skipping cleanup.")
         return 0, 0
 
     keep_ids = set()
@@ -1211,6 +1286,16 @@ def inject_file_into_backup(backup_dir: "str | Path", udid: str, domain: str,
 
     manifest_db = device_dir / "Manifest.db"
     if not manifest_db.exists():
+        return False
+
+    # If backup is encrypted, we can't inject files locally.
+    # The tweaks will need to be applied after restore via AFC or other means.
+    if _is_encrypted_backup(device_dir):
+        log_warn(f"Backup is encrypted — skipping local file injection for {domain}/{relative_path}")
+        return False
+
+    if not _validate_sqlite_db(manifest_db):
+        log_error(f"Manifest.db at {manifest_db} is not a valid SQLite database. Cannot inject file.")
         return False
 
     file_id = hashlib.sha1(f"{domain}-{relative_path}".encode("utf-8")).hexdigest()

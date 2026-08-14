@@ -13,16 +13,15 @@ import src.controllers.video_handler as video_handler
 from src.devicemanagement.constants import Version, LEGACY_SUPPORT_ENABLED
 from src.devicemanagement.device_manager import DeviceManager
 
-from src.gui.dialogs import GestaltDialog, UpdateAppDialog
+from src.gui.dialogs import GestaltDialog, UpdateAppDialog, AboutProgramDialog
 from src.gui.dialogs.reset_dialog import ResetDialog
 from src.gui.thread_workers.apply_worker import ApplyThread, ApplyAlertMessage, RefreshDevicesThread, set_sudo_pwd, set_sudo_complete, get_sudo_pwd
 from src.gui.pages.pages_list import Page
 from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreApplyMethod
 
 from src.tweaks.tweaks import tweaks, TweakID
-
-App_Version = "8.2.1"
-App_Build = 0
+from src.gui.version import App_Version, App_Build
+from src.gui.theme import apply_new_theme, is_theme_enabled
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, device_manager: DeviceManager, translator: Translator):
@@ -38,6 +37,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.threadpool = QtCore.QThreadPool()
         self.loadSettings()
         self.initial_load = True
+
+        # Apply new theme if enabled
+        if is_theme_enabled():
+            apply_new_theme(QtWidgets.QApplication.instance())
 
         # hide every page
         self.ui.posterboardPageBtn.hide()
@@ -82,7 +85,33 @@ class MainWindow(QtWidgets.QMainWindow):
         # Update the app version/build number label
         self.updateAppVersionLabel()
         self.pages[Page.Home].load()
-
+        
+        # Add About button next to title
+        self.aboutBtn = QtWidgets.QToolButton()
+        self.aboutBtn.setText(self.tr("About"))
+        self.aboutBtn.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.aboutBtn.setStyleSheet("""
+            QToolButton {
+                color: #8E8E93;
+                font-size: 13px;
+                background: none;
+                border: none;
+                padding: 4px 8px;
+            }
+            QToolButton:hover {
+                color: #007AFF;
+            }
+        """)
+        self.aboutBtn.setToolButtonStyle(QtCore.Qt.ToolButtonTextOnly)
+        self.aboutBtn.clicked.connect(self.show_about_dialog)
+        
+        # Add to the title bar layout
+        title_layout = self.ui.horizontalLayout_15
+        title_layout.addWidget(self.aboutBtn)
+        
+        # Connect Reset dropdown
+        self.ui.resetDropdown.currentTextChanged.connect(self.on_reset_dropdown_changed)
+        
         ## DEVICE BAR
         self.refresh_devices()
 
@@ -532,6 +561,49 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
     ## APPLY PAGE
+
+    def show_about_dialog(self):
+        dialog = AboutProgramDialog(self)
+        dialog.exec()
+
+    def on_reset_dropdown_changed(self, text: str):
+        if text == "Reset Tweaks":
+            self.ui.resetDropdown.setCurrentIndex(0)
+            self.on_removeTweaksBtn_clicked()
+        elif text == "Reset PosterBoard":
+            self.ui.resetDropdown.setCurrentIndex(0)
+            tweaks[TweakID.PosterBoard].tendies.clear()
+            tweaks[TweakID.PosterBoard].templates.clear()
+            tweaks[TweakID.PosterBoard].videoFile = None
+            tweaks[TweakID.PosterBoard].videoThumbnail = None
+            tweaks[TweakID.PosterBoard].loop_video = True
+            tweaks[TweakID.PosterBoard].reverse_video = False
+            tweaks[TweakID.PosterBoard].use_foreground = False
+            tweaks[TweakID.PosterBoard].calculationMode = "linear"
+            self.pages[Page.Posterboard].load()
+            self.alert_message(ApplyAlertMessage(
+                txt=self.tr("PosterBoard data has been reset."),
+                title=self.tr("Success"),
+                icon=QtWidgets.QMessageBox.Information
+            ))
+        elif text == "Reset All":
+            self.ui.resetDropdown.setCurrentIndex(0)
+            self.on_removeTweaksBtn_clicked()
+            tweaks[TweakID.PosterBoard].tendies.clear()
+            tweaks[TweakID.PosterBoard].templates.clear()
+            tweaks[TweakID.PosterBoard].videoFile = None
+            tweaks[TweakID.PosterBoard].videoThumbnail = None
+            tweaks[TweakID.PosterBoard].loop_video = True
+            tweaks[TweakID.PosterBoard].reverse_video = False
+            tweaks[TweakID.PosterBoard].use_foreground = False
+            tweaks[TweakID.PosterBoard].calculationMode = "linear"
+            self.pages[Page.Posterboard].load()
+            self.alert_message(ApplyAlertMessage(
+                txt=self.tr("All tweaks and PosterBoard data have been reset."),
+                title=self.tr("Success"),
+                icon=QtWidgets.QMessageBox.Information
+            ))
+
     def on_chooseGestaltBtn_clicked(self):
         selected_file, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Select Mobile Gestalt File", "", "Plist Files (*.plist)", options=QtWidgets.QFileDialog.ReadOnly)
         if selected_file == "" or selected_file == None:
