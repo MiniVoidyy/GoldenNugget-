@@ -167,6 +167,7 @@ See [CONTRIBUTING.md](https://github.com/awesomenull-dev/GoldenNugget/blob/main/
 
 ## Credits
 - Translations crowdsourced using [POEditor][POEditorJoin]. Thank you everyone who assisted in the translation effort!
+- [LeminLimez] for creating Nugget.
 - [Wind0ws11Aero] for IOS 27 Support
 - [PosterRestore][PosterRestoreDiscord] for their help with PosterBoard
   - Special thanks to [dootskyre][dootskyreX], [Middo][MiddoX], [dulark][dularkGitHub], forcequitOS, and pingubow for their work on this. It would not have been possible without them!
@@ -179,6 +180,7 @@ See [CONTRIBUTING.md](https://github.com/awesomenull-dev/GoldenNugget/blob/main/
 - [PySide6][PySide6Doc] for the GUI library.
 
 [NuggetLogo]: https://github.com/awesomenull-dev/GoldenNugget/blob/main/src/qt/credits/small_nugget.png
+[LeminLimez]: https://github.com/leminlimez
 [CowabungaLite]: https://github.com/leminlimez/CowabungaLite
 [WallpapersWebsite]: https://cowabun.ga/wallpapers
 [AppleDevices]: https://apps.microsoft.com/detail/9np83lwlpz9k
