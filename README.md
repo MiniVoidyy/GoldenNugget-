@@ -162,8 +162,8 @@ pyside6-lrelease src/qt/translations/Nugget_{language code}.ts -qm src/qt/transl
 
 The application itself can be compiled by running `compile.py`.
 
-# Contributing
-See [CONTRIBUTING.md](https://github.com/awesomenull-dev/GoldenNugget/blob/main/CONTRIBUTING.md)
+# Contributing and forking.
+See [CONTRIBUTING.md](https://github.com/awesomenull-dev/GoldenNugget/blob/main/CONTRIBUTING.md), want fork instead? Then see [FORKING.md](https://github.com/awesomenull-dev/GoldenNugget/blob/main/FORKING.md)
 
 ## Credits
 - Translations crowdsourced using [POEditor][POEditorJoin]. Thank you everyone who assisted in the translation effort!
