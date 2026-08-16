@@ -43,4 +43,5 @@ To keep the repository history clean and easy to read, please use the following 
 If your PR does not follow this format, you may be asked to rename it before it gets reviewed.
 # end
 That's all, i hope this guideline was useful.\
-You can leave you opinion about it in discussion
+You can leave you opinion about it in discussion.\
+Written by entirely awesomenull. can be updated anytime, already created pull requests will not be affected in case of update.
