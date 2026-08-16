@@ -10,32 +10,26 @@ class FeatureFlagsPage(Page):
         self.ui = ui
 
     def load_page(self):
-        self.ui.createFFFolderChk.toggled.connect(self.on_createFFFolderChk_toggled)
         self.ui.clockAnimChk.toggled.connect(self.on_clockAnimChk_toggled)
         self.ui.lockscreenChk.toggled.connect(self.on_lockscreenChk_clicked)
-        self.ui.photosChk.toggled.connect(self.on_photosChk_clicked)
-        self.ui.aiChk.toggled.connect(self.on_aiChk_clicked)
         self.ui.kioskModeChk.toggled.connect(self.on_kioskModeChk_toggled)
         self.ui.solariumFFChk.toggled.connect(self.on_solariumFFChk_toggled)
         self.ui.photosLGFFChk.toggled.connect(self.on_photosLGFFChk_toggled)
         self.ui.shareSheetLGFFChk.toggled.connect(self.on_shareSheetLGFFChk_toggled)
-        
+
+        # hide the removed features (mobilegestalt / eligibility era, iOS 26.2+)
+        for widget_name in ("createFFFolderChk", "createEligFolderChk", "photosChk", "aiChk"):
+            widget = getattr(self.ui, widget_name, None)
+            if widget is not None:
+                widget.hide()
+
         load_featureflags()
 
     ## ACTIONS
-    def on_createFFFolderChk_toggled(self, checked: bool):
-        tweaks[TweakID.CreateBRFolders].set_enabled(checked)
-        self.ui.createEligFolderChk.setChecked(checked)
-
     def on_clockAnimChk_toggled(self, checked: bool):
         tweaks[TweakID.ClockAnim].set_enabled(checked)
     def on_lockscreenChk_clicked(self, checked: bool):
         tweaks[TweakID.Lockscreen].set_enabled(checked)
-
-    def on_photosChk_clicked(self, checked: bool):
-        tweaks[TweakID.PhotoUI].set_enabled(checked)
-    def on_aiChk_clicked(self, checked: bool):
-        tweaks[TweakID.AI].set_enabled(checked)
 
     def on_kioskModeChk_toggled(self, checked: bool):
         tweaks[TweakID.KioskMode].set_enabled(checked)

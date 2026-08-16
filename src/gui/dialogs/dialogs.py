@@ -6,33 +6,6 @@ from webbrowser import open_new_tab
 
 from src.controllers.web_request_handler import Nugget_Repo, get_latest_version
 
-class GestaltDialog(QDialog):
-    def __init__(self, device_manager, gestalt_label, selected_file, parent=None):
-        super().__init__(parent)
-        self.device_manager = device_manager
-        self.gestalt_label = gestalt_label
-        self.selected_file = selected_file
-
-        QBtn = (
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-        )
-
-        self.buttonBox = QDialogButtonBox(QBtn)
-        self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.reject)
-
-        layout = QVBoxLayout()
-        message = QLabel(self.tr("The gestalt file looks like it was made for a different device.\nAre you sure you want to use this one?"))
-        layout.addWidget(message)
-        layout.addWidget(self.buttonBox)
-        self.setLayout(layout)
-
-    def accept(self):
-        self.device_manager.data_singleton.gestalt_path = self.selected_file
-        self.gestalt_label.setText(self.selected_file)
-        super().accept()
-
-
 class PBHelpDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -87,7 +60,19 @@ class AboutProgramDialog(QDialog):
         self.setWindowTitle(self.tr("About GoldenNugget"))
         self.setMinimumSize(500, 600)
         self.setModal(True)
-        
+        self.setStyleSheet("""
+            QDialog { background-color: #1e1e1e; }
+            QDialogButtonBox QPushButton {
+                background-color: #007AFF;
+                border-radius: 10px;
+                color: #FFFFFF;
+                font-size: 15px;
+                font-weight: 600;
+                padding: 10px 24px;
+                border: none;
+            }
+            QDialogButtonBox QPushButton:hover { background-color: #0066CC; }
+        """)
         QBtn = QDialogButtonBox.Ok
         self.buttonBox = QDialogButtonBox(QBtn)
         self.buttonBox.accepted.connect(self.accept)

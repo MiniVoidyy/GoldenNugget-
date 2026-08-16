@@ -53,6 +53,5 @@ def get_resettable_pages(device_manager) -> list[Page]:
     # add the exploit related pages
     if not device_manager.get_current_device_patched():
         page_list.insert(0, Page.FeatureFlags)
-        page_list.insert(0, Page.Gestalt)
 
     return page_list

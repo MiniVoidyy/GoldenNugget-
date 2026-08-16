@@ -1,7 +1,6 @@
 from src.devicemanagement.constants import Version
 from .tweak_names import TweakID
-from .tweak_classes import MobileGestaltTweak, MobileGestaltMultiTweak, MobileGestaltPickerTweak, FeatureFlagTweak, BasicPlistTweak, AdvancedPlistTweak, RdarFixTweak, NullifyFileTweak
-from .eligibility_tweak import EligibilityTweak, AITweak, BookRestoreFileTweak
+from .tweak_classes import FeatureFlagTweak, BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak
 from .posterboard.posterboard_tweak import PosterboardTweak
 from .posterboard.template_options.templates_tweak import TemplatesTweak
 from .status_bar.status_bar_tweak import StatusBarTweak
@@ -20,7 +19,4 @@ tweaks = {
 
     ## Passcode Theme
     TweakID.Passcode: PasscodeThemeTweak(),
-
-    ## Creating the folders for BookRestore
-    TweakID.CreateBRFolders: BookRestoreFileTweak(),
 }

@@ -1,11 +1,8 @@
 from PySide6.QtCore import QCoreApplication, Qt
-from PySide6.QtGui import QFont, QFontDatabase
-
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QToolButton, QLabel, QVBoxLayout
 from ..page import Page
 from src.qt.mainwindow_ui import Ui_Nugget
-
 from src.devicemanagement.constants import Version
-
 
 class HomePage(Page):
     def __init__(self, window, ui: Ui_Nugget):
@@ -13,10 +10,6 @@ class HomePage(Page):
         self.window = window
         self.ui = ui
         self.show_uuid = False
-        
-        # Load Unbounded font
-        self.unbounded_font_id = QFontDatabase.addApplicationFont(":/fonts/Unbounded-VariableFont_wght.ttf")
-        self.unbounded_family = QFontDatabase.applicationFontFamilies(self.unbounded_font_id)[0] if self.unbounded_font_id != -1 else "Unbounded"
 
     def load_page(self):
         ## HOME PAGE ACTIONS

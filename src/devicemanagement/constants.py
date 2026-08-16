@@ -10,8 +10,7 @@ class Device:
     def __init__(self, 
                 udid: int, usb: bool, name: str,
                 version: str, build: str,
-                model: str, hardware: str, cpu: str, locale: str,
-                books_container_uuid: str
+                model: str, hardware: str, cpu: str, locale: str
             ):
         self.udid = udid
         self.connected_via_usb = usb
@@ -22,13 +21,9 @@ class Device:
         self.hardware = hardware
         self.cpu = cpu
         self.locale = locale
-        self.books_container_uuid = books_container_uuid
 
     def is_exploit_fully_patched(self) -> bool:
         return True
-
-    def has_bookrestore(self) -> bool:
-        return False
 
     def has_partial_sparserestore(self) -> bool:
         return False

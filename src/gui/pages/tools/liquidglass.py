@@ -10,6 +10,11 @@ class LiquidGlassPage(Page):
         self.ui = ui
 
     def load_page(self):
+        # hide the removed features (unsupported on iOS 26.2+)
+        disable_solarium = getattr(self.ui, "disableSolariumContent", None)
+        if disable_solarium is not None:
+            disable_solarium.hide()
+
         # Create the radio buttons where needed
         self.createRadioBtns(key=TweakID.ForceSolariumFallback, container=self.ui.forceSolariumFallbackBtns)
         self.createRadioBtns(key=TweakID.DisableSolarium, container=self.ui.disableSolariumBtns)

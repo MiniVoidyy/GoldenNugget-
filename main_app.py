@@ -5,6 +5,9 @@ import runpy
 import warnings
 import traceback
 
+# Add src/qt to path so resources_rc can be found
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src", "qt"))
+
 # 1. SILENCE WARNINGS
 warnings.filterwarnings("ignore")
 

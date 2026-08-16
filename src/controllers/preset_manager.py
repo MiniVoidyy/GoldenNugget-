@@ -11,12 +11,8 @@ from src.tweaks.tweak_names import TweakID
 from src.tweaks import tweak_loader
 from src.tweaks.tweaks import tweaks
 from src.tweaks.tweak_classes import (
-    MobileGestaltTweak, MobileGestaltMultiTweak, MobileGestaltPickerTweak,
-    MobileGestaltCacheDataTweak, RdarFixTweak, FeatureFlagTweak,
-    BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak,
+    FeatureFlagTweak, BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak,
 )
-from src.tweaks.eligibility_tweak import EligibilityTweak, AITweak, BookRestoreFileTweak
-from src.tweaks.custom_gestalt_tweaks import CustomGestaltTweaks, ValueType
 from src.tweaks.posterboard.posterboard_tweak import PosterboardTweak
 from src.tweaks.posterboard.template_options.templates_tweak import TemplatesTweak
 from src.tweaks.status_bar.status_bar_tweak import StatusBarTweak
@@ -225,52 +221,13 @@ class PresetManager:
             except Exception as e:
                 print(f"Failed to serialize tweak {key}: {e}")
 
-        # custom gestalt tweaks
-        custom_gestalt = []
-        for item in CustomGestaltTweaks.custom_tweaks:
-            if item.tweak is None:
-                custom_gestalt.append({
-                    "key": "", "value": "", "value_type": item.value_type.value,
-                    "deactivated": item.deactivated
-                })
-            else:
-                custom_gestalt.append({
-                    "key": item.tweak.key,
-                    "value": item.tweak.value,
-                    "value_type": item.value_type.value,
-                    "deactivated": item.deactivated
-                })
-
         return {
-            "tweaks": tweak_data,
-            "custom_gestalt": custom_gestalt
+            "tweaks": tweak_data
         }
 
     def _serialize_tweak(self, tweak) -> dict:
         data = {"type": type(tweak).__name__, "enabled": tweak.enabled}
-        if isinstance(tweak, MobileGestaltPickerTweak):
-            data["key"] = tweak.key
-            data["subkey"] = tweak.subkey
-            data["values"] = tweak.value
-            data["selected_option"] = tweak.selected_option
-        elif isinstance(tweak, MobileGestaltMultiTweak):
-            data["keyValues"] = tweak.keyValues
-        elif isinstance(tweak, MobileGestaltCacheDataTweak):
-            data["slice_start"] = tweak.slice_start
-            data["slice_len"] = tweak.slice_len
-        elif isinstance(tweak, MobileGestaltTweak):
-            data["key"] = tweak.key
-            data["subkey"] = tweak.subkey
-            data["value"] = tweak.value
-        elif isinstance(tweak, RdarFixTweak):
-            data["mode"] = tweak.mode
-            data["di_type"] = tweak.di_type
-        elif isinstance(tweak, EligibilityTweak):
-            data["code"] = tweak.code
-            data["method"] = tweak.method
-        elif isinstance(tweak, AITweak):
-            data["value"] = tweak.value
-        elif isinstance(tweak, AdvancedPlistTweak):
+        if isinstance(tweak, AdvancedPlistTweak):
             data["value"] = tweak.value
         elif isinstance(tweak, BasicPlistTweak):
             data["value"] = tweak.value
@@ -296,7 +253,7 @@ class PresetManager:
             data["language_code"] = tweak.language_code
             data["big_keys"] = tweak.big_keys
             data["current_size"] = tweak.current_size
-        # FeatureFlagTweak, NullifyFileTweak, BookRestoreFileTweak only need "enabled"
+        # FeatureFlagTweak, NullifyFileTweak only need "enabled"
         return data
 
     ## DESERIALIZATION
@@ -319,9 +276,6 @@ class PresetManager:
                     except Exception as e:
                         print(f"Failed to apply tweak {name}: {e}")
 
-            if "custom_gestalt" in data:
-                self._apply_custom_gestalt(data["custom_gestalt"])
-
             return True
         except Exception as e:
             print(f"Failed to apply preset: {e}")
@@ -329,8 +283,6 @@ class PresetManager:
 
     def _load_all_tweaks(self):
         # idempotent: the loaders return early if the tweaks already exist
-        tweak_loader.load_mobilegestalt(None)
-        tweak_loader.load_eligibility(None)
         tweak_loader.load_featureflags()
         tweak_loader.load_internal()
         tweak_loader.load_springboard()
@@ -341,36 +293,7 @@ class PresetManager:
         if "enabled" in data:
             tweak.enabled = data["enabled"]
 
-        if isinstance(tweak, MobileGestaltPickerTweak):
-            if "values" in data:
-                tweak.value = data["values"]
-            if "selected_option" in data:
-                tweak.selected_option = data["selected_option"]
-        elif isinstance(tweak, MobileGestaltMultiTweak):
-            if "keyValues" in data:
-                tweak.keyValues = data["keyValues"]
-        elif isinstance(tweak, MobileGestaltCacheDataTweak):
-            if "slice_start" in data:
-                tweak.slice_start = data["slice_start"]
-            if "slice_len" in data:
-                tweak.slice_len = data["slice_len"]
-        elif isinstance(tweak, MobileGestaltTweak):
-            if "value" in data:
-                tweak.value = data["value"]
-        elif isinstance(tweak, RdarFixTweak):
-            if "mode" in data:
-                tweak.mode = data["mode"]
-            if "di_type" in data:
-                tweak.di_type = data["di_type"]
-        elif isinstance(tweak, EligibilityTweak):
-            if "code" in data:
-                tweak.code = data["code"]
-            if "method" in data:
-                tweak.method = data["method"]
-        elif isinstance(tweak, AITweak):
-            if "value" in data:
-                tweak.value = data["value"]
-        elif isinstance(tweak, (BasicPlistTweak, AdvancedPlistTweak)):
+        if isinstance(tweak, (BasicPlistTweak, AdvancedPlistTweak)):
             if "value" in data:
                 tweak.value = data["value"]
         elif isinstance(tweak, PosterboardTweak):
@@ -449,18 +372,3 @@ class PresetManager:
             except Exception as e:
                 print(f"Failed to restore status bar: {e}")
 
-    def _apply_custom_gestalt(self, items: list[dict]):
-        CustomGestaltTweaks.custom_tweaks = []
-        for item in items:
-            value_type = ValueType(item.get("value_type", ValueType.Integer.value))
-            if item.get("deactivated", False):
-                CustomGestaltTweaks.create_deactivated(value_type)
-                continue
-            try:
-                CustomGestaltTweaks.create_tweak(
-                    key=item.get("key", ""),
-                    value=item.get("value", ""),
-                    value_type=value_type
-                )
-            except Exception as e:
-                print(f"Failed to restore custom gestalt tweak: {e}")

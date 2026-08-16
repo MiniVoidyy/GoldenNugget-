@@ -1,0 +1,773 @@
+from PySide6.QtCore import Qt, QCoreApplication
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
+    QComboBox, QLineEdit, QListWidget, QMessageBox, QInputDialog,
+    QFileDialog, QDialog
+)
+
+from src.gui.ios.components import (
+    IOSNavBar, IOSSectionHeader, IOSCard, IOSSwitch, IOSPrimaryButton
+)
+from src.gui.ios.theme_manager import ThemeManager
+from src.gui.pages.main.settings import available_languages
+from src.controllers.video_handler import set_ignore_frame_limit
+from src.controllers.preset_manager import PresetManager
+from src.tweaks.tweaks import tweaks, TweakID
+
+
+class IOSSettingsPage(QWidget):
+    def __init__(self, window, parent=None):
+        super().__init__(parent)
+        self.window = window
+        self.setObjectName("iosContainer")
+        self.lang_indexes = []
+        self.preset_manager = PresetManager()
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        nav = IOSNavBar(QCoreApplication.translate("Nugget", "    Settings").strip(), window=self.window)
+        layout.addWidget(nav)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("background-color: #1e1e1e; border: none;")
+        content = QWidget()
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
+
+        self.content_layout = QVBoxLayout(content)
+        self.content_layout.setContentsMargins(16, 16, 16, 32)
+        self.content_layout.setSpacing(8)
+
+        # Appearance
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "Appearance")))
+
+        def on_theme_toggled(ios_enabled: bool):
+            if ios_enabled:
+                self.window.theme_manager.switch_to(ThemeManager.IOS)
+            else:
+                self.window.theme_manager.switch_to(ThemeManager.CLASSIC)
+            toggle = getattr(self.window.ui, "themeToggleChk", None)
+            if toggle is not None:
+                toggle.blockSignals(True)
+                toggle.setChecked(ios_enabled)
+                toggle.blockSignals(False)
+
+        theme_on = self.window.theme_manager.current_theme == ThemeManager.IOS
+        self.theme_switch = self._make_switch(
+            QCoreApplication.translate("IOSSettingsPage", "iOS-style Interface"),
+            theme_on, on_theme_toggled,
+        )
+
+        # Language
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "App Language")))
+        self._make_language_row()
+
+        # Device
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "Device")))
+        pref = self.window.device_manager.pref_manager
+
+        self._make_switch(
+            QCoreApplication.translate("Nugget", "Allow Applying Over WiFi"),
+            pref.apply_over_wifi,
+            self._make_setting_handler("apply_over_wifi"),
+        )
+
+        self._make_switch(
+            QCoreApplication.translate("Nugget", "Auto Reboot After Applying"),
+            pref.auto_reboot,
+            self._make_setting_handler("auto_reboot"),
+        )
+
+        reset_pairing_btn = IOSPrimaryButton(QCoreApplication.translate("Nugget", "Reset Device Pairing"))
+        reset_pairing_btn.clicked.connect(self.window.device_manager.reset_device_pairing)
+        self.content_layout.addWidget(reset_pairing_btn)
+
+        # PosterBoard
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "PosterBoard")))
+
+        self._make_switch(
+            QCoreApplication.translate("Nugget", "Ignore Posterboard Frame Limit"),
+            self.window.settings.value("ignore_pb_frame_limit", False, type=bool),
+            lambda checked: (
+                set_ignore_frame_limit(checked),
+                self.window.settings.setValue("ignore_pb_frame_limit", checked),
+            ),
+        )
+
+        self._make_switch(
+            QCoreApplication.translate("Nugget", "Disable Tendies Limit"),
+            pref.disable_tendies_limit,
+            self._make_setting_handler("disable_tendies_limit"),
+        )
+
+        self._make_switch(
+            QCoreApplication.translate("Nugget", "Force PosterBoard Refresh"),
+            pref.auto_refresh_posterboard,
+            self._make_setting_handler("auto_refresh_posterboard"),
+        )
+
+        self._make_switch(
+            QCoreApplication.translate("IOSSettingsPage", "Rebuild SpringBoard State DB"),
+            pref.rebuild_sb_application_state_db,
+            lambda checked: setattr(pref, "rebuild_sb_application_state_db", checked),
+        )
+
+        self._make_pb_setup_section()
+
+        # Backup
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "Backup")))
+
+        self._make_switch(
+            QCoreApplication.translate("Nugget", "Restore TrustStore (SSL Configuration Profiles)"),
+            pref.restore_truststore,
+            self._make_setting_handler("restore_truststore"),
+        )
+
+        self._make_switch(
+            QCoreApplication.translate("IOSSettingsPage", "Use Encrypted Backups (Experimental)"),
+            pref.use_encrypted_backup,
+            self._make_setting_handler("use_encrypted_backup"),
+        )
+
+        # Setup
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "Setup")))
+
+        self._make_switch(
+            QCoreApplication.translate("Nugget", "Skip Setup * (non-exploit files only)"),
+            pref.skip_setup,
+            self._make_setting_handler("skip_setup"),
+        )
+
+        self._make_switch(
+            QCoreApplication.translate("Nugget", "Enable Supervision * (requires Skip Setup)"),
+            pref.supervised,
+            self._make_setting_handler("supervised"),
+        )
+
+        self._make_text_row(
+            QCoreApplication.translate("Nugget", "Enter Organization Name"),
+            pref.organization_name,
+            self._on_org_name_edited,
+        )
+
+        # Presets
+        self._make_presets_section()
+
+        # Original Plists
+        self._make_originals_section()
+
+        # About
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "About")))
+
+        about_btn = IOSPrimaryButton(QCoreApplication.translate("IOSSettingsPage", "About GoldenNugget"))
+        about_btn.clicked.connect(self.show_about)
+        self.content_layout.addWidget(about_btn)
+
+        self.refresh_presets()
+        self.update_originals_status()
+        self.content_layout.addStretch()
+
+    # ---------- helpers ----------
+
+    def _make_switch(self, title: str, checked: bool, on_toggled) -> IOSSwitch:
+        card = IOSCard()
+        row = QHBoxLayout(card)
+        row.setContentsMargins(16, 10, 16, 10)
+        row.setSpacing(12)
+
+        label = QLabel(title)
+        label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
+        label.setWordWrap(True)
+        row.addWidget(label, 1)
+
+        switch = IOSSwitch(checked)
+        switch.toggled.connect(on_toggled)
+        row.addWidget(switch)
+        self.content_layout.addWidget(card)
+        return switch
+
+    def _make_setting_handler(self, pref_attr: str):
+        pref = self.window.device_manager.pref_manager
+        def handler(checked: bool):
+            setattr(pref, pref_attr, checked)
+            self.window.settings.setValue(pref_attr, checked)
+        return handler
+
+    def _make_text_row(self, title: str, current: str, on_submit):
+        card = IOSCard()
+        row = QHBoxLayout(card)
+        row.setContentsMargins(16, 10, 16, 10)
+        row.setSpacing(12)
+
+        label = QLabel(title)
+        label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
+        row.addWidget(label, 1)
+
+        self.org_value_lbl = QLabel(current if current else QCoreApplication.translate("MainWindow", "None"))
+        self.org_value_lbl.setStyleSheet("color: #8E8E93; font-size: 14px;")
+        row.addWidget(self.org_value_lbl)
+
+        edit_btn = QLabel("✎")
+        edit_btn.setStyleSheet("color: #007AFF; font-size: 17px;")
+        edit_btn.setCursor(Qt.PointingHandCursor)
+        edit_btn.mousePressEvent = lambda e: self._on_text_row_edit(title, on_submit)
+        row.addWidget(edit_btn)
+
+        self.content_layout.addWidget(card)
+
+    def _on_text_row_edit(self, title: str, on_submit):
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setLabelText(QCoreApplication.translate("IOSSettingsPage", "Enter value:"))
+        dialog.setTextValue(self.window.device_manager.pref_manager.organization_name)
+        dialog.setStyleSheet("""
+            QDialog, QInputDialog { background-color: #1e1e1e; }
+            QLabel { color: #FFFFFF; font-size: 15px; }
+            QLineEdit {
+                background-color: #3b3b3b;
+                border: none;
+                border-radius: 10px;
+                color: #FFFFFF;
+                font-size: 15px;
+                padding: 10px 14px;
+            }
+            QPushButton {
+                background-color: #007AFF;
+                border-radius: 10px;
+                color: #FFFFFF;
+                font-size: 15px;
+                font-weight: 600;
+                padding: 10px 20px;
+                border: none;
+            }
+        """)
+        if dialog.exec() == QDialog.Accepted:
+            text = dialog.textValue()
+            on_submit(text)
+            self.org_value_lbl.setText(text if text else QCoreApplication.translate("MainWindow", "None"))
+
+    def _on_org_name_edited(self, text: str):
+        pref = self.window.device_manager.pref_manager
+        pref.organization_name = text
+        self.window.settings.setValue("organization_name", text)
+
+    def _make_language_row(self):
+        card = IOSCard()
+        row = QHBoxLayout(card)
+        row.setContentsMargins(16, 10, 16, 10)
+        row.setSpacing(12)
+
+        label = QLabel(QCoreApplication.translate("Nugget", "App Language"))
+        label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
+        row.addWidget(label, 1)
+
+        self.lang_drp = QComboBox()
+        self.lang_drp.setStyleSheet("""
+            QComboBox {
+                background-color: #3b3b3b;
+                border: none;
+                border-radius: 10px;
+                color: #FFFFFF;
+                font-size: 14px;
+                padding: 8px 12px;
+                min-width: 140px;
+            }
+            QComboBox::drop-down { border: none; width: 24px; }
+            QComboBox::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #8E8E93; margin-right: 10px; }
+            QComboBox QAbstractItemView {
+                background-color: #2C2C2E;
+                border: 1px solid #3A3A3C;
+                border-radius: 10px;
+                color: #FFFFFF;
+                selection-background-color: #007AFF;
+            }
+        """)
+        for language in available_languages.keys():
+            self.lang_indexes.append(available_languages[language])
+            self.lang_drp.addItem(language)
+        try:
+            idx = self.lang_indexes.index(self.window.translator.get_saved_locale_code())
+        except Exception:
+            idx = 0
+        self.lang_drp.setCurrentIndex(idx)
+        self.lang_drp.activated.connect(self._on_lang_selected)
+        row.addWidget(self.lang_drp)
+
+        self.content_layout.addWidget(card)
+
+    def _on_lang_selected(self, index: int):
+        new_lang = self.lang_indexes[index]
+        if new_lang != self.window.translator.get_saved_locale_code():
+            self.window.translator.set_new_language(new_lang, restart=True)
+
+    def _make_pb_setup_section(self):
+        self.content_layout.addWidget(IOSSectionHeader(
+            QCoreApplication.translate("IOSSettingsPage", "PosterBoard Database")
+        ))
+
+        # apply method
+        card = IOSCard()
+        row = QHBoxLayout(card)
+        row.setContentsMargins(16, 10, 16, 10)
+        row.setSpacing(12)
+
+        label = QLabel(QCoreApplication.translate("IOSSettingsPage", "Apply Method"))
+        label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
+        row.addWidget(label, 1)
+
+        self.use_configs_switch = IOSSwitch(tweaks[TweakID.PosterBoard].use_configs)
+        self.use_configs_switch.toggled.connect(self._on_use_configs_toggled)
+        row.addWidget(self.use_configs_switch)
+        self.content_layout.addWidget(card)
+
+        self._make_label_row(QCoreApplication.translate("IOSSettingsPage", "Database"), "sqlite: None")
+
+        self._make_button_row(
+            QCoreApplication.translate("IOSSettingsPage", "Get Database from Device"),
+            self._on_pb_get_db,
+        )
+        self._make_button_row(
+            QCoreApplication.translate("IOSSettingsPage", "Select Database File"),
+            self._on_pb_select_db,
+        )
+
+        # saved ids list
+        ids_card = IOSCard()
+        ids_layout = QVBoxLayout(ids_card)
+        ids_layout.setContentsMargins(16, 12, 16, 12)
+        ids_layout.setSpacing(8)
+        ids_title = QLabel(QCoreApplication.translate("IOSSettingsPage", "Saved Configuration IDs"))
+        ids_title.setStyleSheet("color: #FFFFFF; font-size: 15px;")
+        ids_layout.addWidget(ids_title)
+
+        self.saved_ids_list = QListWidget()
+        self.saved_ids_list.setStyleSheet("""
+            QListWidget {
+                background-color: #3b3b3b;
+                border: none;
+                border-radius: 8px;
+                color: #e8e8e8;
+                font-size: 13px;
+                padding: 4px;
+            }
+            QListWidget::item { padding: 6px; }
+            QListWidget::item:selected { background-color: #535353; color: #ffffff; }
+        """)
+        self.saved_ids_list.setMinimumHeight(90)
+        ids_layout.addWidget(self.saved_ids_list)
+
+        ids_btns = QHBoxLayout()
+        clear_btn = self._make_mini_button(QCoreApplication.translate("IOSSettingsPage", "Clear"))
+        clear_btn.clicked.connect(self._on_clear_saved_ids)
+        remove_btn = self._make_mini_button(QCoreApplication.translate("IOSSettingsPage", "Remove Selected"))
+        remove_btn.clicked.connect(self._on_remove_selected_id)
+        ids_btns.addWidget(clear_btn)
+        ids_btns.addWidget(remove_btn)
+        ids_layout.addLayout(ids_btns)
+        self.content_layout.addWidget(ids_card)
+
+        self._refresh_saved_ids()
+
+    def _make_label_row(self, title: str, value: str):
+        card = IOSCard()
+        row = QHBoxLayout(card)
+        row.setContentsMargins(16, 10, 16, 10)
+        row.setSpacing(12)
+
+        label = QLabel(title)
+        label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
+        row.addWidget(label, 1)
+
+        self.pb_db_lbl = QLabel(value)
+        self.pb_db_lbl.setStyleSheet("color: #8E8E93; font-size: 14px;")
+        row.addWidget(self.pb_db_lbl)
+        self.content_layout.addWidget(card)
+
+    def _make_button_row(self, title: str, on_click):
+        btn = IOSPrimaryButton(title)
+        btn.setFixedHeight(44)
+        btn.clicked.connect(on_click)
+        self.content_layout.addWidget(btn)
+
+    def _make_mini_button(self, title: str):
+        from PySide6.QtWidgets import QPushButton
+        btn = QPushButton(title)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3b3b3b;
+                border: none;
+                border-radius: 10px;
+                color: #FFFFFF;
+                font-size: 13px;
+                padding: 8px 12px;
+            }
+            QPushButton:hover { background-color: #4a4a4a; }
+        """)
+        return btn
+
+    def _on_use_configs_toggled(self, checked: bool):
+        tweaks[TweakID.PosterBoard].use_configs = checked
+
+    def _on_pb_get_db(self):
+        from src.gui.dialogs import PosterBoardDBWizard
+        current = self.window.device_manager.data_singleton.current_device
+        if current is None:
+            QMessageBox.warning(
+                self, QCoreApplication.translate("IOSSettingsPage", "Get Database"),
+                QCoreApplication.translate("QCoreApplication", "Please connect a device."))
+            return
+        wizard = PosterBoardDBWizard(current.udid, self.pb_db_lbl, self._refresh_saved_ids)
+        wizard.exec()
+
+    def _on_pb_select_db(self):
+        from PySide6.QtWidgets import QFileDialog as FD
+        selected_file, _ = FD.getOpenFileName(
+            self, QCoreApplication.translate("IOSSettingsPage", "Select PBFPosterExtensionDataStoreSQLiteDatabase File"),
+            "", "*.sqlite3", options=FD.ReadOnly)
+        if selected_file in (None, ""):
+            tweaks[TweakID.PosterBoard].config_manager.database = None
+            self.pb_db_lbl.setText("sqlite: None")
+        else:
+            if not tweaks[TweakID.PosterBoard].config_manager.update_database_file(
+                    selected_file, self.window.device_manager.get_current_device_udid()):
+                QMessageBox.critical(
+                    self, QCoreApplication.translate("QtCore.QCoreApplication", "Error!"),
+                    QCoreApplication.translate("IOSSettingsPage", "The database is not of the correct format!"))
+                return
+            self.pb_db_lbl.setText("sqlite: Selected")
+
+    def _refresh_saved_ids(self):
+        self.saved_ids_list.clear()
+        saved_ids = tweaks[TweakID.PosterBoard].config_manager.saved_items
+        if len(saved_ids) == 0:
+            self.saved_ids_list.setEnabled(False)
+            self.saved_ids_list.addItem(QCoreApplication.translate("MainWindow", "None"))
+        else:
+            self.saved_ids_list.setEnabled(True)
+            self.saved_ids_list.addItems([item.to_str() for item in saved_ids])
+
+    def _on_clear_saved_ids(self):
+        confirm = QMessageBox.question(
+            self, QCoreApplication.translate("IOSSettingsPage", "Clear Saved IDs"),
+            QCoreApplication.translate("IOSSettingsPage", "Clear all saved configuration IDs?"))
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        tweaks[TweakID.PosterBoard].config_manager.saved_items.clear()
+        self._refresh_saved_ids()
+
+    def _on_remove_selected_id(self):
+        curr_row = self.saved_ids_list.currentRow()
+        if curr_row >= 0 and len(tweaks[TweakID.PosterBoard].config_manager.saved_items) > 0:
+            tweaks[TweakID.PosterBoard].config_manager.saved_items.pop(curr_row)
+            self._refresh_saved_ids()
+
+    # ---------- presets ----------
+
+    def _make_presets_section(self):
+        self.content_layout.addWidget(IOSSectionHeader(
+            QCoreApplication.translate("IOSSettingsPage", "Presets")
+        ))
+
+        card = IOSCard()
+        presets_layout = QVBoxLayout(card)
+        presets_layout.setContentsMargins(16, 12, 16, 12)
+        presets_layout.setSpacing(8)
+
+        name_row = QHBoxLayout()
+        self.preset_name_txt = QLineEdit()
+        self.preset_name_txt.setPlaceholderText(QCoreApplication.translate("IOSSettingsPage", "Preset name"))
+        self.preset_desc_txt = QLineEdit()
+        self.preset_desc_txt.setPlaceholderText(QCoreApplication.translate("IOSSettingsPage", "Description (optional)"))
+        for edit in (self.preset_name_txt, self.preset_desc_txt):
+            edit.setStyleSheet("""
+                QLineEdit {
+                    background-color: #3b3b3b;
+                    border: none;
+                    border-radius: 10px;
+                    color: #FFFFFF;
+                    font-size: 14px;
+                    padding: 10px 14px;
+                }
+            """)
+        name_row.addWidget(self.preset_name_txt, 2)
+        name_row.addWidget(self.preset_desc_txt, 3)
+        presets_layout.addLayout(name_row)
+
+        save_btn = self._make_mini_button(QCoreApplication.translate("IOSSettingsPage", "Save Preset"))
+        save_btn.clicked.connect(self._on_preset_save)
+        presets_layout.addWidget(save_btn)
+
+        self.preset_list = QListWidget()
+        self.preset_list.setStyleSheet("""
+            QListWidget {
+                background-color: #3b3b3b;
+                border: none;
+                border-radius: 8px;
+                color: #e8e8e8;
+                font-size: 13px;
+                padding: 4px;
+            }
+            QListWidget::item { padding: 8px; }
+            QListWidget::item:selected { background-color: #535353; color: #ffffff; }
+        """)
+        self.preset_list.setMinimumHeight(120)
+        presets_layout.addWidget(self.preset_list)
+
+        btns_row = QHBoxLayout()
+        for title, handler in [
+            (QCoreApplication.translate("IOSSettingsPage", "Load"), self._on_preset_load),
+            (QCoreApplication.translate("IOSSettingsPage", "Delete"), self._on_preset_delete),
+            (QCoreApplication.translate("IOSSettingsPage", "Refresh"), self.refresh_presets),
+            (QCoreApplication.translate("IOSSettingsPage", "Export"), self._on_preset_export),
+            (QCoreApplication.translate("IOSSettingsPage", "Import"), self._on_preset_import),
+        ]:
+            btn = self._make_mini_button(title)
+            btn.clicked.connect(handler)
+            btns_row.addWidget(btn)
+        presets_layout.addLayout(btns_row)
+
+        self.content_layout.addWidget(card)
+
+    def refresh_presets(self):
+        self.preset_list.clear()
+        for meta in self.preset_manager.list_presets_with_metadata():
+            name = meta["name"]
+            desc = meta.get("description", "")
+            model = meta.get("device_model", "Unknown")
+            ios = meta.get("ios_version", "Unknown")
+            tags = meta.get("tags", [])
+            tag_str = "  #" + " #".join(tags) if tags else ""
+            if desc:
+                item_text = f"{name}\n  {desc}  ({model} • iOS {ios}){tag_str}"
+            else:
+                item_text = f"{name}  ({model} • iOS {ios}){tag_str}"
+            self.preset_list.addItem(item_text)
+
+    def _on_preset_save(self):
+        default_name = self.preset_name_txt.text().strip()
+        default_desc = self.preset_desc_txt.text().strip()
+        name, ok = QInputDialog.getText(
+            self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
+            QCoreApplication.translate("IOSSettingsPage", "Enter a name for this preset:"),
+            text=default_name)
+        if not ok or name.strip() == "":
+            return
+        desc, ok2 = QInputDialog.getText(
+            self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
+            QCoreApplication.translate("IOSSettingsPage", "Enter a description (optional):"),
+            text=default_desc)
+        if not ok2:
+            desc = default_desc
+        if self.preset_manager.save_preset(name.strip(), desc.strip(), tags=[]):
+            self.preset_name_txt.clear()
+            self.preset_desc_txt.clear()
+            self.refresh_presets()
+            QMessageBox.information(
+                self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Preset \"{0}\" saved successfully.").format(name.strip()))
+        else:
+            QMessageBox.critical(
+                self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Failed to save the preset."))
+
+    def _on_preset_load(self):
+        if self.preset_list.currentRow() < 0:
+            QMessageBox.warning(
+                self, QCoreApplication.translate("IOSSettingsPage", "Load Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Select a preset to load first."))
+            return
+        item_text = self.preset_list.currentItem().text()
+        name = item_text.split("\n")[0].strip()
+        meta = self.preset_manager.get_preset_metadata(name)
+        desc = meta.get("description", "") if meta else ""
+        model = meta.get("device_model", "Unknown") if meta else "Unknown"
+        ios = meta.get("ios_version", "Unknown") if meta else "Unknown"
+        confirm = QMessageBox.question(
+            self, QCoreApplication.translate("IOSSettingsPage", "Load Preset"),
+            QCoreApplication.translate(
+                "IOSSettingsPage",
+                "Load preset \"{0}\"?\n\nDescription: {1}\nDevice: {2} • iOS {3}\n\nThis will replace your current configuration."
+            ).format(name, desc, model, ios))
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        if not self.preset_manager.load_preset(name):
+            QMessageBox.critical(
+                self, QCoreApplication.translate("IOSSettingsPage", "Load Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Failed to load the preset."))
+            return
+        self.window.settings.setValue("last_loaded_preset", name)
+        self.window.settings.sync()
+        QMessageBox.information(
+            self, QCoreApplication.translate("IOSSettingsPage", "Load Preset"),
+            QCoreApplication.translate(
+                "IOSSettingsPage",
+                "Preset \"{0}\" loaded.\n\nGoldenNugget will now restart to apply the changes.").format(name))
+        self._restart_app()
+
+    def _on_preset_delete(self):
+        if self.preset_list.currentRow() < 0:
+            QMessageBox.warning(
+                self, QCoreApplication.translate("IOSSettingsPage", "Delete Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Select a preset to delete first."))
+            return
+        item_text = self.preset_list.currentItem().text()
+        name = item_text.split("\n")[0].strip()
+        confirm = QMessageBox.question(
+            self, QCoreApplication.translate("IOSSettingsPage", "Delete Preset"),
+            QCoreApplication.translate("IOSSettingsPage", "Delete preset \"{0}\"?").format(name))
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        if self.preset_manager.delete_preset(name):
+            self.refresh_presets()
+        else:
+            QMessageBox.critical(
+                self, QCoreApplication.translate("IOSSettingsPage", "Delete Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Failed to delete the preset."))
+
+    def _on_preset_export(self):
+        if self.preset_list.currentRow() < 0:
+            QMessageBox.warning(
+                self, QCoreApplication.translate("IOSSettingsPage", "Export Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Select a preset to export first."))
+            return
+        item_text = self.preset_list.currentItem().text()
+        name = item_text.split("\n")[0].strip()
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, QCoreApplication.translate("IOSSettingsPage", "Export Preset"),
+            f"{name}.json",
+            QCoreApplication.translate("IOSSettingsPage", "JSON Files (*.json)"))
+        if not file_path:
+            return
+        if self.preset_manager.export_preset(name, file_path):
+            QMessageBox.information(
+                self, QCoreApplication.translate("IOSSettingsPage", "Export Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Preset exported to:\n{0}").format(file_path))
+        else:
+            QMessageBox.critical(
+                self, QCoreApplication.translate("IOSSettingsPage", "Export Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Failed to export preset."))
+
+    def _on_preset_import(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, QCoreApplication.translate("IOSSettingsPage", "Import Preset"),
+            "",
+            QCoreApplication.translate("IOSSettingsPage", "JSON Files (*.json)"))
+        if not file_path:
+            return
+        success, result = self.preset_manager.import_preset(file_path)
+        if success:
+            self.refresh_presets()
+            QMessageBox.information(
+                self, QCoreApplication.translate("IOSSettingsPage", "Import Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Preset \"{0}\" imported successfully.").format(result))
+        else:
+            QMessageBox.critical(
+                self, QCoreApplication.translate("IOSSettingsPage", "Import Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Failed to import preset:\n{0}").format(result))
+
+    def _restart_app(self):
+        import os
+        import sys
+        os.execl(sys.executable, sys.executable, *sys.argv)
+
+    # ---------- original plists ----------
+
+    def _make_originals_section(self):
+        self.content_layout.addWidget(IOSSectionHeader(
+            QCoreApplication.translate("IOSSettingsPage", "Original Plists")
+        ))
+
+        card = IOSCard()
+        originals_layout = QVBoxLayout(card)
+        originals_layout.setContentsMargins(16, 12, 16, 12)
+        originals_layout.setSpacing(8)
+
+        desc = QLabel(QCoreApplication.translate(
+            "IOSSettingsPage",
+            "Back up the system plists Nugget overwrites so Reset can restore your "
+            "original settings instead of empty ones. Save from a clean (just "
+            "restored) device for the best result. Saved files only apply to "
+            "devices of the same model and iOS build."))
+        desc.setWordWrap(True)
+        desc.setStyleSheet("color: #8E8E93; font-size: 13px;")
+        originals_layout.addWidget(desc)
+
+        self.originals_status_lbl = QLabel("")
+        self.originals_status_lbl.setStyleSheet("color: #e8a33d; font-size: 13px;")
+        originals_layout.addWidget(self.originals_status_lbl)
+
+        btns = QHBoxLayout()
+        save_btn = self._make_mini_button(QCoreApplication.translate("IOSSettingsPage", "Save Originals"))
+        save_btn.clicked.connect(self._on_originals_save)
+        delete_btn = self._make_mini_button(QCoreApplication.translate("IOSSettingsPage", "Delete Originals"))
+        delete_btn.clicked.connect(self._on_originals_delete)
+        btns.addWidget(save_btn)
+        btns.addWidget(delete_btn)
+        originals_layout.addLayout(btns)
+
+        self.content_layout.addWidget(card)
+
+    def update_originals_status(self):
+        model = self.window.device_manager.get_current_device_model()
+        build = self.window.device_manager.get_current_device_build()
+        originals = {}
+        if model and build:
+            originals = self.window.device_manager.pref_manager.get_original_plists(model, build)
+        if originals:
+            self.originals_status_lbl.setText(QCoreApplication.translate(
+                "IOSSettingsPage", "Saved: {0} files for {1} ({2})").format(len(originals), model, build))
+            self.originals_status_lbl.setStyleSheet("color: #7ed67e; font-size: 13px;")
+        else:
+            self.originals_status_lbl.setText(QCoreApplication.translate(
+                "IOSSettingsPage", "Not saved yet. Connect a clean device and tap \"Save Originals\"."))
+            self.originals_status_lbl.setStyleSheet("color: #e8a33d; font-size: 13px;")
+
+    def _on_originals_save(self):
+        if not self.window.device_manager.get_current_device_udid():
+            QMessageBox.warning(
+                self, QCoreApplication.translate("IOSSettingsPage", "Save Originals"),
+                QCoreApplication.translate("QCoreApplication", "Please connect a device."))
+            return
+        confirm = QMessageBox.question(
+            self, QCoreApplication.translate("IOSSettingsPage", "Save Originals"),
+            QCoreApplication.translate(
+                "IOSSettingsPage",
+                "Back up the current device's original plists?\n\n"
+                "This may take a few minutes and the device may ask for its passcode. "
+                "Save from a clean (just restored) device for the best result."))
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        self.window.capture_originals()
+
+    def _on_originals_delete(self):
+        model = self.window.device_manager.get_current_device_model()
+        build = self.window.device_manager.get_current_device_build()
+        if not model or not build:
+            return
+        confirm = QMessageBox.question(
+            self, QCoreApplication.translate("IOSSettingsPage", "Delete Originals"),
+            QCoreApplication.translate(
+                "IOSSettingsPage",
+                "Delete the saved original plists for {0} ({1})?\n\n"
+                "Reset will fall back to writing empty plists.").format(model, build))
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        self.window.device_manager.pref_manager.remove_original_plists(model, build)
+        self.update_originals_status()
+
+    # ---------- about ----------
+
+    def show_about(self):
+        from src.gui.dialogs import AboutProgramDialog
+        dialog = AboutProgramDialog(self.window)
+        dialog.exec()
+
+    def refresh_theme_switch(self):
+        ios_on = self.window.theme_manager.current_theme == ThemeManager.IOS
+        self.theme_switch.blockSignals(True)
+        self.theme_switch.setChecked(ios_on)
+        self.theme_switch.blockSignals(False)

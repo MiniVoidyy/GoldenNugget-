@@ -50,6 +50,7 @@ class ApplyThread(QThread):
         self.reset_pages = reset_pages
         self.capture_only = capture_only
         self.revert_last_apply_only = revert_last_apply_only
+        self.success = False
 
     def do_work(self):
         if self.revert_last_apply_only:
@@ -66,7 +67,12 @@ class ApplyThread(QThread):
             self.manager.reset_tweaks(self.reset_pages, self.settings, self.update_label, self.alert_window)
 
     def run(self):
-        self.do_work()
+        try:
+            self.do_work()
+            self.success = True
+        except Exception as e:
+            self.success = False
+            print(f"ApplyThread error: {e}")
 
 class RefreshDevicesThread(QThread):
     alert = Signal(ApplyAlertMessage)

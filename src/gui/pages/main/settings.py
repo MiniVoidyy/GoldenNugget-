@@ -12,11 +12,10 @@ from PySide6.QtWidgets import (
     QToolButton, QVBoxLayout, QWidget,
 )
 
-from src.tweaks.tweak_loader import load_rdar_fix
 from src.tweaks.tweaks import tweaks
 from src.controllers.video_handler import set_ignore_frame_limit
 from src.controllers.preset_manager import PresetManager
-from src.restore.bookrestore import BookRestoreFileTransferMethod, BookRestoreApplyMethod
+from src.gui.dialogs import AboutProgramDialog
 
 available_languages = {
     "English": "en",
@@ -59,14 +58,12 @@ class SettingsPage(Page):
         self.preset_manager = PresetManager()
         self.presetList = None
         self.presetNameTxt = None
-        self.toggle_UAC_btn(self.window.device_manager.pref_manager.bookrestore_apply_mode == BookRestoreApplyMethod.AFC)
         self.setup_presets_ui()
         self.setup_pb_database_ui()
         self.setup_originals_ui()
 
     def setup_presets_ui(self):
-        # Presets section, inserted between the PosterBoard settings and the
-        # BookRestore options
+        # Presets section
         presets_widget = QWidget(self.ui.settingsPageContent)
         presets_widget.setObjectName("presetsWidget")
         presets_layout = QVBoxLayout(presets_widget)
@@ -155,7 +152,7 @@ class SettingsPage(Page):
         btns_layout.addWidget(self.presetImportBtn)
         presets_layout.addLayout(btns_layout)
 
-        # insert the section after the PosterBoard checkboxes, before BookRestore
+        # insert the section after the PosterBoard checkboxes
         layout = self.ui._21
         idx = layout.indexOf(self.ui.rebuildSBApplicationStateDBChk)
         layout.insertWidget(idx + 1, presets_widget)
@@ -172,13 +169,12 @@ class SettingsPage(Page):
         self.ui.descriptorsSpacer.changeSize(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
         layout = self.ui._21
-        idx = layout.indexOf(self.ui.bookrestoreWidget)
+        idx = layout.indexOf(self.ui.rebuildSBApplicationStateDBChk)
         layout.insertWidget(idx, pb_setup)
 
     def setup_originals_ui(self):
         # Original Plists section: back up the system plists Nugget overwrites
-        # so Reset can restore the user's original settings. Placed before the
-        # BookRestore options.
+        # so Reset can restore the user's original settings.
         originals_widget = QWidget(self.ui.settingsPageContent)
         originals_widget.setObjectName("originalsWidget")
         originals_layout = QVBoxLayout(originals_widget)
@@ -225,22 +221,52 @@ class SettingsPage(Page):
         originals_layout.addLayout(originals_btns)
 
         layout = self.ui._21
-        idx = layout.indexOf(self.ui.bookrestoreWidget)
+        idx = layout.indexOf(self.ui.rebuildSBApplicationStateDBChk)
         layout.insertWidget(idx, originals_widget)
+
+        # About Program section
+        self.setup_about_ui()
+
+    def setup_about_ui(self):
+        about_widget = QWidget(self.ui.settingsPageContent)
+        about_widget.setObjectName("aboutWidget")
+        about_layout = QVBoxLayout(about_widget)
+        about_layout.setObjectName("aboutLayout")
+        about_layout.setContentsMargins(0, 0, 0, 0)
+        about_layout.setSpacing(6)
+
+        about_divider = QFrame(about_widget)
+        about_divider.setObjectName("aboutDivider")
+        about_divider.setStyleSheet("QFrame {\n\tcolor: #414141;\n}")
+        about_divider.setFrameShadow(QFrame.Plain)
+        about_divider.setFrameShape(QFrame.Shape.HLine)
+        about_layout.addWidget(about_divider)
+
+        self.aboutBtn = QToolButton(about_widget)
+        self.aboutBtn.setObjectName("aboutBtn")
+        self.aboutBtn.setText(QCoreApplication.tr("About GoldenNugget"))
+        self.aboutBtn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.aboutBtn.setStyleSheet("QToolButton { color: #007AFF; font-size: 14px; text-align: left; padding: 8px; background: none; border: none; }")
+        self.aboutBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        from PySide6.QtGui import QIcon
+        self.aboutBtn.setIcon(QIcon(":/icon/questionmark.circle.svg"))
+        self.aboutBtn.setIconSize(QSize(20, 20))
+        about_layout.addWidget(self.aboutBtn)
+
+        layout = self.ui._21
+        idx = layout.indexOf(self.ui.rebuildSBApplicationStateDBChk)
+        layout.insertWidget(idx, about_widget)
 
     def load_page(self):
         self.ui.allowWifiApplyingChk.toggled.connect(self.on_allowWifiApplyingChk_toggled)
         self.ui.autoRebootChk.toggled.connect(self.on_autoRebootChk_toggled)
-        self.ui.showAllSpoofableChk.toggled.connect(self.on_showAllSpoofableChk_toggled)
+
+        self.setup_theme_toggle_ui()
 
         self.ui.ignorePBFrameLimitChk.toggled.connect(self.on_ignorePBFrameLimitChk_toggled)
         self.ui.disableTendiesLimitChk.toggled.connect(self.on_disableTendiesLimitChk_toggled)
         self.ui.forcePBRefreshChk.toggled.connect(self.on_forcePBRefreshChk_toggled)
         self.ui.rebuildSBApplicationStateDBChk.toggled.connect(self.on_rebuildSBApplicationStateDBChk_toggled)
-
-        self.ui.brApplyModeDrp.activated.connect(self.on_brApplyModeDrp_activated)
-        self.ui.brTransferModeDrp.activated.connect(self.on_brTransferModeDrp_activated)
-        self.ui.booksContainerUUIDTxt.textEdited.connect(self.on_booksContainerUUIDTxt_textEdited)
 
         self.ui.trustStoreChk.toggled.connect(self.on_trustStoreChk_toggled)
         # Experimental: encrypted backup option
@@ -292,10 +318,39 @@ class SettingsPage(Page):
         self.originalsSaveBtn.clicked.connect(self.on_originalsSaveBtn_clicked)
         self.originalsDeleteBtn.clicked.connect(self.on_originalsDeleteBtn_clicked)
 
+        self.aboutBtn.clicked.connect(self.on_aboutBtn_clicked)
+
         self.load_available_languages()
         self.ui.langDrp.activated.connect(self.on_langDrp_activated)
         self.refresh_presets()
         self.update_originals_status()
+
+    def setup_theme_toggle_ui(self):
+        # iOS-style interface toggle (switches between iOS and classic UI)
+        if hasattr(self.ui, 'themeToggleChk'):
+            self.ui.themeToggleChk.toggled.connect(self.on_themeToggleChk_toggled)
+            return
+        from PySide6.QtWidgets import QCheckBox
+        self.ui.themeToggleChk = QCheckBox(self.ui.settingsPageContent)
+        self.ui.themeToggleChk.setObjectName("themeToggleChk")
+        self.ui.themeToggleChk.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.ui.themeToggleChk.setText(QCoreApplication.tr("iOS-style Interface (new UI)"))
+        from src.gui.ios.theme_manager import ThemeManager
+        theme_on = self.window.theme_manager.current_theme == ThemeManager.IOS
+        self.ui.themeToggleChk.setChecked(theme_on)
+        self.ui.themeToggleChk.toggled.connect(self.on_themeToggleChk_toggled)
+        layout = self.ui._21
+        layout.addWidget(self.ui.themeToggleChk)
+
+    def on_themeToggleChk_toggled(self, checked: bool):
+        from src.gui.ios.theme_manager import ThemeManager
+        if checked:
+            self.window.theme_manager.switch_to(ThemeManager.IOS)
+        else:
+            self.window.theme_manager.switch_to(ThemeManager.CLASSIC)
+        # keep the iOS settings switch in sync
+        if hasattr(self.window, "ios_settings"):
+            self.window.ios_settings.refresh_theme_switch()
 
     # Load available languages
     def load_available_languages(self):
@@ -330,12 +385,6 @@ class SettingsPage(Page):
         self.window.device_manager.pref_manager.apply_over_wifi = checked
         # save the setting
         self.window.settings.setValue("apply_over_wifi", checked)
-    def on_showAllSpoofableChk_toggled(self, checked: bool):
-        self.window.device_manager.pref_manager.show_all_spoofable_models = checked
-        # save the setting
-        self.window.settings.setValue("show_all_spoofable_models", checked)
-        # refresh the list of spoofable models
-        self.window.pages[PageItem.Gestalt].setup_spoofedModelDrp_models()
     def on_ignorePBFrameLimitChk_toggled(self, checked: bool):
         set_ignore_frame_limit(checked)
         # save the setting
@@ -379,22 +428,6 @@ class SettingsPage(Page):
         self.window.device_manager.pref_manager.supervised = checked
         # save the setting
         self.window.settings.setValue("supervised", checked)
-
-    # BookRestore Options
-    def on_booksContainerUUIDTxt_textEdited(self, text: str):
-        self.window.device_manager.current_device_books_container_uuid_callback(text)
-    def on_brTransferModeDrp_activated(self, index: int):
-        new_mode = BookRestoreFileTransferMethod(index)
-        self.window.device_manager.pref_manager.bookrestore_transfer_mode = new_mode
-        # save the setting
-        self.window.settings.setValue("bookrestore_transfer_mode", index)
-    def on_brApplyModeDrp_activated(self, index: int):
-        new_mode = BookRestoreApplyMethod(index)
-        self.window.device_manager.pref_manager.bookrestore_apply_mode = new_mode
-        show_btn = new_mode == BookRestoreApplyMethod.AFC and self.window.device_manager.get_current_device_uses_bookrestore()
-        self.toggle_UAC_btn(show_btn)
-        # save the setting
-        self.window.settings.setValue("bookrestore_apply_mode", index)
 
     # Device Options
     def on_resetPairBtn_clicked(self):
@@ -603,6 +636,10 @@ class SettingsPage(Page):
             return
         self.window.device_manager.pref_manager.remove_original_plists(model, build)
         self.update_originals_status()
+
+    def on_aboutBtn_clicked(self):
+        dialog = AboutProgramDialog(self.window)
+        dialog.exec()
 
     def restart_app(self):
         os.execl(sys.executable, sys.executable, *sys.argv)

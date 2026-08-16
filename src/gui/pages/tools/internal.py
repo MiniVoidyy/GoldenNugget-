@@ -10,12 +10,17 @@ class InternalPage(Page):
         self.ui = ui
 
     def load_page(self):
+        # hide the removed features (unsupported on iOS 26.2+)
+        for widget_name in ("metalHUDContent", "keyFlickContent"):
+            widget = getattr(self.ui, widget_name, None)
+            if widget is not None:
+                widget.hide()
+
         # Create the radio buttons where needed
         self.createRadioBtns(key=TweakID.SBBuildNumber, container=self.ui.buildVersionBtns)
         self.createRadioBtns(key=TweakID.RTL, container=self.ui.RTLBtns)
         self.createRadioBtns(key=TweakID.LTR, container=self.ui.LTRBtns)
         self.createRadioBtns(key=TweakID.SBIconVisibility, container=self.ui.sbIconVisibilityBtns)
-        self.createRadioBtns(key=TweakID.KeyFlick, container=self.ui.keyFlickBtns)
 
         self.createRadioBtns(key=TweakID.DisableSecondsHand, container=self.ui.disableSecondsHandBtns)
         self.createRadioBtns(key=TweakID.DisableSearchingWebsites, container=self.ui.searchDisabledDomainsBtns)

@@ -65,8 +65,7 @@ from src.controllers.files_handler import get_bundle_files
 
 from src.exceptions.nugget_exception import NuggetException
 
-from src.tweaks.tweaks import tweaks, TweakID, FeatureFlagTweak, EligibilityTweak, AITweak, BasicPlistTweak, AdvancedPlistTweak, RdarFixTweak, NullifyFileTweak, StatusBarTweak, PasscodeThemeTweak
-from src.tweaks.custom_gestalt_tweaks import CustomGestaltTweaks
+from src.tweaks.tweaks import tweaks, TweakID, FeatureFlagTweak, BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak, StatusBarTweak, PasscodeThemeTweak
 from src.tweaks.posterboard.posterboard_tweak import PosterboardTweak
 from src.tweaks.posterboard.template_options.templates_tweak import TemplatesTweak
 from src.tweaks.basic_plist_locations import FileLocation
@@ -116,10 +115,10 @@ def show_apply_error(e: Exception, update_label=lambda x: None, files_list: list
         return ApplyAlertMessage(QCoreApplication.tr("Device failed in sending files. The file list is possibly corrupted or has duplicates. Click Show Details for more info."),
                                  detailed_txt=files_str + "TRACEBACK:\n\n" + str(traceback.format_exc()))
     elif isinstance(e, AccessDeniedError):
-        return ApplyAlertMessage(QCoreApplication.tr("You must run the application as an administrator to use BookRestore tweaks."), detailed_txt="Try running the program with sudo.")
+        return ApplyAlertMessage(QCoreApplication.tr("Access denied while sending files."), detailed_txt="Try running the program with sudo.")
     elif isinstance(e, InvalidServiceError):
         return ApplyAlertMessage(QCoreApplication.tr("You must enable developer mode on your device. You can do it in the Settings app."),
-                                 detailed_txt=QCoreApplication.tr("BookRestore tweaks with the AFC method require developer mode to apply.\n\nYou can enable this at the bottom of Settings > Privacy & Security > Developer Mode on your iPhone or iPad."))
+                                 detailed_txt=QCoreApplication.tr("Applying tweaks requires developer mode.\n\nYou can enable this at the bottom of Settings > Privacy & Security > Developer Mode on your iPhone or iPad."))
     elif isinstance(e, NuggetException):
         return ApplyAlertMessage(str(e), detailed_txt=e.detailed_text)
     else:
@@ -203,7 +202,6 @@ class DeviceManager:
                         product_type = settings.value(device.serial + "_model", "", type=str)
                         hardware_type = settings.value(device.serial + "_hardware", "", type=str)
                         cpu_type = settings.value(device.serial + "_cpu", "", type=str)
-                        books_uuid = settings.value(device.serial + "_books_container_uuid", "", type=str)
                         if product_type == "":
                             # save the new product type
                             settings.setValue(device.serial + "_model", model)
@@ -232,7 +230,6 @@ class DeviceManager:
                             hardware=hardware,
                             cpu=cpu,
                             locale=locale,
-                            books_container_uuid=books_uuid
                         )
                     self.devices.append(dev)
                 except PasswordRequiredError as e:
@@ -258,30 +255,15 @@ class DeviceManager:
         if index == None or len(self.devices) == 0:
             self.data_singleton.current_device = None
             self.data_singleton.device_available = False
-            self.data_singleton.gestalt_path = None
             self.current_device_index = 0
-            if TweakID.SpoofModel in tweaks:
-                tweaks[TweakID.SpoofModel].value[0] = "Placeholder"
-                tweaks[TweakID.SpoofHardware].value[0] = "Placeholder"
-                tweaks[TweakID.SpoofCPU].value[0] = "Placeholder"
         else:
             self.data_singleton.current_device = self.devices[index]
             if not self.devices[index].is_supported_by_fork():
                 # hard-block old versions (< 26.2): the device is listed so the
                 # user sees it, but every action is refused.
                 self.data_singleton.device_available = False
-                self.data_singleton.gestalt_path = None
             else:
-                # load the mga file
-                if self.pref_manager.has_valid_mga_data(self.get_current_device_udid(), self.get_current_device_build(), self.get_current_device_model()):
-                    self.data_singleton.gestalt_path = self.data_singleton.SAVED_GESTALT_STRING
-                else:
-                    self.data_singleton.gestalt_path = None
                 self.data_singleton.device_available = True
-                if TweakID.SpoofModel in tweaks:
-                    tweaks[TweakID.SpoofModel].value[0] = self.data_singleton.current_device.model
-                    tweaks[TweakID.SpoofHardware].value[0] = self.data_singleton.current_device.hardware
-                    tweaks[TweakID.SpoofCPU].value[0] = self.data_singleton.current_device.cpu
             self.current_device_index = index
         
     def get_current_device_name(self) -> str:
@@ -320,12 +302,6 @@ class DeviceManager:
         else:
             return self.data_singleton.current_device.supported()
     
-    def get_current_device_uses_bookrestore(self) -> bool:
-        if self.data_singleton.current_device == None:
-            return False
-        else:
-            return self.data_singleton.current_device.has_bookrestore()
-    
     def get_current_device_patched(self) -> bool:
         if self.data_singleton.current_device == None:
             return True
@@ -337,14 +313,6 @@ class DeviceManager:
             return False
         else:
             return self.data_singleton.current_device.is_supported_by_fork()
-        
-    def current_device_books_container_uuid_callback(self, uuid: Optional[str]=None) -> Optional[Optional[str]]:
-        # if there is no argument, return the existing uuid
-        if uuid is None:
-            return self.data_singleton.current_device.books_container_uuid
-        self.data_singleton.current_device.books_container_uuid = uuid
-        # save it to settings
-        self.pref_manager.settings.setValue(self.data_singleton.current_device.udid + "_books_container_uuid", uuid)
         
     def reset_device_pairing(self):
         asyncio.run(self._reset_device_pairing())
@@ -812,7 +780,7 @@ class DeviceManager:
             return None
 
     def _get_original_plist_paths(self) -> list[str]:
-        return [loc.value for loc in FileLocation if loc != FileLocation.mga]
+        return [loc.value for loc in FileLocation]
 
     async def _capture_original_plists(self, udid: str, update_label) -> dict:
         """Run the psysbackup capture and return usable originals.
@@ -937,7 +905,7 @@ class DeviceManager:
 
     def _original_plists_required(self, reset_pages: list[Page]) -> bool:
         for page in reset_pages:
-            if page == Page.FeatureFlags and not self.get_current_device_uses_bookrestore():
+            if page == Page.FeatureFlags:
                 return True
             if page == Page.InternalOptions:
                 return True
@@ -959,7 +927,7 @@ class DeviceManager:
         if not model or not build:
             return []
         paths = []
-        if Page.FeatureFlags in reset_pages and not self.get_current_device_uses_bookrestore():
+        if Page.FeatureFlags in reset_pages:
             paths.append(FileLocation.featureflags.value)
         if Page.InternalOptions in reset_pages:
             paths.extend([
@@ -983,17 +951,8 @@ class DeviceManager:
         """
         if templates is None:
             templates = tweaks[TweakID.Templates].templates
-        gestalt_plist = None
-        if self.data_singleton.gestalt_path != None:
-            if self.data_singleton.gestalt_path == self.data_singleton.SAVED_GESTALT_STRING:
-                gestalt_plist = self.pref_manager.get_mga_data(self.get_current_device_udid())
-            else:
-                with open(self.data_singleton.gestalt_path, 'rb') as in_fp:
-                    gestalt_plist = plistlib.load(in_fp)
         # create the other plists
         flag_plist: dict = {}
-        eligibility_files = None
-        ai_file = None
         basic_plists: dict = {}
         basic_plists_ownership: dict = {}
         files_data: dict = {}
@@ -1013,11 +972,7 @@ class DeviceManager:
                     passcode_files = tweak.apply_tweak()
                     if passcode_files is not None and len(passcode_files) > 0:
                         files_to_restore.extend(passcode_files)
-                elif isinstance(tweak, EligibilityTweak):
-                    eligibility_files = tweak.apply_tweak()
-                elif isinstance(tweak, AITweak):
-                    ai_file = tweak.apply_tweak()
-                elif isinstance(tweak, BasicPlistTweak) or isinstance(tweak, RdarFixTweak) or isinstance(tweak, AdvancedPlistTweak):
+                elif isinstance(tweak, BasicPlistTweak) or isinstance(tweak, AdvancedPlistTweak):
                     basic_plists = tweak.apply_tweak(basic_plists)
                     basic_plists_ownership[tweak.file_location] = tweak.owner
                 elif isinstance(tweak, NullifyFileTweak):
@@ -1041,21 +996,7 @@ class DeviceManager:
                     # feature flag — writing fails due to no write permissions.
 # The feature is disabled on iOS 27+.
                     flag_plist = tweak.apply_tweak(flag_plist, version=self.get_current_device_version())
-                else:
-                    if gestalt_plist != None:
-                        gestalt_plist = tweak.apply_tweak(gestalt_plist)
-                    elif tweak.enabled:
-                        # no mobilegestalt file provided but applying mga tweaks, give warning
-                        update_label("Failed.")
-                        raise NuggetException(QCoreApplication.tr("No mobilegestalt file provided! Please select your file to apply mobilegestalt tweaks."))
-            # set the custom gestalt keys
-            if gestalt_plist != None:
-                gestalt_plist = CustomGestaltTweaks.apply_tweaks(gestalt_plist)
             
-            gestalt_data = None
-            if gestalt_plist != None:
-                gestalt_data = plistlib.dumps(gestalt_plist)
-
             # Merge the saved original plists into the files being applied so
             # untouched user settings survive the tweak, and device-specific
             # placeholders (<DeviceName>, ...) get the current device's values.
@@ -1084,31 +1025,6 @@ class DeviceManager:
             
             self.add_rebuild_sb_application_state_db(files_to_restore)
             await self.add_skip_setup(files_to_restore, uses_domains)
-            if gestalt_data != None:
-                self.concat_file(
-                    contents=gestalt_data,
-                    path=FileLocation.mga.value,
-                    files_to_restore=files_to_restore
-                )
-            if eligibility_files:
-                new_eligibility_files: dict[FileToRestore] = []
-                if not self.get_current_device_supported():
-                    # update the files
-                    for file in eligibility_files:
-                        self.concat_file(
-                            contents=file.contents,
-                            path=file.restore_path,
-                            files_to_restore=new_eligibility_files
-                        )
-                else:
-                    new_eligibility_files = eligibility_files
-                files_to_restore += new_eligibility_files
-            if ai_file != None:
-                self.concat_file(
-                    contents=ai_file.contents,
-                    path=ai_file.restore_path,
-                    files_to_restore=files_to_restore
-                )
             for location, plist in basic_plists.items():
                 if location in basic_plists_ownership:
                     ownership = basic_plists_ownership[location]
@@ -1179,8 +1095,7 @@ class DeviceManager:
                     mode=_FileMode.S_IRUSR | _FileMode.S_IWUSR  | _FileMode.S_IRGRP | _FileMode.S_IWGRP | _FileMode.S_IROTH | _FileMode.S_IWOTH
                 ))
 
-            if tweaks[TweakID.CreateBRFolders].enabled == True:
-                files_to_restore.extend(tweaks[TweakID.CreateBRFolders].apply_tweak())
+            
 
 # Check if backup encryption is enabled and handle it
             backup_password = ""
@@ -1230,7 +1145,7 @@ class DeviceManager:
                         pass
 
             # restore to the device
-            final_alert = await self.start_restore(files_to_restore, update_label, skips_br_for_folders=tweaks[TweakID.CreateBRFolders].enabled, reboot_for_br=(len(flag_plist) > 0), backup_password=backup_password)
+            final_alert = await self.start_restore(files_to_restore, update_label, reboot_for_br=(len(flag_plist) > 0), backup_password=backup_password)
             return final_alert, files_to_restore
         finally:
             if len(tmp_dirs) > 0:
@@ -1259,14 +1174,7 @@ class DeviceManager:
 
             # use if-statements instead of match (switch) statements for compatibility with Python 3.9
             for page in reset_pages:
-                if page == Page.Gestalt:
-                    ## MOBILE GESTALT
-                    # remove the saved device model, hardware, and cpu
-                    settings.setValue(self.data_singleton.current_device.udid + "_model", "")
-                    settings.setValue(self.data_singleton.current_device.udid + "_hardware", "")
-                    settings.setValue(self.data_singleton.current_device.udid + "_cpu", "")
-                    files_to_null.append(FileLocation.mga.value)
-                elif page == Page.FeatureFlags:
+                if page == Page.FeatureFlags:
                     ## FEATURE FLAGS
                     self.concat_file(
                         contents=plistlib.dumps({
@@ -1338,22 +1246,17 @@ class DeviceManager:
                         "Open Settings and tap \"Save Originals\" (with this device connected) "
                         "so the reset can restore your original files instead of empty ones."))
             for file_path in files_to_null:
-                if file_path == FileLocation.mga.value:
-                    # MobileGestalt is nulled on purpose to clear spoofed values;
-                    # the system recreates it from its cache on next boot.
-                    contents = plistlib.dumps({})
+                original = original_plists.get(file_path)
+                if original is not None:
+                    contents = plistlib.dumps(materialize_plist(original, all_values))
                 else:
-                    original = original_plists.get(file_path)
-                    if original is not None:
-                        contents = plistlib.dumps(materialize_plist(original, all_values))
-                    else:
-                        # Restore a valid empty plist instead of a zero-byte
-                        # file: on iOS 26.2+ a truncated plist (e.g. an empty
-                        # com.apple.springboard.plist) makes SpringBoard crash
-                        # at boot, which sends the device into a boot loop. An
-                        # empty dict parses fine and makes the system fall back
-                        # to its default values.
-                        contents = plistlib.dumps({})
+                    # Restore a valid empty plist instead of a zero-byte
+                    # file: on iOS 26.2+ a truncated plist (e.g. an empty
+                    # com.apple.springboard.plist) makes SpringBoard crash
+                    # at boot, which sends the device into a boot loop. An
+                    # empty dict parses fine and makes the system fall back
+                    # to its default values.
+                    contents = plistlib.dumps({})
                 self.concat_file(
                     contents=contents,
                     path=file_path,

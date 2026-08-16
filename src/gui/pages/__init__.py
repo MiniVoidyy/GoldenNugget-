@@ -1,7 +1,5 @@
 from .main.home import HomePage as Home
 from .tools.posterboard import PosterboardPage as Posterboard
-from .tools.gestalt import GestaltPage as MobileGestalt
-from .tools.eligibility import EligibilityPage as Eligibility
 from .tools.featureflags import FeatureFlagsPage as FeatureFlags
 from .tools.status_bar import StatusBarPage as StatusBar
 from .tools.springboard import SpringboardPage as Springboard
