@@ -167,7 +167,8 @@ The application itself can be compiled by running `compile.py`.
 See [CONTRIBUTING.md](https://github.com/awesomenull-dev/GoldenNugget/blob/main/CONTRIBUTING.md), want fork instead? Then see [FORKING.md](https://github.com/awesomenull-dev/GoldenNugget/blob/main/FORKING.md)
 
 ## Credits
-- Translations crowdsourced using [POEditor][POEditorJoin]. Thank you everyone who assisted in the translation effort!
+- Translations crowdsourced using [gNugget-i18n repository][i18n]
+- [LEGACY] Translations crowdsourced using [POEditor][POEditorJoin]. Thank you everyone who assisted in the translation effort!
 - [LeminLimez] for creating Nugget.
 - [Wind0ws11Aero] for IOS 27 Support
 - [PosterRestore][PosterRestoreDiscord] for their help with PosterBoard
@@ -180,6 +181,7 @@ See [CONTRIBUTING.md](https://github.com/awesomenull-dev/GoldenNugget/blob/main/
 - [pymobiledevice3][pymobiledevice3GitHub] for restoring and device algorithms.
 - [PySide6][PySide6Doc] for the GUI library.
 
+[i18n]: https://github.com/awesomenull-dev/gNugget-i18n
 [NuggetLogo]: https://github.com/awesomenull-dev/GoldenNugget/blob/main/src/qt/credits/small_nugget.png
 [LeminLimez]: https://github.com/leminlimez
 [CowabungaLite]: https://github.com/leminlimez/CowabungaLite
