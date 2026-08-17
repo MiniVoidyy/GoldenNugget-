@@ -151,6 +151,15 @@ CONTROL_CENTER_PATH_PREFIXES = (
 # themselves — restoring the stale copies would undo the applied tweaks.
 _SKIP_PATH_PREFIXES = (
     "Library/SpringBoard/statusBarOverrides",  # Not captured stale; re-injected with fresh tweak content
+    "Library/SpringBoard/LockScreenFootnote",  # Lock screen footnote text (tweak)
+    "Library/SpringBoard/SpringBoardState",    # SpringBoard state with tweaks
+    "Library/SpringBoard/IconState",           # Icon layout with tweaks
+    "Library/SpringBoard/StatusBarOverrides",  # Status bar overrides (tweak)
+    "Library/Preferences/.GlobalPreferences.plist",  # Region, locale (tweak)
+    "Library/Preferences/com.apple.springboard.plist",  # SpringBoard settings (tweak)
+    "Library/Preferences/com.apple.springboard.lockscreen.plist",  # Lock screen settings
+    "Library/Preferences/com.apple.springboard.daemons.plist",  # Daemons tweaks
+    "Library/Preferences/com.apple.springboard.statusbar.plist",  # Status bar tweaks
 )
 
 # Files iOS manages internally and rejects if included in a sparse backup
@@ -159,6 +168,11 @@ _SKIP_PATH_PREFIXES = (
 _SKIP_FILES = frozenset({
     "keychain-backup.plist",    # iOS validates protection class, rejects flags=4
     ".GlobalPreferences.plist",  # Written separately as tweaks; skip to avoid overwrite
+    "com.apple.springboard.plist",  # SpringBoard settings (tweak)
+    "com.apple.springboard.lockscreen.plist",  # Lock screen settings
+    "com.apple.springboard.daemons.plist",  # Daemons tweaks
+    "com.apple.springboard.statusbar.plist",  # Status bar tweaks
+    "com.apple.springboard.lockscreen.plist",  # Lock screen settings
 })
 
 

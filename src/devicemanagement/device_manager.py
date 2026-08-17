@@ -149,6 +149,9 @@ class DeviceManager:
         # preferences
         self.pref_manager = PreferenceManager(None)
         
+        # Backup password (for encrypted backups)
+        self._backup_password: Optional[str] = None
+        
         # Test mode
         self._test_mode = "--test-mode" in sys.argv
         
@@ -203,6 +206,34 @@ class DeviceManager:
             return any(d.serial == udid for d in connected_devices)
         except Exception:
             return False
+    
+    def _get_backup_password(self) -> str:
+        """Get backup password from settings or return empty string."""
+        if self._backup_password:
+            return self._backup_password
+        # Try to get from settings
+        if hasattr(self, 'pref_manager') and self.pref_manager.settings:
+            pwd = self.pref_manager.settings.value("backup_password", "", type=str)
+            if pwd:
+                self._backup_password = pwd
+                return pwd
+        return ""
+    
+    def set_backup_password(self, password: str):
+        """Set backup password and save to settings."""
+        self._backup_password = password
+        if hasattr(self, 'pref_manager') and self.pref_manager.settings:
+            if password:
+                self.pref_manager.settings.setValue("backup_password", password)
+            else:
+                self.pref_manager.settings.remove("backup_password")
+            self.pref_manager.settings.sync()
+    
+    async def _prompt_backup_password(self, update_label=lambda x: None) -> str:
+        """Prompt user for backup password."""
+        # This is called from async context, need to run in main thread
+        # For now return empty - will be improved later
+        return self._get_backup_password()
     
     def get_current_device_udid(self) -> Optional[str]:
         """Get current device UDID or None."""
@@ -740,6 +771,7 @@ class DeviceManager:
             return
         try:
             update_label(QCoreApplication.tr("Capturing pre-apply state..."))
+            backup_password = self._get_backup_password()
             captured = await psysbackup(
                 udid, self._get_original_plist_paths(), update_label,
                 self._backup_progress(update_label), backup_password)

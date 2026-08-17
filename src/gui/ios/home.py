@@ -228,10 +228,21 @@ class IOSHomePage(QWidget):
         cards_row.addWidget(self.statusbar_card, 1)
         layout.addLayout(cards_row)
 
-        # Apply Tweaks button - opens classic apply page with iOS nav bar (we'll switch to classic and show apply page, but also show iOS nav bar? We'll just switch to classic apply page for now)
+        # Apply Tweaks button
         apply_btn = IOSPrimaryButton(QCoreApplication.translate("IOSHomePage", "Apply Tweaks"))
         apply_btn.clicked.connect(self.open_apply_classic)
         layout.addWidget(apply_btn)
+
+        # Reset Tweaks button
+        reset_btn = IOSPrimaryButton(QCoreApplication.translate("IOSHomePage", "Reset Tweaks"))
+        reset_btn.clicked.connect(self.reset_tweaks)
+        layout.addWidget(reset_btn)
+
+        # Revert Last Apply button
+        revert_btn = IOSPrimaryButton(QCoreApplication.translate("IOSHomePage", "Revert Last Apply"))
+        revert_btn.clicked.connect(self.revert_last_apply)
+        layout.addWidget(revert_btn)
+
         layout.addStretch()
 
         # Initial update
@@ -278,6 +289,20 @@ class IOSHomePage(QWidget):
     def open_apply_classic(self):
         # Actually apply tweaks instead of just opening apply page
         self.window.apply_changes()
+
+    def reset_tweaks(self):
+        """Reset all tweaks (calls classic reset via main window)."""
+        if hasattr(self.window, 'remove_tweaks'):
+            self.window.remove_tweaks()
+        else:
+            # Fallback: call device_manager directly
+            from src.gui.pages.pages_list import Page
+            pages = [Page.Posterboard, Page.Tweaks, Page.Springboard, Page.Daemons, Page.StatusBar]
+            self.window.apply_changes(reset_pages=pages)
+
+    def revert_last_apply(self):
+        """Revert last apply."""
+        self.window.revert_last_apply()
 
     def update_status(self):
         try:

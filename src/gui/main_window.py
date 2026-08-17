@@ -19,7 +19,6 @@ from src.gui.pages.pages_list import Page
 
 from src.tweaks.tweaks import tweaks, TweakID
 from src.gui.version import App_Version, App_Build
-from src.gui.theme import apply_new_theme, is_theme_enabled
 
 from src.gui.ios.theme_manager import ThemeManager
 from src.gui.ios.home import IOSHomePage
@@ -44,10 +43,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.threadpool = QtCore.QThreadPool()
         self.loadSettings()
         self.initial_load = True
-
-        # Apply new theme if enabled
-        if is_theme_enabled():
-            apply_new_theme(QtWidgets.QApplication.instance())
 
         # hide every page
         self.ui.posterboardPageBtn.hide()
@@ -609,6 +604,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if success:
             worker = getattr(self, 'worker_thread', None)
             if worker is not None and worker.reset_pages is None and not worker.capture_only and not worker.revert_last_apply_only:
+                # Show Find My iPhone reminder
+                QtWidgets.QMessageBox.information(
+                    self,
+                    self.tr("Done"),
+                    self.tr("Success! Rebooting your device...\n\nRemember to turn Find My back on!"),
+                    QtWidgets.QMessageBox.Ok
+                )
                 self.prompt_star_on_github()
         else:
             # Show error notification if not already shown via alert
