@@ -558,7 +558,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, revert_last_apply_only=True)
             self.worker_thread.progress.connect(self.ui.statusLbl.setText)
             self.worker_thread.alert.connect(self.alert_message)
-            self.worker_thread.finished.connect(self.finish_apply_thread)
+            self.worker_thread.finished_with_result.connect(self.finish_apply_thread)
             self.worker_thread.finished.connect(self.worker_thread.deleteLater)
             self.worker_thread.start()
 
@@ -569,7 +569,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, capture_only=True)
             self.worker_thread.progress.connect(self.ui.statusLbl.setText)
             self.worker_thread.alert.connect(self.alert_message)
-            self.worker_thread.finished.connect(self.finish_apply_thread)
+            self.worker_thread.finished_with_result.connect(self.finish_apply_thread)
             self.worker_thread.finished.connect(self.worker_thread.deleteLater)
             self.worker_thread.start()
 
@@ -580,7 +580,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, reset_pages=reset_pages)
             self.worker_thread.progress.connect(self.ui.statusLbl.setText)
             self.worker_thread.alert.connect(self.alert_message)
-            self.worker_thread.finished.connect(self.finish_apply_thread)
+            self.worker_thread.finished_with_result.connect(self.finish_apply_thread)
             self.worker_thread.finished.connect(self.worker_thread.deleteLater)
             self.worker_thread.start()
     def alert_message(self, alert: Optional[ApplyAlertMessage], log_to_console: bool = True):
@@ -602,17 +602,27 @@ class MainWindow(QtWidgets.QMainWindow):
             detailsBox.setDetailedText(alert.detailed_txt)
         detailsBox.exec()
 
-    def finish_apply_thread(self):
+    def finish_apply_thread(self, success: bool = False, error_msg: str = ""):
         self.apply_in_progress = False
         self.toggle_thread_btns(disabled=False)
         self.update_pb_saved_ids_list()
-        worker = getattr(self, 'worker_thread', None)
-        if worker is not None and getattr(worker, 'success', False) and worker.reset_pages is None and not worker.capture_only and not worker.revert_last_apply_only:
-            self.prompt_star_on_github()
+        if success:
+            worker = getattr(self, 'worker_thread', None)
+            if worker is not None and worker.reset_pages is None and not worker.capture_only and not worker.revert_last_apply_only:
+                self.prompt_star_on_github()
+        else:
+            # Show error notification if not already shown via alert
+            if error_msg and "timed out" not in error_msg.lower():
+                self.alert_message(ApplyAlertMessage(
+                    txt=f"Operation failed: {error_msg}",
+                    title="Error",
+                    icon=QtWidgets.QMessageBox.Critical
+                ), log_to_console=False)
     def prompt_star_on_github(self):
         if self.settings.value("star_prompt_done", False, type=bool):
             return
         self.settings.setValue("star_prompt_done", True)
+        self._sync_settings()
         box = QtWidgets.QMessageBox(self)
         box.setIcon(QtWidgets.QMessageBox.Question)
         box.setWindowTitle(self.tr("Enjoying GoldenNugget?"))
@@ -623,6 +633,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if box.clickedButton() == star_btn:
             from PySide6.QtGui import QDesktopServices
             QDesktopServices.openUrl(QtCore.QUrl("https://github.com/awesomenull-dev/GoldenNugget"))
+
+    def _sync_settings(self):
+        """Sync settings to disk immediately after critical changes."""
+        try:
+            self.settings.sync()
+        except Exception:
+            pass  # Best effort
     def toggle_thread_btns(self, disabled: bool):
         if disabled or not self.apply_in_progress:
             self.ui.applyTweaksBtn.setDisabled(disabled)

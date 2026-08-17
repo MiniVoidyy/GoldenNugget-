@@ -4,6 +4,7 @@ import multiprocessing
 import runpy
 import warnings
 import traceback
+import logging
 
 # Add src/qt to path so resources_rc can be found
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src", "qt"))
@@ -19,6 +20,7 @@ from src.controllers.settings import Settings
 from src.gui.main_window import MainWindow
 from src.devicemanagement.device_manager import DeviceManager
 from src.tweaks.tweaks import tweaks, TweakID
+from src.gui.logger import setup_logging, get_logger
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
@@ -38,10 +40,9 @@ if __name__ == "__main__":
                 except ImportError as e:
                     # Attempt 2: Handle "is a package" error by targeting __main__ explicitly
                     if "cannot be directly executed" in str(e) or "No module named" in str(e):
-                         runpy.run_module(f"{module_name}.__main__", run_name="__main__", alter_sys=True)
+                        runpy.run_module(f"{module_name}.__main__", run_name="__main__", alter_sys=True)
                     else:
                         raise
-
             except Exception as e:
                 # Print error to stderr so the main process can read it
                 sys.stderr.write(f"Background Process Crash: {e}\n")
@@ -64,11 +65,44 @@ if __name__ == "__main__":
         print("LEGACY SUPPORT ENABLED: iOS version restrictions are disabled. Use at your own risk!")
     if "--new-theme" in sys.argv:
         print("NEW THEME ENABLED: iOS-style visual refresh (experimental)")
+    if "--test-mode" in sys.argv:
+        print("TEST MODE ENABLED: Mock device will be created")
+
+    # Setup logging
+    log_file = os.environ.get("GOLDENNUGGET_LOG_FILE")
+    if "--debug" in sys.argv:
+        setup_logging(log_file, logging.DEBUG)
+    else:
+        setup_logging(log_file)
+
+    logger = get_logger(__name__)
+    logger.info("Starting GoldenNugget")
+
     from src.controllers.nugget_logger import init_logging
     init_logging()
-    
+
     app = QtWidgets.QApplication([])
     dm = DeviceManager()
+
+    # Test mode: create mock device
+    if "--test-mode" in sys.argv:
+        from src.devicemanagement.constants import Device
+        mock_device = Device(
+            udid=0x1234567890ABCDEF,
+            usb=True,
+            name="Test iPhone 15 Pro",
+            version="27.0",
+            build="21A5284a",
+            model="iPhone15,3",
+            hardware="D84AP",
+            cpu="t8140",
+            locale="en_US"
+        )
+        dm.data_singleton.current_device = mock_device
+        dm.data_singleton.device_available = True
+        dm.devices.append(mock_device)
+        dm.current_device_index = 0
+        logger.info("Test mode: Mock device created")
 
     QCoreApplication.setOrganizationDomain("com.leemin")
     QCoreApplication.setApplicationName("GoldenNugget")
@@ -88,11 +122,12 @@ if __name__ == "__main__":
         try:
             from src.controllers.preset_manager import PresetManager
             if PresetManager().load_preset(last_loaded_preset):
-                print(f"Restored preset: {last_loaded_preset}")
+                logger.info("Restored preset: %s", last_loaded_preset)
         except Exception as e:
-            print(f"Failed to restore preset '{last_loaded_preset}': {e}")
+            logger.error("Failed to restore preset '%s': %s", last_loaded_preset, e)
         finally:
             settings.setValue("last_loaded_preset", "")
+            settings.sync()
 
     widget = MainWindow(device_manager=dm, translator=translator)
     translator.fix_ui_for_rtl(widget.ui)
@@ -105,5 +140,5 @@ if __name__ == "__main__":
         elif arg.endswith('.batter'):
             tweaks[TweakID.Templates].add_template(arg)
 
-    print("GoldenNugget launched.")
+    logger.info("GoldenNugget launched.")
     sys.exit(app.exec())

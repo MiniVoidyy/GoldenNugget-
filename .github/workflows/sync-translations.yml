@@ -1,0 +1,80 @@
+name: Sync Translations from gNugget-i18n
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 0'  # Weekly on Sunday 3 AM UTC
+  repository_dispatch:
+    types: [translations-updated]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-translations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout GoldenNugget with submodules
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyside6
+
+      - name: Update i18n submodule to latest
+        run: |
+          git submodule update --remote --merge i18n
+
+      - name: Sync translations
+        id: sync
+        run: |
+          python scripts/sync_translations.py i18n src/qt/translations
+
+      - name: Compile translations
+        run: |
+          cd src/qt/translations
+          for f in *.ts; do
+            [ -f "$f" ] || continue
+            pyside6-lrelease "$f" -qm "${f%.ts}.qm"
+          done
+
+      - name: Regenerate resources_rc.py
+        run: |
+          cd src/qt
+          pyside6-rcc resources.qrc -o resources_rc.py
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git diff --quiet || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore(i18n): sync translations from gNugget-i18n submodule'
+          title: 'chore(i18n): sync translations from gNugget-i18n submodule'
+          body: |
+            Automated sync of translations from [gNugget-i18n](https://github.com/awesomenull-dev/gNugget-i18n) submodule.
+            
+            This PR updates .ts/.qm files and regenerates resources_rc.py.
+          branch: i18n/sync-translations
+          delete-branch: true
+          labels: |
+            i18n
+            automated
+          reviewers: awesomenull

@@ -9,18 +9,20 @@ if target_arch:
 
 # Base PyInstaller args
 args = [
-    'main_app.py',
+'main_app.py',
     '--name=Nugget',
     '--icon=nugget.ico',
     '--onedir',
     '--noconfirm',
-    '--collect-all=pymobiledevice3',  # <--- FIXED: Forces inclusion of __main__.py
+    '--collect-all=pymobiledevice3',
     '--add-data=files/:files',
     '--copy-metadata=pyimg4',
     '--hidden-import=zeroconf',
     '--hidden-import=pyimg4',
     '--hidden-import=zeroconf._utils.ipaddress',
-    '--hidden-import=zeroconf._handlers.answers'
+    '--hidden-import=zeroconf._handlers.answers',
+    '--hidden-import=src.qt.resources_rc',
+    '--add-data=src/qt:src/qt',
 ]
 
 if target_arch:

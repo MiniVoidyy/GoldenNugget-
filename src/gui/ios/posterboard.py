@@ -2,12 +2,32 @@ from PySide6.QtCore import Qt, QSize, QCoreApplication
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout,
     QPushButton, QScrollArea, QToolButton, QStackedWidget, QSizePolicy,
-    QCheckBox
+    QCheckBox, QComboBox
 )
+from PySide6.QtGui import QPixmap, QIcon
 
-from src.gui.ios.components import IOSNavBar, IOSCard, IOSPrimaryButton
+from src.gui.ios.components import IOSNavBar, IOSCard, IOSPrimaryButton, IOSSettingsRow, IOSSwitch
 from src.tweaks.tweaks import tweaks, TweakID
 from src.qt.mainwindow_ui import Ui_Nugget
+
+
+class TemplatePreviewCard(QLabel):
+    """Clickable preview image that can show full size"""
+    def __init__(self, pixmap: QPixmap, preview_name: str, parent=None):
+        super().__init__(parent)
+        self.setAlignment(Qt.AlignCenter)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedSize(200, 200)
+        self.setStyleSheet(
+            "QLabel { background-color: #1C1C1E; border-radius: 12px; border: 1px solid #3A3A3C; }"
+        )
+        self._original_pixmap = pixmap
+        self._preview_name = preview_name
+        self.setPixmap(pixmap.scaled(190, 190, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+
+    def mousePressEvent(self, event):
+        # Could open full-size preview dialog here
+        pass
 
 
 class IOSPosterboardPage(QWidget):
@@ -131,13 +151,9 @@ class IOSPosterboardPage(QWidget):
         plus_icon = QLabel()
         plus_icon.setFixedSize(64, 64)
         plus_icon.setAlignment(Qt.AlignCenter)
-        plus_icon.setStyleSheet("""
-            QLabel {
-                background-color: #1C1C1E;
-                border-radius: 12px;
-                border: 2px dashed #3A3A3C;
-            }
-        """)
+        plus_icon.setStyleSheet(
+            "QLabel { background-color: #1C1C1E; border-radius: 12px; border: 2px dashed #3A3A3C; }"
+        )
         plus_icon.setText("+")
         plus_icon.setStyleSheet(plus_icon.styleSheet() + "font-size: 36px; color: #007AFF;")
         inner.addWidget(plus_icon, 0, Qt.AlignCenter)
@@ -150,17 +166,20 @@ class IOSPosterboardPage(QWidget):
         return card
 
     def _create_templates_tab(self) -> QWidget:
+        """Port of classic templates page - uses template.create_ui() for full functionality"""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet("background-color: #1e1e1e; border: none;")
+        scroll.setFrameStyle(QScrollArea.NoFrame)
+        
         content = QWidget()
-        scroll.setWidget(content)
-
         self.templates_layout = QVBoxLayout(content)
         self.templates_layout.setContentsMargins(16, 16, 16, 32)
         self.templates_layout.setSpacing(12)
         self.templates_layout.setAlignment(Qt.AlignTop)
+        scroll.setWidget(content)
 
+        # Import button (classic style)
         import_btn = IOSPrimaryButton(QCoreApplication.translate("Nugget", "  Import Templates (.batter)"))
         import_btn.clicked.connect(self.show_add_templates_dialog)
         self.templates_import_btn = import_btn
@@ -171,9 +190,54 @@ class IOSPosterboardPage(QWidget):
         self.templates_placeholder.setAlignment(Qt.AlignCenter)
         self.templates_layout.addWidget(self.templates_placeholder)
 
-        self.refresh_templates()
+        # Load existing templates using classic create_ui()
+        self._load_templates_list()
 
         return scroll
+
+    def show_add_templates_dialog(self):
+        """Port of classic on_importTemplatesBtn_clicked"""
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        selected_files, _ = QFileDialog.getOpenFileNames(
+            self.window, QCoreApplication.translate("IOSPosterboardPage", "Select Nugget Template Files"), "", "Zip Files (*.batter)"
+        )
+        if selected_files:
+            templates_tweak = tweaks[TweakID.Templates]
+            try:
+                device_version = self.window.device_manager.get_current_device_version()
+            except Exception:
+                device_version = None
+            for file in selected_files:
+                try:
+                    templates_tweak.add_template(file, device_version)
+                except Exception as e:
+                    QMessageBox.warning(self.window, "Import Failed", f"Failed to load template:\n{file}\n\n{str(e)}")
+            self._load_templates_list()
+
+    def _load_templates_list(self):
+        """Port of classic load_templates_list / load_pb_templates - uses template.create_ui()"""
+        from src.tweaks.tweaks import tweaks, TweakID
+        templates = tweaks[TweakID.Templates].templates
+        if not templates:
+            self.templates_placeholder.show()
+            return
+        self.templates_placeholder.hide()
+
+        # Clear existing template widgets (keep import button and placeholder)
+        for i in reversed(range(self.templates_layout.count())):
+            widget = self.templates_layout.itemAt(i).widget()
+            if widget is not None and widget not in (self.templates_placeholder, self.templates_import_btn):
+                widget.deleteLater()
+
+        # Classic approach: call template.create_ui() for each template
+        # This creates the full UI with previews, pickers, bundle ID, etc.
+        widgets = {}
+        for template in templates:
+            template.create_ui(self.window, tweaks[TweakID.Templates], widgets, self.templates_layout)
+
+    def refresh_templates(self):
+        """Refresh templates list (alias for _load_templates_list)"""
+        self._load_templates_list()
 
     def _create_video_tab(self) -> QWidget:
         scroll = QScrollArea()
@@ -374,15 +438,10 @@ class IOSPosterboardPage(QWidget):
         del_btn.setIconSize(QSize(20, 20))
         from PySide6.QtGui import QIcon
         del_btn.setIcon(QIcon(":/icon/trash.svg"))
-        del_btn.setStyleSheet("""
-            QToolButton {
-                background-color: #1C1C1E;
-                border-radius: 12px;
-                color: #FF3B30;
-                padding: 8px;
-            }
-            QToolButton:hover { background-color: #FF3B30; color: white; }
-        """)
+        del_btn.setStyleSheet(
+            "QToolButton { background-color: #1C1C1E; border-radius: 12px; color: #FF3B30; padding: 8px; }"
+            "QToolButton:hover { background-color: #FF3B30; color: white; }"
+        )
         del_btn.setCursor(Qt.PointingHandCursor)
         del_btn.clicked.connect(lambda: self._delete_tendie(tendie))
         inner.addWidget(del_btn, 0, Qt.AlignCenter)
@@ -395,89 +454,5 @@ class IOSPosterboardPage(QWidget):
             tweaks[TweakID.PosterBoard].tendies.remove(tendie)
         self.refresh_tendies()
 
-    def show_add_templates_dialog(self):
-        from PySide6.QtWidgets import QFileDialog
-        selected_files, _ = QFileDialog.getOpenFileNames(
-            self.window, QCoreApplication.translate("IOSPosterboardPage", "Select Nugget Template Files"), "", "Zip Files (*.batter)"
-        )
-        if selected_files:
-            templates_tweak = tweaks[TweakID.Templates]
-            try:
-                device_version = self.window.device_manager.get_current_device_version()
-            except Exception:
-                device_version = None
-            for file in selected_files:
-                try:
-                    templates_tweak.add_template(file, device_version)
-                except Exception:
-                    pass
-            self.refresh_templates()
-
-    def refresh_templates(self):
-        from src.tweaks.tweaks import tweaks, TweakID
-        # Clear existing template rows
-        for i in reversed(range(self.templates_layout.count())):
-            widget = self.templates_layout.itemAt(i).widget()
-            if widget is not None and widget not in (self.templates_placeholder, self.templates_import_btn):
-                widget.deleteLater()
-
-        templates = tweaks[TweakID.Templates].templates
-        if not templates:
-            self.templates_placeholder.show()
-            return
-        self.templates_placeholder.hide()
-
-        for template in templates:
-            self.templates_layout.addWidget(self._create_template_card(template))
-
-    def _create_template_card(self, template) -> QWidget:
-        card = IOSCard()
-        row_layout = QHBoxLayout(card)
-        row_layout.setContentsMargins(16, 12, 16, 12)
-        row_layout.setSpacing(12)
-
-        text_layout = QVBoxLayout()
-        text_layout.setSpacing(4)
-
-        name = QLabel(template.name)
-        name.setStyleSheet("color: #FFFFFF; font-size: 15px;")
-        name.setWordWrap(True)
-        text_layout.addWidget(name)
-
-        author = QLabel(f"by {template.author}" if template.author else "")
-        author.setStyleSheet("color: #8E8E93; font-size: 13px;")
-        text_layout.addWidget(author)
-
-        if template.description:
-            desc = QLabel(template.description)
-            desc.setStyleSheet("color: #8E8E93; font-size: 13px;")
-            desc.setWordWrap(True)
-            text_layout.addWidget(desc)
-
-        row_layout.addLayout(text_layout, 1)
-
-        del_btn = QToolButton()
-        del_btn.setIconSize(QSize(20, 20))
-        from PySide6.QtGui import QIcon
-        del_btn.setIcon(QIcon(":/icon/trash.svg"))
-        del_btn.setStyleSheet("""
-            QToolButton {
-                background-color: #1C1C1E;
-                border-radius: 12px;
-                color: #FF3B30;
-                padding: 8px;
-            }
-            QToolButton:hover { background-color: #FF3B30; color: white; }
-        """)
-        del_btn.setCursor(Qt.PointingHandCursor)
-        del_btn.clicked.connect(lambda: self._delete_template(template))
-        row_layout.addWidget(del_btn)
-
-        return card
-
-    def _delete_template(self, template):
-        from src.tweaks.tweaks import tweaks, TweakID
-        templates_tweak = tweaks[TweakID.Templates]
-        if template in templates_tweak.templates:
-            templates_tweak.templates.remove(template)
-        self.refresh_templates()
+def refresh_templates(self):
+        self._load_templates_list()

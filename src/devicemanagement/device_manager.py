@@ -1,6 +1,7 @@
 import asyncio
 import os.path
 import plistlib
+import sys
 import time
 import traceback
 
@@ -13,7 +14,7 @@ from cryptography.hazmat.primitives.serialization import Encoding
 from uuid import uuid4
 
 from PySide6.QtWidgets import QMessageBox, QInputDialog, QLineEdit
-from PySide6.QtCore import QSettings, QCoreApplication
+from PySide6.QtCore import QSettings, QCoreApplication, QTimer
 
 from packaging.version import Version
 
@@ -147,13 +148,82 @@ class DeviceManager:
 
         # preferences
         self.pref_manager = PreferenceManager(None)
+        
+        # Test mode
+        self._test_mode = "--test-mode" in sys.argv
+        
+        # Device watchdog
+        self._watchdog_timer: Optional[QTimer] = None
+        self._watchdog_interval_ms = 5000  # Check every 5 seconds
+        self._device_connected_callback: Optional[callable] = None
+    
+    def start_device_watchdog(self, on_disconnected: Optional[callable] = None):
+        """Start monitoring device connection status.
+        
+        Args:
+            on_disconnected: Callback when device disconnects. Receives (udid: str).
+        """
+        self.stop_device_watchdog()
+        self._device_connected_callback = on_disconnected
+        
+        if self._watchdog_timer is None:
+            self._watchdog_timer = QTimer()
+            self._watchdog_timer.setInterval(self._watchdog_interval_ms)
+            self._watchdog_timer.timeout.connect(self._check_device_connection)
+        
+        if self._watchdog_timer and not self._watchdog_timer.isActive():
+            self._watchdog_timer.start()
+    
+    def stop_device_watchdog(self):
+        """Stop the device connection watchdog."""
+        if self._watchdog_timer and self._watchdog_timer.isActive():
+            self._watchdog_timer.stop()
+        self._device_connected_callback = None
+    
+    def _check_device_connection(self):
+        """Periodic check for device connection status."""
+        udid = self.get_current_device_udid()
+        if not udid:
+            self.stop_device_watchdog()
+            return
+        
+        try:
+            # Quick connection test via usbmux
+            connected = asyncio.run(self._verify_device_connected(udid))
+            if not connected and self._device_connected_callback:
+                self._device_connected_callback(udid)
+        except Exception:
+            # Ignore check errors to avoid watchdog crash
+            pass
+    
+    async def _verify_device_connected(self, udid: str) -> bool:
+        """Verify device is still connected via usbmux."""
+        try:
+            connected_devices = await usbmux.list_devices()
+            return any(d.serial == udid for d in connected_devices)
+        except Exception:
+            return False
+    
+    def get_current_device_udid(self) -> Optional[str]:
+        """Get current device UDID or None."""
+        if self.current_device_index is not None and 0 <= self.current_device_index < len(self.devices):
+            return self.devices[self.current_device_index].serial
+        return None
+        
+        # Device watchdog
+        self._watchdog_timer: Optional[QTimer] = None
+        self._watchdog_interval_ms = 5000  # Check every 5 seconds
+        self._device_connected_callback: Optional[callable] = None
     
     def get_devices(self, settings: QSettings, show_alert=lambda x: None):
         asyncio.run(self._get_devices(settings, show_alert))
     async def _get_devices(self, settings: QSettings, show_alert=lambda x: None):
-        self.devices.clear()
-        if self.pref_manager.settings == None:
+        # Test mode: use mock device already set up in main_app.py
+        if self._test_mode:
             self.pref_manager.settings = settings
+            return
+        
+        self.devices.clear()
         # handle errors when failing to get connected devices
         try:
             connected_devices = await usbmux.list_devices()

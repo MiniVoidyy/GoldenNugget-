@@ -94,6 +94,7 @@ class IOSSettingsPage(QWidget):
             lambda checked: (
                 set_ignore_frame_limit(checked),
                 self.window.settings.setValue("ignore_pb_frame_limit", checked),
+                self.window._sync_settings(),
             ),
         )
 
@@ -194,6 +195,7 @@ class IOSSettingsPage(QWidget):
         def handler(checked: bool):
             setattr(pref, pref_attr, checked)
             self.window.settings.setValue(pref_attr, checked)
+            self.window._sync_settings()
         return handler
 
     def _make_text_row(self, title: str, current: str, on_submit):
@@ -253,6 +255,7 @@ class IOSSettingsPage(QWidget):
         pref = self.window.device_manager.pref_manager
         pref.organization_name = text
         self.window.settings.setValue("organization_name", text)
+        self.window._sync_settings()
 
     def _make_language_row(self):
         card = IOSCard()
@@ -600,7 +603,7 @@ class IOSSettingsPage(QWidget):
                 QCoreApplication.translate("IOSSettingsPage", "Failed to load the preset."))
             return
         self.window.settings.setValue("last_loaded_preset", name)
-        self.window.settings.sync()
+        self.window._sync_settings()
         QMessageBox.information(
             self, QCoreApplication.translate("IOSSettingsPage", "Load Preset"),
             QCoreApplication.translate(
