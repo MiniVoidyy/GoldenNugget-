@@ -8,6 +8,7 @@ import src.gui.pages as Pages
 from src.controllers.web_request_handler import is_update_available
 from src.controllers.translator import Translator
 import src.controllers.video_handler as video_handler
+from src.controllers.preset_manager import PresetManager
 
 from src.devicemanagement.constants import Version, LEGACY_SUPPORT_ENABLED
 from src.devicemanagement.device_manager import DeviceManager
@@ -18,6 +19,7 @@ from src.gui.thread_workers.apply_worker import ApplyThread, ApplyAlertMessage, 
 from src.gui.pages.pages_list import Page
 
 from src.tweaks.tweaks import tweaks, TweakID
+from src.tweaks.tweak_classes import set_tweak_change_callback
 from src.gui.version import App_Version, App_Build
 
 from src.gui.ios.theme_manager import ThemeManager
@@ -41,7 +43,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.apply_in_progress = False
         self.refresh_in_progress = False
         self.threadpool = QtCore.QThreadPool()
+
+        self.preset_manager = PresetManager()
+        self._preset_autosave_pending = False
+
         self.loadSettings()
+        self._load_last_preset()
+        self._register_tweak_autosave()
+
         self.initial_load = True
 
         # hide every page
@@ -458,7 +467,33 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
     
+    def _load_last_preset(self):
+        """Load the last used preset on startup."""
+        last_preset = self.settings.value("last_loaded_preset", "", type=str)
+        if last_preset:
+            self.preset_manager.load_preset(last_preset)
 
+    def _register_tweak_autosave(self):
+        """Register callback to auto-save preset when tweaks change."""
+        set_tweak_change_callback(self._on_tweak_changed)
+
+    def _on_tweak_changed(self):
+        """Called when any tweak value changes - schedule autosave."""
+        if self._preset_autosave_pending:
+            return
+        self._preset_autosave_pending = True
+        # Debounce: save after 500ms of no changes
+        QtCore.QTimer.singleShot(500, self._save_autosave_preset)
+
+    def _save_autosave_preset(self):
+        """Save current tweak state to AutoSave preset."""
+        self._preset_autosave_pending = False
+        try:
+            self.preset_manager.save_preset("AutoSave", "Automatic save of last tweak configuration", tags=["auto"])
+        except Exception:
+            pass  # Silent fail - autosave is best-effort
+     
+    
     ## SIDE BAR FUNCTIONS
     def is_ios_theme(self) -> bool:
         return self.theme_manager.current_theme == ThemeManager.IOS

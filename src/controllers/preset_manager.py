@@ -24,10 +24,11 @@ PRESET_VERSION = 2
 
 class PresetManager:
     def __init__(self):
-        self.presets_dir = os.path.join(
-            QStandardPaths.writableLocation(QStandardPaths.AppDataLocation),
-            PRESETS_DIR_NAME
-        )
+        base_dir = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+        # Ensure GoldenNugget-specific folder
+        if not base_dir.endswith("GoldenNugget") and not base_dir.endswith("GoldenNugget/"):
+            base_dir = os.path.join(base_dir, "GoldenNugget")
+        self.presets_dir = os.path.join(base_dir, PRESETS_DIR_NAME)
         os.makedirs(self.presets_dir, exist_ok=True)
 
     def get_preset_path(self, name: str) -> str:

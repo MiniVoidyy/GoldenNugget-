@@ -1,9 +1,24 @@
 import re
+from typing import Optional, Callable
 
 from PySide6.QtCore import QCoreApplication
 
 from src.exceptions.nugget_exception import NuggetException
 from .basic_plist_locations import FileLocation
+
+_on_tweak_change: Optional[Callable[[], None]] = None
+
+def set_tweak_change_callback(callback: Optional[Callable[[], None]]):
+    """Register a callback to be invoked when any tweak changes."""
+    global _on_tweak_change
+    _on_tweak_change = callback
+
+def _notify_tweak_change():
+    if _on_tweak_change:
+        try:
+            _on_tweak_change()
+        except Exception:
+            pass  # Never let callback errors break tweak changes
 
 class Tweak:
     def __init__(
@@ -19,13 +34,17 @@ class Tweak:
         self.enabled = False
 
     def set_enabled(self, value: bool):
-        self.enabled = value
+        if self.enabled != value:
+            self.enabled = value
+            _notify_tweak_change()
     def toggle_enabled(self):
         self.enabled = not self.enabled
+        _notify_tweak_change()
     def set_value(self, new_value: any, toggle_enabled: bool = True):
         self.value = new_value
         if toggle_enabled:
             self.enabled = True
+        _notify_tweak_change()
 
     def apply_tweak(self):
         raise NotImplementedError
