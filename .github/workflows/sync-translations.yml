@@ -59,22 +59,14 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          git diff --quiet || echo "changed=true" >> $GITHUB_OUTPUT
-
-      - name: Create Pull Request
-        if: steps.changes.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'chore(i18n): sync translations from gNugget-i18n submodule'
-          title: 'chore(i18n): sync translations from gNugget-i18n submodule'
-          body: |
-            Automated sync of translations from [gNugget-i18n](https://github.com/awesomenull-dev/gNugget-i18n) submodule.
-            
-            This PR updates .ts/.qm files and regenerates resources_rc.py.
-          branch: i18n/sync-translations
-          delete-branch: true
-          labels: |
-            i18n
-            automated
-          reviewers: awesomenull
+          if ! git diff --quiet; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            # Commit and push directly
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/qt/translations/*.ts src/qt/translations/*.qm src/qt/resources_rc.py
+            git commit -m "chore(i18n): sync translations from gNugget-i18n submodule"
+            git push origin HEAD:main
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
