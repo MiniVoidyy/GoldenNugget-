@@ -48,6 +48,41 @@ class IOSPosterboardPage(QWidget):
         )
         layout.addWidget(nav)
 
+        # Reset PosterBoard card — emergency exit for a misbehaving or
+        # malformed PosterBoard database (see regression found in 8.3).
+        reset_card = IOSCard()
+        reset_layout = QVBoxLayout(reset_card)
+        reset_layout.setContentsMargins(16, 12, 16, 12)
+        reset_layout.setSpacing(8)
+
+        reset_btn = QPushButton(QCoreApplication.translate("IOSPosterboardPage", "Reset PosterBoard"))
+        reset_btn.setCursor(Qt.PointingHandCursor)
+        reset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3b3b3b;
+                border: none;
+                border-radius: 10px;
+                color: #FF453A;
+                font-size: 15px;
+                font-weight: 600;
+                padding: 12px;
+            }
+            QPushButton:hover { background-color: #4a4a4a; }
+        """)
+        reset_btn.clicked.connect(self._reset_posterboard)
+        reset_layout.addWidget(reset_btn)
+
+        reset_caption = QLabel(QCoreApplication.translate(
+            "IOSPosterboardPage",
+            "Emergency reset for when PosterBoard behaves strangely or the "
+            "database won't load after a restore. Resets on the next apply."
+        ))
+        reset_caption.setWordWrap(True)
+        reset_caption.setStyleSheet("color: #8E8E93; font-size: 12px;")
+        reset_layout.addWidget(reset_caption)
+
+        layout.addWidget(reset_card)
+
         # Tab bar
         self.tab_stack = QStackedWidget()
         layout.addWidget(self.tab_stack)
@@ -454,5 +489,83 @@ class IOSPosterboardPage(QWidget):
             tweaks[TweakID.PosterBoard].tendies.remove(tendie)
         self.refresh_tendies()
 
-def refresh_templates(self):
-        self._load_templates_list()
+    def _reset_posterboard(self):
+        """Show dialog to schedule a PosterBoard reset.
+
+        Reuses the existing reset mechanism (tweaks[PosterBoard].resetModes)
+        that the classic UI's Reset dropdown drives — this only adds the
+        iOS-style dialog, it does not duplicate the reset logic itself.
+        """
+        from PySide6.QtWidgets import (
+            QDialog, QVBoxLayout, QLabel, QCheckBox, QDialogButtonBox, QMessageBox,
+        )
+
+        dialog = QDialog(self.window)
+        dialog.setWindowTitle(QCoreApplication.translate("IOSPosterboardPage", "Reset PosterBoard"))
+        dialog.setMinimumWidth(350)
+        dialog.setStyleSheet("""
+            QDialog { background-color: #1e1e1e; }
+            QLabel { color: #FFFFFF; font-size: 15px; }
+            QCheckBox { color: #FFFFFF; font-size: 14px; spacing: 8px; }
+            QCheckBox::indicator { width: 20px; height: 20px; }
+            QDialogButtonBox QPushButton {
+                background-color: #007AFF;
+                border-radius: 10px;
+                color: #FFFFFF;
+                font-size: 14px;
+                font-weight: 600;
+                padding: 10px 20px;
+                border: none;
+                min-width: 80px;
+            }
+            QDialogButtonBox QPushButton:hover { background-color: #0056CC; }
+        """)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+
+        desc = QLabel(QCoreApplication.translate(
+            "IOSPosterboardPage",
+            "Select what to reset. This is useful if PosterBoard is behaving "
+            "strangely or the database is corrupted (malformed) after a restore."
+        ))
+        desc.setWordWrap(True)
+        desc.setStyleSheet("color: #8E8E93; font-size: 13px;")
+        layout.addWidget(desc)
+
+        reset_collections = QCheckBox(QCoreApplication.translate("IOSPosterboardPage", "Collections"))
+        reset_collections.setChecked(True)
+        layout.addWidget(reset_collections)
+
+        reset_suggested = QCheckBox(QCoreApplication.translate("IOSPosterboardPage", "Suggested Photos"))
+        reset_suggested.setChecked(True)
+        layout.addWidget(reset_suggested)
+
+        reset_gallery = QCheckBox(QCoreApplication.translate("IOSPosterboardPage", "Gallery Cache"))
+        reset_gallery.setChecked(True)
+        layout.addWidget(reset_gallery)
+
+        btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btn_box.accepted.connect(dialog.accept)
+        btn_box.rejected.connect(dialog.reject)
+        layout.addWidget(btn_box)
+
+        if dialog.exec() == QDialog.Accepted:
+            selected = []
+            if reset_collections.isChecked():
+                selected.append("Collections")
+            if reset_suggested.isChecked():
+                selected.append("Suggested Photos")
+            if reset_gallery.isChecked():
+                selected.append("Gallery Cache")
+            tweaks[TweakID.PosterBoard].resetModes = selected
+            QMessageBox.information(
+                self.window,
+                QCoreApplication.translate("IOSPosterboardPage", "Reset Scheduled"),
+                QCoreApplication.translate(
+                    "IOSPosterboardPage",
+                    "PosterBoard reset has been scheduled. The selected items "
+                    "will be cleared on the next apply. Apply your tweaks to "
+                    "execute the reset.")
+            )

@@ -8,7 +8,58 @@ from typing import Optional
 from src.exceptions.nugget_exception import NuggetException
 from src.controllers.files_handler import get_bundle_files
 from src.devicemanagement.preference_manager import PreferenceManager
+from src.restore.protective import log_warn
 from .pb_config_item import PBConfigItem
+
+
+def _validate_posterboard_db(db_path: str) -> bool:
+    """Check if a file is a valid PosterBoard SQLite database with required tables."""
+    if not path.exists(db_path) or path.getsize(db_path) < 100:
+        return False
+    try:
+        conn = sqlite3.connect(db_path)
+        # First check it's a valid SQLite database
+        conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
+        # Then check it has the required PosterBoard tables
+        cursor = conn.cursor()
+        tables_to_check = ["poster", "posterAttributes", "posterRoleMembership", "sqlite_sequence"]
+        for tab in tables_to_check:
+            cursor.execute(f"PRAGMA table_info({tab})")
+            if cursor.fetchone() is None:
+                conn.close()
+                return False
+        # Check database integrity
+        cursor.execute("PRAGMA integrity_check")
+        result = cursor.fetchone()
+        if result is None or result[0] != "ok":
+            conn.close()
+            return False
+        conn.close()
+        return True
+    except sqlite3.DatabaseError:
+        return False
+    except Exception:
+        return False
+
+
+def _is_encrypted_database(db_path: str) -> bool:
+    """Check if a database file appears to be encrypted (SQLCipher) or unreadable."""
+    if not path.exists(db_path) or path.getsize(db_path) < 100:
+        return False
+    try:
+        # Try to open as regular SQLite first
+        conn = sqlite3.connect(db_path)
+        conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
+        conn.close()
+        return False
+    except sqlite3.DatabaseError as e:
+        # Check if it's an encryption-related error
+        err_msg = str(e).lower()
+        if "encrypted" in err_msg or "not a database" in err_msg or "file is not a database" in err_msg:
+            return True
+        return False
+    except Exception:
+        return False
 
 DB_FILE_NAME = "PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3"
 
@@ -64,6 +115,17 @@ class PBConfigManager:
             self.database = None
             self.staged_database = None
             return False
+
+        # Validate the saved database before using it
+        if not _validate_posterboard_db(db_data):
+            log_warn(f"Saved PosterBoard database for {udid} is corrupted or invalid, removing it")
+            # Remove the corrupted database and ids
+            PreferenceManager.remove_pbconfig_data(udid)
+            PreferenceManager.remove_pbconfig_ids(udid)
+            self.database = None
+            self.staged_database = None
+            return False
+
         self.database = db_data
         # get the list of saved ids
         self.saved_items = PreferenceManager.get_pbconfig_ids(udid)
@@ -76,7 +138,33 @@ class PBConfigManager:
         if not path.exists(app_data_path):
             makedirs(app_data_path)
         dbpath = path.join(app_data_path, DB_FILE_NAME)
+
+        # Validate source database before copying
+        if _is_encrypted_database(new_db):
+            raise NuggetException(
+                "The PosterBoard database from the backup appears to be encrypted. "
+                "Please disable backup encryption on your device (Settings > General > "
+                "Transfer or Reset iPhone > Erase All Content and Settings is NOT needed; "
+                "just uncheck 'Encrypt local backup' in Finder/iTunes and create a new backup) "
+                "and try again."
+            )
+
+        if not _validate_posterboard_db(new_db):
+            raise NuggetException(
+                "The PosterBoard database from the backup is corrupted or invalid. "
+                "This can happen if the backup was interrupted. "
+                "Please create a fresh backup of your device and try again."
+            )
+
         shutil.copyfile(new_db, dbpath)
+
+        # Validate the copied database
+        if not _validate_posterboard_db(dbpath):
+            raise NuggetException(
+                "Failed to create a valid copy of the PosterBoard database. "
+                "The backup file may be corrupted. Please create a fresh backup and try again."
+            )
+
         # make sure it has the tables
         db_connection = sqlite3.connect(dbpath)
         db_cursor = db_connection.cursor()
@@ -124,9 +212,26 @@ class PBConfigManager:
         #   roleSortKey = # of highest sort key + 1
         if self.database is None:
             raise NuggetException("PosterBoard database file not selected!")
+
+        # Validate the database before use
+        if not _validate_posterboard_db(self.database):
+            raise NuggetException(
+                "The PosterBoard database is corrupted or invalid. "
+                "This can happen if the backup was interrupted or the database was modified externally. "
+                "Please fetch a fresh database from your device and try again."
+            )
+
         # copy and open database file
         self.staged_database = path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), f'STAGED-{DB_FILE_NAME}')
         shutil.copyfile(self.database, self.staged_database)
+
+        # Validate the staged copy
+        if not _validate_posterboard_db(self.staged_database):
+            raise NuggetException(
+                "Failed to create a valid copy of the PosterBoard database for staging. "
+                "The source database may be corrupted. Please fetch a fresh database and try again."
+            )
+
         conn = sqlite3.connect(self.staged_database)
         cursor = conn.cursor()
         # read number sequence

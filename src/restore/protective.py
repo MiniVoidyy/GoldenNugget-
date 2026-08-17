@@ -122,15 +122,15 @@ APPLE_ID_PATH_PREFIXES = (
     "Library/Preferences",           # User settings (dark mode, wallpaper, etc.)
 )
 
-# Path prefixes in ManagedPreferencesDomain for profiles
-MANAGED_PROFILE_PATH_PREFIXES = (
-    "Library/ConfigurationProfiles",
-)
-
-# Path prefixes in SystemPreferencesDomain for profiles
-SYSTEM_PROFILE_PATH_PREFIXES = (
-    "Library/ConfigurationProfiles",
-)
+# NOTE: ConfigurationProfiles backup/restore was added in commit 25006f5
+# (Aug 12) to preserve MDM/VPN/WebClip profiles across the restore cycle,
+# but this widened the Phase 3 restore scope enough to also roll back
+# applied tweaks on repeat apply and corrupt the PosterBoard database.
+# Profiles are not reliably preserved by this approach anyway (confirmed
+# still reset in practice), so scope is reverted to the narrow pre-fix
+# state. If profile preservation is revisited, it needs a separate,
+# isolated restore path that does not share scope with tweak/PosterBoard
+# state — see regression found in 8.3 (reverted before public release).
 
 # Path prefixes within HomeDomain that hold SpringBoard's home screen layout
 # and icon state. Restoring these keeps the home screen (icon layout, folders,
@@ -151,15 +151,6 @@ CONTROL_CENTER_PATH_PREFIXES = (
 # themselves — restoring the stale copies would undo the applied tweaks.
 _SKIP_PATH_PREFIXES = (
     "Library/SpringBoard/statusBarOverrides",  # Not captured stale; re-injected with fresh tweak content
-    "Library/SpringBoard/LockScreenFootnote",  # Lock screen footnote text (tweak)
-    "Library/SpringBoard/SpringBoardState",    # SpringBoard state with tweaks
-    "Library/SpringBoard/IconState",           # Icon layout with tweaks
-    "Library/SpringBoard/StatusBarOverrides",  # Status bar overrides (tweak)
-    "Library/Preferences/.GlobalPreferences.plist",  # Region, locale (tweak)
-    "Library/Preferences/com.apple.springboard.plist",  # SpringBoard settings (tweak)
-    "Library/Preferences/com.apple.springboard.lockscreen.plist",  # Lock screen settings
-    "Library/Preferences/com.apple.springboard.daemons.plist",  # Daemons tweaks
-    "Library/Preferences/com.apple.springboard.statusbar.plist",  # Status bar tweaks
 )
 
 # Files iOS manages internally and rejects if included in a sparse backup
@@ -168,11 +159,6 @@ _SKIP_PATH_PREFIXES = (
 _SKIP_FILES = frozenset({
     "keychain-backup.plist",    # iOS validates protection class, rejects flags=4
     ".GlobalPreferences.plist",  # Written separately as tweaks; skip to avoid overwrite
-    "com.apple.springboard.plist",  # SpringBoard settings (tweak)
-    "com.apple.springboard.lockscreen.plist",  # Lock screen settings
-    "com.apple.springboard.daemons.plist",  # Daemons tweaks
-    "com.apple.springboard.statusbar.plist",  # Status bar tweaks
-    "com.apple.springboard.lockscreen.plist",  # Lock screen settings
 })
 
 
@@ -187,10 +173,6 @@ def _is_protective_file(domain: str, relative_path: str, include_photos: bool = 
         return (relative_path.startswith(APPLE_ID_PATH_PREFIXES)
                 or relative_path.startswith(SPRINGBOARD_PATH_PREFIXES)
                 or relative_path.startswith(CONTROL_CENTER_PATH_PREFIXES))
-    if domain == "ManagedPreferencesDomain":
-        return relative_path.startswith(MANAGED_PROFILE_PATH_PREFIXES)
-    if domain == "SystemPreferencesDomain":
-        return relative_path.startswith(SYSTEM_PROFILE_PATH_PREFIXES)
     if include_photos and domain in PROTECTIVE_DOMAINS:
         return True
     return False

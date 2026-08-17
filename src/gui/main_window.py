@@ -604,13 +604,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if success:
             worker = getattr(self, 'worker_thread', None)
             if worker is not None and worker.reset_pages is None and not worker.capture_only and not worker.revert_last_apply_only:
-                # Show Find My iPhone reminder
-                QtWidgets.QMessageBox.information(
-                    self,
-                    self.tr("Done"),
-                    self.tr("Success! Rebooting your device...\n\nRemember to turn Find My back on!"),
-                    QtWidgets.QMessageBox.Ok
-                )
                 self.prompt_star_on_github()
         else:
             # Show error notification if not already shown via alert
