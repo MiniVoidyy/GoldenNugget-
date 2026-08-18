@@ -1,3 +1,4 @@
+# note: This is 8.x branch (main, stable) only bug fixes accepts here. For development use 9.0 branch (unstable) but be ready for rapid changes
 # contribute guide
 ## 1. about AI usage
 # 1. Terms of AI use 
