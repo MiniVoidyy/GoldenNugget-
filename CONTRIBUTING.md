@@ -15,12 +15,12 @@ That's all.
 ## 3. New Features
 # 1. QOL (goldennugget app features)
 New features should NOT be useless.\
-GoldenNugget is already a HUGE project. And i don't want to turn goldennugget into "elephant" or superapp
+GoldenNugget is already a HUGE project. And i don't want to turn goldennugget into "elephant" or superapp.
 # 2. Tweaks (New features for customization)
-This is really interesting part.\
 As a "new tweaks" i accept:
 1. Old tweaks on new IOS versions
 2. New plist-based tweaks (like easyspeak workaround on iOS 27)
+3. New exploit-based tweaks (like bookrestore/sparserestore)
 ## 4. Pull Request Naming Convention
 
 To keep the repository history clean and easy to read, please use the following tags at the beginning of your PR title:
@@ -40,8 +40,8 @@ To keep the repository history clean and easy to read, please use the following 
 * `added new tweak please merge`
 * `update`
 
-If your PR does not follow this format, you may be asked to rename it before it gets reviewed.
-# end
+If your PR does not follow this format, you need to rename it before it gets reviewed.
+# End
 That's all, i hope this guideline was useful.\
 You can leave you opinion about it in discussion.\
-Written by entirely awesomenull. can be updated anytime, already created pull requests will not be affected in case of update.
+Written entirely by awesomenull. can be updated anytime, already created pull requests will not be affected in case of update.
