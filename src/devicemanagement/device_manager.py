@@ -467,9 +467,6 @@ class DeviceManager:
                     'CloudStorage',
                     'ScreenSaver',
                     'TapToSetup',
-                    'Keyboard',
-                    'PreferredLanguage',
-                    'SpokenLanguage',
                     'WatchMigration',
                     'OnBoarding',
                     'TVProviderSignIn',
@@ -490,7 +487,6 @@ class DeviceManager:
                     'WiFi',
                     'Display',
                     'Tone',
-                    'LanguageAndLocale',
                     'TouchID',
                     'TrueToneDisplay',
                     'FileVault',
@@ -501,10 +497,7 @@ class DeviceManager:
                     'UnlockWithWatch',
                     'Accessibility',
                     'All',
-                    'ExpressLanguage',
-                    'Language',
                     'N/A',
-                    'Region',
                     'Avatar',
                     'DeviceProtection',
                     'Key',
@@ -515,7 +508,6 @@ class DeviceManager:
                     'DataSubtitle',
                     'AppleIDSubtitle',
                     'AppearanceSubtitle',
-                    'PreferredLang',
                     'OnboardingSubtitle',
                     'AppleTVSubtitle',
                     'Intelligence',
@@ -561,8 +553,7 @@ class DeviceManager:
             ))
             purplebuddy_plist: dict = {
                 "SetupDone": True,
-                "SetupFinishedAllSteps": True,
-                "UserChoseLanguage": True
+                "SetupFinishedAllSteps": True
             }
             files_to_restore.append(FileToRestore(
                 contents=plistlib.dumps(purplebuddy_plist),
