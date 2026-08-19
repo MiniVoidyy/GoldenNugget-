@@ -8,12 +8,11 @@ from src.gui.pages.pages_list import Page
 
 
 class ApplyAlertMessage:
-    def __init__(self, txt: str, title: str = "Error!", icon=QMessageBox.Critical, detailed_txt: str = None, is_revert: bool = False, backup_path: str = None):
+    def __init__(self, txt: str, title: str = "Error!", icon=QMessageBox.Critical, detailed_txt: str = None, backup_path: str = None):
         self.txt = txt
         self.title = title
         self.icon = icon
         self.detailed_txt = detailed_txt
-        self.is_revert = is_revert
         self.backup_path = backup_path
 
 
@@ -63,16 +62,6 @@ def set_sudo_pwd(pwd: Optional[str]):
     _sudo_state.set_pwd(pwd)
 
 
-class ApplyAlertMessage:
-    def __init__(self, txt: str, title: str = "Error!", icon=QMessageBox.Critical, detailed_txt: str = None, is_revert: bool = False, backup_path: str = None):
-        self.txt = txt
-        self.title = title
-        self.icon = icon
-        self.detailed_txt = detailed_txt
-        self.is_revert = is_revert
-        self.backup_path = backup_path
-
-
 class ApplyThread(QThread):
     progress = Signal(str)
     alert = Signal(object)  # ApplyAlertMessage or None for sudo prompt
@@ -80,13 +69,11 @@ class ApplyThread(QThread):
 
     _TIMEOUT_MS = 10 * 60 * 1000  # 10 minutes max for apply/restore
 
-    def __init__(self, manager, settings: QSettings, reset_pages: Optional[list[Page]] = None, capture_only: bool = False, revert_last_apply_only: bool = False):
+    def __init__(self, manager, settings: QSettings, reset_pages: Optional[list[Page]] = None):
         super().__init__()
         self.manager = manager
         self.settings = settings
         self.reset_pages = reset_pages
-        self.capture_only = capture_only
-        self.revert_last_apply_only = revert_last_apply_only
         self.success = False
         self._error_msg: str = ""
         self._timeout_timer: Optional[QTimer] = None
@@ -137,11 +124,7 @@ class ApplyThread(QThread):
                 self._timeout_timer.stop()
 
     def _do_work(self):
-        if self.revert_last_apply_only:
-            self.manager.revert_last_apply(self.update_label, self.alert_window)
-        elif self.capture_only:
-            self.manager.capture_originals(self.update_label, self.alert_window)
-        elif self.reset_pages is None:
+        if self.reset_pages is None:
             self.manager.apply_changes(self.update_label, self.alert_window)
         else:
             self.manager.reset_tweaks(self.reset_pages, self.settings, self.update_label, self.alert_window)
@@ -168,19 +151,3 @@ class RefreshDevicesThread(QThread):
                 icon=QMessageBox.Critical,
                 detailed_txt=traceback.format_exc()
             ))
-
-
-def get_sudo_pwd() -> Optional[str]:
-    return _sudo_state.get_pwd()
-
-
-def get_sudo_complete() -> bool:
-    return _sudo_state.get_complete()
-
-
-def set_sudo_complete(is_complete: bool):
-    _sudo_state.set_complete(is_complete)
-
-
-def set_sudo_pwd(pwd: Optional[str]):
-    _sudo_state.set_pwd(pwd)

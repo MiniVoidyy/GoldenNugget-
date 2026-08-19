@@ -1,8 +1,4 @@
-from PySide6 import QtCore, QtWidgets, QtGui
-import webbrowser
-import subprocess
-import os
-import uuid
+from PySide6 import QtCore, QtWidgets
 
 from ..page import Page
 from src.qt.mainwindow_ui import Ui_Nugget

@@ -5957,16 +5957,6 @@ class Ui_Nugget(object):
 
         self.horizontalLayout_17.addWidget(self.applyTweaksBtn)
 
-        self.revertLastApplyBtn = QToolButton(self.horizontalWidget_8)
-        self.revertLastApplyBtn.setObjectName(u"revertLastApplyBtn")
-        self.revertLastApplyBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        icon32 = QIcon()
-        icon32.addFile(u":/icon/arrow.clockwise.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.revertLastApplyBtn.setIcon(icon32)
-        self.revertLastApplyBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-
-        self.horizontalLayout_17.addWidget(self.revertLastApplyBtn)
-
 
         self.verticalLayout_241.addWidget(self.horizontalWidget_8)
 
@@ -6157,25 +6147,12 @@ class Ui_Nugget(object):
 
         self._21.addWidget(self.languageWidget)
 
-        self.allowWifiApplyingChk = QCheckBox(self.settingsPageContent)
-        self.allowWifiApplyingChk.setObjectName(u"allowWifiApplyingChk")
-        self.allowWifiApplyingChk.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.allowWifiApplyingChk.setChecked(False)
-
-        self._21.addWidget(self.allowWifiApplyingChk)
-
         self.autoRebootChk = QCheckBox(self.settingsPageContent)
         self.autoRebootChk.setObjectName(u"autoRebootChk")
         self.autoRebootChk.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.autoRebootChk.setChecked(True)
 
         self._21.addWidget(self.autoRebootChk)
-
-        self.showAllSpoofableChk = QCheckBox(self.settingsPageContent)
-        self.showAllSpoofableChk.setObjectName(u"showAllSpoofableChk")
-        self.showAllSpoofableChk.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-
-        self._21.addWidget(self.showAllSpoofableChk)
 
         self.ignorePBFrameLimitChk = QCheckBox(self.settingsPageContent)
         self.ignorePBFrameLimitChk.setObjectName(u"ignorePBFrameLimitChk")
@@ -6195,93 +6172,6 @@ class Ui_Nugget(object):
 
         self._21.addWidget(self.forcePBRefreshChk)
 
-        self.rebuildSBApplicationStateDBChk = QCheckBox(self.settingsPageContent)
-        self.rebuildSBApplicationStateDBChk.setObjectName(u"rebuildSBApplicationStateDBChk")
-        self.rebuildSBApplicationStateDBChk.setChecked(False)
-
-        self._21.addWidget(self.rebuildSBApplicationStateDBChk)
-
-        self.bookrestoreWidget = QWidget(self.settingsPageContent)
-        self.bookrestoreWidget.setObjectName(u"bookrestoreWidget")
-        self.verticalLayout_621 = QVBoxLayout(self.bookrestoreWidget)
-        self.verticalLayout_621.setObjectName(u"verticalLayout_621")
-        self.verticalLayout_621.setContentsMargins(0, 0, 0, 0)
-        self.line_6 = QFrame(self.bookrestoreWidget)
-        self.line_6.setObjectName(u"line_6")
-        self.line_6.setStyleSheet(u"QFrame {\n"
-"	color: #414141;\n"
-"}")
-        self.line_6.setFrameShadow(QFrame.Plain)
-        self.line_6.setFrameShape(QFrame.Shape.HLine)
-
-        self.verticalLayout_621.addWidget(self.line_6)
-
-        self.horizontalLayout_23 = QHBoxLayout()
-        self.horizontalLayout_23.setObjectName(u"horizontalLayout_23")
-        self.horizontalLayout_23.setContentsMargins(-1, -1, -1, 0)
-        self.label_511 = QLabel(self.bookrestoreWidget)
-        self.label_511.setObjectName(u"label_511")
-
-        self.horizontalLayout_23.addWidget(self.label_511)
-
-        self.horizontalSpacer_13 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-
-        self.horizontalLayout_23.addItem(self.horizontalSpacer_13)
-
-        self.brApplyModeDrp = QComboBox(self.bookrestoreWidget)
-        self.brApplyModeDrp.addItem(u"   AFC*")
-        self.brApplyModeDrp.addItem("")
-        self.brApplyModeDrp.setObjectName(u"brApplyModeDrp")
-        self.brApplyModeDrp.setMinimumSize(QSize(125, 0))
-        self.brApplyModeDrp.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-
-        self.horizontalLayout_23.addWidget(self.brApplyModeDrp)
-
-
-        self.verticalLayout_621.addLayout(self.horizontalLayout_23)
-
-        self.horizontalLayout_22 = QHBoxLayout()
-        self.horizontalLayout_22.setObjectName(u"horizontalLayout_22")
-        self.horizontalLayout_22.setContentsMargins(-1, -1, -1, 0)
-        self.label_50 = QLabel(self.bookrestoreWidget)
-        self.label_50.setObjectName(u"label_50")
-
-        self.horizontalLayout_22.addWidget(self.label_50)
-
-        self.horizontalSpacer_11 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-
-        self.horizontalLayout_22.addItem(self.horizontalSpacer_11)
-
-        self.brTransferModeDrp = QComboBox(self.bookrestoreWidget)
-        self.brTransferModeDrp.addItem("")
-        self.brTransferModeDrp.addItem("")
-        self.brTransferModeDrp.setObjectName(u"brTransferModeDrp")
-        self.brTransferModeDrp.setMinimumSize(QSize(175, 0))
-        self.brTransferModeDrp.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-
-        self.horizontalLayout_22.addWidget(self.brTransferModeDrp)
-
-
-        self.verticalLayout_621.addLayout(self.horizontalLayout_22)
-
-        self.label_49 = QLabel(self.bookrestoreWidget)
-        self.label_49.setObjectName(u"label_49")
-
-        self.verticalLayout_621.addWidget(self.label_49)
-
-        self.booksContainerUUIDTxt = QLineEdit(self.bookrestoreWidget)
-        self.booksContainerUUIDTxt.setObjectName(u"booksContainerUUIDTxt")
-
-        self.verticalLayout_621.addWidget(self.booksContainerUUIDTxt)
-
-        self.label_52 = QLabel(self.bookrestoreWidget)
-        self.label_52.setObjectName(u"label_52")
-
-        self.verticalLayout_621.addWidget(self.label_52)
-
-
-        self._21.addWidget(self.bookrestoreWidget)
-
         self.line_24 = QFrame(self.settingsPageContent)
         self.line_24.setObjectName(u"line_24")
         self.line_24.setStyleSheet(u"QFrame {\n"
@@ -6291,13 +6181,6 @@ class Ui_Nugget(object):
         self.line_24.setFrameShape(QFrame.Shape.HLine)
 
         self._21.addWidget(self.line_24)
-
-        self.trustStoreChk = QCheckBox(self.settingsPageContent)
-        self.trustStoreChk.setObjectName(u"trustStoreChk")
-        self.trustStoreChk.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.trustStoreChk.setChecked(False)
-
-        self._21.addWidget(self.trustStoreChk)
 
         self.skipSetupChk = QCheckBox(self.settingsPageContent)
         self.skipSetupChk.setObjectName(u"skipSetupChk")
@@ -6379,7 +6262,6 @@ class Ui_Nugget(object):
         self.dynamicIslandDrp.setCurrentIndex(0)
         self.spoofedModelDrp.setCurrentIndex(0)
         self.pTypeDrp.setCurrentIndex(0)
-        self.brTransferModeDrp.setCurrentIndex(0)
 
 
         QMetaObject.connectSlotsByName(Nugget)
@@ -6967,24 +6849,12 @@ class Ui_Nugget(object):
         self.gestaltLocationTitleLbl.setText(QCoreApplication.translate("Nugget", u"Current gestalt file location:", None))
         self.chooseGestaltBtn.setText(QCoreApplication.translate("Nugget", u"  Choose Gestalt File", None))
         self.applyTweaksBtn.setText(QCoreApplication.translate("Nugget", u"  Apply Changes", None))
-        self.revertLastApplyBtn.setText(QCoreApplication.translate("Nugget", u"  Revert Last Apply", None))
         self.statusLbl.setText(QCoreApplication.translate("Nugget", u"Ready!", None))
         self.skipSetupOnLbl.setText(QCoreApplication.translate("Nugget", u"Note: Skip Setup is currently turned on.", None))
         self.removeTweaksBtn.setText(QCoreApplication.translate("Nugget", u"Remove Tweaks", None))
         self.springboardOptionsLbl1.setText(QCoreApplication.translate("Nugget", u"Nugget Settings", None))
         self.langLbl.setText(QCoreApplication.translate("Nugget", u"App Language", None))
-        self.allowWifiApplyingChk.setText(QCoreApplication.translate("Nugget", u"Allow Applying Over WiFi", None))
         self.autoRebootChk.setText(QCoreApplication.translate("Nugget", u"Auto Reboot After Applying", None))
-#if QT_CONFIG(tooltip)
-        self.showAllSpoofableChk.setToolTip(QCoreApplication.translate("Nugget", u"Show models for other device types in the AI device spoofing tab.", None))
-#endif // QT_CONFIG(tooltip)
-#if QT_CONFIG(statustip)
-        self.showAllSpoofableChk.setStatusTip("")
-#endif // QT_CONFIG(statustip)
-#if QT_CONFIG(whatsthis)
-        self.showAllSpoofableChk.setWhatsThis("")
-#endif // QT_CONFIG(whatsthis)
-        self.showAllSpoofableChk.setText(QCoreApplication.translate("Nugget", u"Show All Spoofable Models", None))
         self.ignorePBFrameLimitChk.setText(QCoreApplication.translate("Nugget", u"Ignore Posterboard Frame Limit", None))
 #if QT_CONFIG(tooltip)
         self.disableTendiesLimitChk.setToolTip(QCoreApplication.translate("Nugget", u"Disables the tendies file limit of 2. There is still the descriptor limit.\n"
@@ -6993,33 +6863,9 @@ class Ui_Nugget(object):
 #endif // QT_CONFIG(tooltip)
         self.disableTendiesLimitChk.setText(QCoreApplication.translate("Nugget", u"Disable Tendies Limit", None))
         self.forcePBRefreshChk.setText(QCoreApplication.translate("Nugget", u"Force PosterBoard Refresh", None))
-        self.rebuildSBApplicationStateDBChk.setText(QCoreApplication.translate("Nugget", u"Rebuild SpringBoard Application State DB", None))
-#if QT_CONFIG(tooltip)
-        self.rebuildSBApplicationStateDBChk.setToolTip(QCoreApplication.translate("Nugget", u"Replaces applicationState.db with an empty file, causing SpringBoard to rebuild it.\n"
-"\n"
-"This is necessary if badges persist on the Settings app after disabling FollowUp.", None))
-#endif // QT_CONFIG(tooltip)
-        self.label_511.setText(QCoreApplication.translate("Nugget", u"BookRestore Apply Method", None))
-        self.brApplyModeDrp.setItemText(1, QCoreApplication.translate("Nugget", u"   Restore", None))
-
-        self.label_50.setText(QCoreApplication.translate("Nugget", u"BookRestore File Transfer Method", None))
-        self.brTransferModeDrp.setItemText(0, QCoreApplication.translate("Nugget", u"   LocalHost", None))
-        self.brTransferModeDrp.setItemText(1, QCoreApplication.translate("Nugget", u"   On-Device (Slower)", None))
-
-        self.label_49.setText(QCoreApplication.translate("Nugget", u"Books Container UUID", None))
-#if QT_CONFIG(tooltip)
-        self.booksContainerUUIDTxt.setToolTip(QCoreApplication.translate("Nugget", u"Enter your books container UUID if you know it.\n"
-"It will be automatically found if this is left blank.", None))
-#endif // QT_CONFIG(tooltip)
-        self.booksContainerUUIDTxt.setPlaceholderText(QCoreApplication.translate("Nugget", u"Enter Books Container UUID", None))
-        self.label_52.setText(QCoreApplication.translate("Nugget", u"* Developer Mode/Administrator permissions required for these options.", None))
 #if QT_CONFIG(tooltip)
         self.line_24.setToolTip("")
 #endif // QT_CONFIG(tooltip)
-#if QT_CONFIG(tooltip)
-        self.trustStoreChk.setToolTip(QCoreApplication.translate("Nugget", u"Restores the SSL config that does something idk", None))
-#endif // QT_CONFIG(tooltip)
-        self.trustStoreChk.setText(QCoreApplication.translate("Nugget", u"Restore TrustStore (SSL Configuration Profiles)", None))
         self.skipSetupChk.setText(QCoreApplication.translate("Nugget", u"Skip Setup * (non-exploit files only)", None))
         self.supervisionChk.setText(QCoreApplication.translate("Nugget", u"Enable Supervision * (requires Skip Setup)", None))
         self.supervisionOrganization.setPlaceholderText(QCoreApplication.translate("Nugget", u"Enter Organization Name", None))

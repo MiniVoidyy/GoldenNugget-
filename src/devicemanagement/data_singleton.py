@@ -1,6 +1,4 @@
-from pathlib import Path
-
-from src.devicemanagement.constants import Device, Tweak
+from src.devicemanagement.constants import Device
 
 class DataSingleton:
     def __init__(self):

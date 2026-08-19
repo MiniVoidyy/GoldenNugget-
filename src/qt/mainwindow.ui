@@ -11473,29 +11473,12 @@ Warning: Disabling will cause the battery to show &quot;Unknown Part&quot; or &q
                         <enum>Qt::ToolButtonTextBesideIcon</enum>
                        </property>
                       </widget>
-                     </item>
-                     <item>
-                      <widget class="QToolButton" name="revertLastApplyBtn">
-                       <property name="cursor">
-                        <cursorShape>PointingHandCursor</cursorShape>
-                       </property>
-                       <property name="text">
-                        <string>  Revert Last Apply</string>
-                       </property>
-                       <property name="icon">
-                        <iconset resource="resources.qrc">
-                         <normaloff>:/icon/arrow.clockwise.svg</normaloff>:/icon/arrow.clockwise.svg</iconset>
-                       </property>
-                       <property name="toolButtonStyle">
-                        <enum>Qt::ToolButtonTextBesideIcon</enum>
-                       </property>
-                      </widget>
-                     </item>
-                   </layout>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QLabel" name="statusLbl">
+</item>
+                    </layout>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="statusLbl">
                    <property name="text">
                     <string>Ready!</string>
                    </property>

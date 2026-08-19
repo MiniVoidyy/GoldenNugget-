@@ -169,7 +169,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         ## APPLY PAGE ACTIONS
         self.ui.applyTweaksBtn.clicked.connect(self.on_applyTweaksBtn_clicked)
-        self.ui.revertLastApplyBtn.clicked.connect(self.on_revertLastApplyBtn_clicked)
         self.ui.restartUACBtn.clicked.connect(self.on_restartUACBtn_clicked)
         self.ui.removeTweaksBtn.clicked.connect(self.on_removeTweaksBtn_clicked)
 
@@ -265,12 +264,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.devicePicker.setEnabled(True)
             # populate the ComboBox with device names
             for device in self.device_manager.devices:
-                tag = ""
-                if self.device_manager.pref_manager.apply_over_wifi:
-                    if device.connected_via_usb:
-                        tag = " (@ USB)"
-                    else:
-                        tag = " (@ WiFi)"
+                tag = " (@ USB)" if device.connected_via_usb else " (@ WiFi)"
                 self.ui.devicePicker.addItem(f"{device.name}{tag}")
             
             # show all pages
@@ -308,7 +302,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.device_manager.set_current_device(index=index)
             # hide options that are for newer versions
             MinTweakVersions = {
-                "no_patch": [self.ui.chooseGestaltBtn, self.ui.gestaltPageBtn, self.ui.gestaltLocationLbl, self.ui.gestaltLocationTitleLbl, self.ui.showAllSpoofableChk, self.ui.featureFlagsPageBtn],
+                "no_patch": [self.ui.chooseGestaltBtn, self.ui.gestaltPageBtn, self.ui.gestaltLocationLbl, self.ui.gestaltLocationTitleLbl, self.ui.featureFlagsPageBtn],
                 "exploit": [("1.0", self.ui.regularDomainsLbl)],
                 "17.4": [self.ui.supportsDIChk],
                 "18.0": [self.ui.aodChk, self.ui.aodVibrancyChk, self.ui.iphone16SettingsChk],
@@ -422,24 +416,20 @@ class MainWindow(QtWidgets.QMainWindow):
     def loadSettings(self):
         try:
             # load the settings
-            apply_over_wifi = self.settings.value("apply_over_wifi", False, type=bool)
             auto_reboot = self.settings.value("auto_reboot", True, type=bool)
             ignore_frame_limit = self.settings.value("ignore_pb_frame_limit", False, type=bool)
             disable_tendies_limit = self.settings.value("disable_tendies_limit", False, type=bool)
             auto_refresh_posterboard = self.settings.value("auto_refresh_posterboard", True, type=bool)
-            restore_truststore = self.settings.value("restore_truststore", False, type=bool)
 
             skip_setup = self.settings.value("skip_setup", True, type=bool)
             supervised = self.settings.value("supervised", False, type=bool)
             organization_name = self.settings.value("organization_name", "", type=str)
             use_encrypted_backup = self.settings.value("use_encrypted_backup", False, type=bool)
 
-            self.ui.allowWifiApplyingChk.setChecked(apply_over_wifi)
             self.ui.autoRebootChk.setChecked(auto_reboot)
             self.ui.ignorePBFrameLimitChk.setChecked(ignore_frame_limit)
             self.ui.disableTendiesLimitChk.setChecked(disable_tendies_limit)
             self.ui.forcePBRefreshChk.setChecked(auto_refresh_posterboard)
-            self.ui.trustStoreChk.setChecked(restore_truststore)
             # Experimental encrypted backup option
             if hasattr(self.ui, 'encryptedBackupChk'):
                 self.ui.encryptedBackupChk.setChecked(use_encrypted_backup)
@@ -454,12 +444,10 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 self.ui.skipSetupOnLbl.hide()
 
-            self.device_manager.pref_manager.apply_over_wifi = apply_over_wifi
             self.device_manager.pref_manager.auto_reboot = auto_reboot
             video_handler.set_ignore_frame_limit(ignore_frame_limit)
             self.device_manager.pref_manager.disable_tendies_limit = disable_tendies_limit
             self.device_manager.pref_manager.auto_refresh_posterboard = auto_refresh_posterboard
-            self.device_manager.pref_manager.restore_truststore = restore_truststore
             self.device_manager.pref_manager.use_encrypted_backup = use_encrypted_backup
             self.device_manager.pref_manager.skip_setup = skip_setup
             self.device_manager.pref_manager.supervised = supervised
@@ -468,7 +456,15 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
     
     def _load_last_preset(self):
-        """Load the last used preset on startup."""
+        """Load the latest autosaved preset on startup.
+
+        Prefers the AutoSave preset (written on every tweak change) so the UI
+        restores the most recent configuration. Falls back to the last
+        manually-loaded preset when no autosave exists.
+        """
+        if "AutoSave" in self.preset_manager.list_presets():
+            self.preset_manager.load_preset("AutoSave")
+            return
         last_preset = self.settings.value("last_loaded_preset", "", type=str)
         if last_preset:
             self.preset_manager.load_preset(last_preset)
@@ -563,6 +559,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def update_label(self, txt: str):
         self.ui.statusLbl.setText(txt)
+        # Mirror progress into the iOS home indicator when in iOS theme
+        try:
+            if self.is_ios_theme() and txt:
+                self.ios_home.show_process_status(txt)
+        except Exception:
+            pass
     def update_bar(self, percent):
         self.ui.restoreProgressBar.setValue(int(percent))
     def on_removeTweaksBtn_clicked(self):
@@ -580,35 +582,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_applyTweaksBtn_clicked(self):
         self.apply_changes()
 
-    @QtCore.Slot()
-    def on_revertLastApplyBtn_clicked(self):
-        if not self.apply_in_progress:
-            self.apply_in_progress = True
-            self.toggle_thread_btns(disabled=True)
-            self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, revert_last_apply_only=True)
-            self.worker_thread.progress.connect(self.ui.statusLbl.setText)
-            self.worker_thread.alert.connect(self.alert_message)
-            self.worker_thread.finished_with_result.connect(self.finish_apply_thread)
-            self.worker_thread.finished.connect(self.worker_thread.deleteLater)
-            self.worker_thread.start()
-
-    def capture_originals(self):
-        if not self.apply_in_progress:
-            self.apply_in_progress = True
-            self.toggle_thread_btns(disabled=True)
-            self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, capture_only=True)
-            self.worker_thread.progress.connect(self.ui.statusLbl.setText)
-            self.worker_thread.alert.connect(self.alert_message)
-            self.worker_thread.finished_with_result.connect(self.finish_apply_thread)
-            self.worker_thread.finished.connect(self.worker_thread.deleteLater)
-            self.worker_thread.start()
-
     def apply_changes(self, reset_pages: list=None):
         if not self.apply_in_progress:
             self.apply_in_progress = True
             self.toggle_thread_btns(disabled=True)
             self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, reset_pages=reset_pages)
-            self.worker_thread.progress.connect(self.ui.statusLbl.setText)
+            self.worker_thread.progress.connect(self.update_label)
             self.worker_thread.alert.connect(self.alert_message)
             self.worker_thread.finished_with_result.connect(self.finish_apply_thread)
             self.worker_thread.finished.connect(self.worker_thread.deleteLater)
@@ -636,9 +615,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.apply_in_progress = False
         self.toggle_thread_btns(disabled=False)
         self.update_pb_saved_ids_list()
+        worker = getattr(self, 'worker_thread', None)
+        is_reset = worker is not None and worker.reset_pages is not None
+        # Show completion indicator on the iOS home page
+        try:
+            if self.is_ios_theme():
+                if success:
+                    self.ios_home.show_process_status(
+                        QCoreApplication.tr("Reset complete!") if is_reset else QCoreApplication.tr("Apply complete!"),
+                        success=True)
+                else:
+                    self.ios_home.show_process_status(
+                        QCoreApplication.tr("Operation failed"), success=False)
+        except Exception:
+            pass
         if success:
-            worker = getattr(self, 'worker_thread', None)
-            if worker is not None and worker.reset_pages is None and not worker.capture_only and not worker.revert_last_apply_only:
+            if worker is not None and not is_reset:
                 self.prompt_star_on_github()
         else:
             # Show error notification if not already shown via alert
@@ -674,6 +666,5 @@ class MainWindow(QtWidgets.QMainWindow):
         if disabled or not self.apply_in_progress:
             self.ui.applyTweaksBtn.setDisabled(disabled)
             self.ui.removeTweaksBtn.setDisabled(disabled)
-            self.ui.revertLastApplyBtn.setDisabled(disabled)
         if disabled or not self.refresh_in_progress:
             self.ui.refreshBtn.setDisabled(disabled)

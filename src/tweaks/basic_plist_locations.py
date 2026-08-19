@@ -1,10 +1,6 @@
 from enum import Enum
 
 class FileLocation(Enum):
-    # Mobile Gestalt
-    resolution = "/var/Managed Preferences/mobile/com.apple.iokit.IOMobileGraphicsFamily.plist"
-    mga = "/var/containers/Shared/SystemGroup/systemgroup.com.apple.mobilegestaltcache/Library/Caches/com.apple.MobileGestalt.plist"
-
     # Feature Flags
     featureflags = "/var/preferences/FeatureFlags/Global.plist"
     
@@ -27,6 +23,3 @@ class FileLocation(Enum):
     # Daemons
     disabledDaemons = "/var/db/com.apple.xpc.launchd/disabled.plist"
     screentime = "/var/mobile/Library/Preferences/com.apple.ScreenTimeAgent.plist"
-
-    # Risky Options
-    ota = "/var/Managed Preferences/mobile/com.apple.MobileAsset.plist"

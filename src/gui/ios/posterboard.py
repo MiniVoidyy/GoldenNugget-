@@ -1,14 +1,13 @@
 from PySide6.QtCore import Qt, QSize, QCoreApplication
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout,
-    QPushButton, QScrollArea, QToolButton, QStackedWidget, QSizePolicy,
-    QCheckBox, QComboBox
+    QPushButton, QScrollArea, QToolButton, QStackedWidget,
+    QCheckBox
 )
 from PySide6.QtGui import QPixmap, QIcon
 
-from src.gui.ios.components import IOSNavBar, IOSCard, IOSPrimaryButton, IOSSettingsRow, IOSSwitch
+from src.gui.ios.components import IOSNavBar, IOSCard, IOSPrimaryButton
 from src.tweaks.tweaks import tweaks, TweakID
-from src.qt.mainwindow_ui import Ui_Nugget
 
 
 class TemplatePreviewCard(QLabel):

@@ -50,51 +50,6 @@ class MbdbRecord:
     flags: int
     properties: list
 
-    @classmethod
-    def from_stream(cls, d: BytesIO):
-        #d = BytesIO(data)
-
-        domain_len = int.from_bytes(d.read(2), "big")
-        domain = d.read(domain_len).decode("utf-8")
-
-        filename_len = int.from_bytes(d.read(2), "big")
-        filename = d.read(filename_len).decode("utf-8")
-
-        link_len = int.from_bytes(d.read(2), "big")
-        link = d.read(link_len).decode("utf-8") if link_len != 0xffff else ""
-
-        hash_len = int.from_bytes(d.read(2), "big")
-        hash = d.read(hash_len) if hash_len != 0xffff else b""
-
-        key_len = int.from_bytes(d.read(2), "big")
-        key = d.read(key_len) if key_len != 0xffff else b""
-
-        mode = _FileMode(int.from_bytes(d.read(2), "big"))
-        #unknown2 = int.from_bytes(d.read(4), "big")
-        #unknown3 = int.from_bytes(d.read(4), "big")
-        inode = int.from_bytes(d.read(8), "big")
-        user_id = int.from_bytes(d.read(4), "big")
-        group_id = int.from_bytes(d.read(4), "big")
-        mtime = int.from_bytes(d.read(4), "big")
-        atime = int.from_bytes(d.read(4), "big")
-        ctime = int.from_bytes(d.read(4), "big")
-        size = int.from_bytes(d.read(8), "big")
-        flags = int.from_bytes(d.read(1), "big")
-
-        properties_count = int.from_bytes(d.read(1), "big")
-        properties = []
-
-        for _ in range(properties_count):
-            name_len = int.from_bytes(d.read(2), "big")
-            name = d.read(name_len).decode("utf-8") if name_len != 0xffff else ""
-
-            value_len = int.from_bytes(d.read(2), "big")
-            value = d.read(value_len).decode("utf-8") if value_len != 0xffff else ""
-
-            properties.append((name, value))
-
-        return cls(domain, filename, link, hash, key, mode, inode, user_id, group_id, mtime, atime, ctime, size, flags, properties)
-    
     def to_bytes(self) -> bytes:
         d = BytesIO()
 
@@ -140,22 +95,6 @@ class MbdbRecord:
 class Mbdb:
     records: list[MbdbRecord]
 
-    @classmethod
-    def from_bytes(cls, data: bytes):
-        d = BytesIO(data)
-
-        if d.read(4) != b"mbdb":
-            raise ValueError("Invalid MBDB file")
-
-        if d.read(2) != b"\x05\x00":
-            raise ValueError("Invalid MBDB version")
-
-        records = []
-        while d.tell() < len(data):
-            records.append(MbdbRecord.from_stream(d))
-
-        return cls(records)
-    
     def to_bytes(self) -> bytes:
         d = BytesIO()
 

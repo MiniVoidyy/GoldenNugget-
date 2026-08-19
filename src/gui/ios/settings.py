@@ -70,12 +70,6 @@ class IOSSettingsPage(QWidget):
         pref = self.window.device_manager.pref_manager
 
         self._make_switch(
-            QCoreApplication.translate("Nugget", "Allow Applying Over WiFi"),
-            pref.apply_over_wifi,
-            self._make_setting_handler("apply_over_wifi"),
-        )
-
-        self._make_switch(
             QCoreApplication.translate("Nugget", "Auto Reboot After Applying"),
             pref.auto_reboot,
             self._make_setting_handler("auto_reboot"),
@@ -110,22 +104,10 @@ class IOSSettingsPage(QWidget):
             self._make_setting_handler("auto_refresh_posterboard"),
         )
 
-        self._make_switch(
-            QCoreApplication.translate("IOSSettingsPage", "Rebuild SpringBoard State DB"),
-            pref.rebuild_sb_application_state_db,
-            lambda checked: setattr(pref, "rebuild_sb_application_state_db", checked),
-        )
-
         self._make_pb_setup_section()
 
         # Backup
         self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "Backup")))
-
-        self._make_switch(
-            QCoreApplication.translate("Nugget", "Restore TrustStore (SSL Configuration Profiles)"),
-            pref.restore_truststore,
-            self._make_setting_handler("restore_truststore"),
-        )
 
         self._make_switch(
             QCoreApplication.translate("IOSSettingsPage", "Use Encrypted Backups (Experimental)"),
@@ -157,9 +139,6 @@ class IOSSettingsPage(QWidget):
         # Presets
         self._make_presets_section()
 
-        # Original Plists
-        self._make_originals_section()
-
         # About
         self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "About")))
 
@@ -168,7 +147,6 @@ class IOSSettingsPage(QWidget):
         self.content_layout.addWidget(about_btn)
 
         self.refresh_presets()
-        self.update_originals_status()
         self.content_layout.addStretch()
 
     # ---------- helpers ----------
@@ -229,7 +207,7 @@ class IOSSettingsPage(QWidget):
             QDialog, QInputDialog { background-color: #1e1e1e; }
             QLabel { color: #FFFFFF; font-size: 15px; }
             QLineEdit {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -270,7 +248,7 @@ class IOSSettingsPage(QWidget):
         self.lang_drp = QComboBox()
         self.lang_drp.setStyleSheet("""
             QComboBox {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -349,7 +327,7 @@ class IOSSettingsPage(QWidget):
         self.saved_ids_list = QListWidget()
         self.saved_ids_list.setStyleSheet("""
             QListWidget {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 8px;
                 color: #e8e8e8;
@@ -488,7 +466,7 @@ class IOSSettingsPage(QWidget):
         for edit in (self.preset_name_txt, self.preset_desc_txt):
             edit.setStyleSheet("""
                 QLineEdit {
-                    background-color: #3b3b3b;
+                    background-color: #1C1C1E;
                     border: none;
                     border-radius: 10px;
                     color: #FFFFFF;
@@ -507,7 +485,7 @@ class IOSSettingsPage(QWidget):
         self.preset_list = QListWidget()
         self.preset_list.setStyleSheet("""
             QListWidget {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 8px;
                 color: #e8e8e8;
@@ -676,91 +654,6 @@ class IOSSettingsPage(QWidget):
         import os
         import sys
         os.execl(sys.executable, sys.executable, *sys.argv)
-
-    # ---------- original plists ----------
-
-    def _make_originals_section(self):
-        self.content_layout.addWidget(IOSSectionHeader(
-            QCoreApplication.translate("IOSSettingsPage", "Original Plists")
-        ))
-
-        card = IOSCard()
-        originals_layout = QVBoxLayout(card)
-        originals_layout.setContentsMargins(16, 12, 16, 12)
-        originals_layout.setSpacing(8)
-
-        desc = QLabel(QCoreApplication.translate(
-            "IOSSettingsPage",
-            "Back up the system plists Nugget overwrites so Reset can restore your "
-            "original settings instead of empty ones. Save from a clean (just "
-            "restored) device for the best result. Saved files only apply to "
-            "devices of the same model and iOS build."))
-        desc.setWordWrap(True)
-        desc.setStyleSheet("color: #8E8E93; font-size: 13px;")
-        originals_layout.addWidget(desc)
-
-        self.originals_status_lbl = QLabel("")
-        self.originals_status_lbl.setStyleSheet("color: #e8a33d; font-size: 13px;")
-        originals_layout.addWidget(self.originals_status_lbl)
-
-        btns = QHBoxLayout()
-        save_btn = self._make_mini_button(QCoreApplication.translate("IOSSettingsPage", "Save Originals"))
-        save_btn.clicked.connect(self._on_originals_save)
-        delete_btn = self._make_mini_button(QCoreApplication.translate("IOSSettingsPage", "Delete Originals"))
-        delete_btn.clicked.connect(self._on_originals_delete)
-        btns.addWidget(save_btn)
-        btns.addWidget(delete_btn)
-        originals_layout.addLayout(btns)
-
-        self.content_layout.addWidget(card)
-
-    def update_originals_status(self):
-        model = self.window.device_manager.get_current_device_model()
-        build = self.window.device_manager.get_current_device_build()
-        originals = {}
-        if model and build:
-            originals = self.window.device_manager.pref_manager.get_original_plists(model, build)
-        if originals:
-            self.originals_status_lbl.setText(QCoreApplication.translate(
-                "IOSSettingsPage", "Saved: {0} files for {1} ({2})").format(len(originals), model, build))
-            self.originals_status_lbl.setStyleSheet("color: #7ed67e; font-size: 13px;")
-        else:
-            self.originals_status_lbl.setText(QCoreApplication.translate(
-                "IOSSettingsPage", "Not saved yet. Connect a clean device and tap \"Save Originals\"."))
-            self.originals_status_lbl.setStyleSheet("color: #e8a33d; font-size: 13px;")
-
-    def _on_originals_save(self):
-        if not self.window.device_manager.get_current_device_udid():
-            QMessageBox.warning(
-                self, QCoreApplication.translate("IOSSettingsPage", "Save Originals"),
-                QCoreApplication.translate("QCoreApplication", "Please connect a device."))
-            return
-        confirm = QMessageBox.question(
-            self, QCoreApplication.translate("IOSSettingsPage", "Save Originals"),
-            QCoreApplication.translate(
-                "IOSSettingsPage",
-                "Back up the current device's original plists?\n\n"
-                "This may take a few minutes and the device may ask for its passcode. "
-                "Save from a clean (just restored) device for the best result."))
-        if confirm != QMessageBox.StandardButton.Yes:
-            return
-        self.window.capture_originals()
-
-    def _on_originals_delete(self):
-        model = self.window.device_manager.get_current_device_model()
-        build = self.window.device_manager.get_current_device_build()
-        if not model or not build:
-            return
-        confirm = QMessageBox.question(
-            self, QCoreApplication.translate("IOSSettingsPage", "Delete Originals"),
-            QCoreApplication.translate(
-                "IOSSettingsPage",
-                "Delete the saved original plists for {0} ({1})?\n\n"
-                "Reset will fall back to writing empty plists.").format(model, build))
-        if confirm != QMessageBox.StandardButton.Yes:
-            return
-        self.window.device_manager.pref_manager.remove_original_plists(model, build)
-        self.update_originals_status()
 
     # ---------- about ----------
 

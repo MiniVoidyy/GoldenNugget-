@@ -1,5 +1,5 @@
 from PySide6.QtCore import QCoreApplication
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel, QFrame
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel
 
 from src.gui.ios.components import IOSNavBar, IOSSectionHeader, IOSCard, IOSSwitch
 from src.tweaks.tweaks import tweaks, TweakID

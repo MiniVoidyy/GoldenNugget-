@@ -1,6 +1,5 @@
 from .tweaks import tweaks, TweakID
 from .tweak_classes import FeatureFlagTweak, BasicPlistTweak, FileLocation, AdvancedPlistTweak, NullifyFileTweak
-from src.devicemanagement.constants import Version
 
 
 def load_featureflags():
@@ -283,12 +282,3 @@ def load_daemons():
         TweakID.ClearScreenTimeAgentPlist: NullifyFileTweak(FileLocation.screentime),
     }
     tweaks.update(additional_tweaks)
-
-
-def load_all_tweaks(version: str):
-    # iOS 26.2+ (iOS 27 era) - all tweaks available
-    load_featureflags()
-    load_internal()
-    load_liquidglass()
-    load_springboard()
-    load_daemons()

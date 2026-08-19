@@ -1,5 +1,4 @@
 from PySide6.QtCore import Signal, QThread
-from .apply_worker import ApplyAlertMessage
 
 class PBDBThread(QThread):
     progress = Signal(float)

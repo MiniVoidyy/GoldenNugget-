@@ -79,9 +79,6 @@ class TweakID(Enum):
     IgnoreSolariumOptOut = auto()
     DisableSpecularEverywhere = auto()
 
-    # risky
-    DisableOTAFile = auto()
-    CustomResolution = auto()
     # daemons
     Daemons = auto()
     ClearScreenTimeAgentPlist = auto()

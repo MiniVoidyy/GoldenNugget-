@@ -1,5 +1,4 @@
 import asyncio
-import hashlib
 import os
 import plistlib
 import shutil
@@ -7,14 +6,13 @@ import ssl
 import tempfile
 import time
 
-from . import backup, perform_restore, reboot_device
+from . import backup, perform_restore
 from .mbdb import _FileMode
 from .protective import (
     clean_backup_for_restore,
     inject_file_into_backup,
     log_error,
     log_info,
-    log_warn,
     perform_protective_backup,
 )
 from pymobiledevice3.lockdown import LockdownClient, create_using_usbmux
@@ -192,55 +190,6 @@ _HOME_DOMAIN_TWEAK_PATHS = (
 _SYSTEM_PREFERENCES_TWEAK_PATHS = (
     "FeatureFlags/Global.plist",  # Status Bar (Speakeasy) feature flag override
 )
-
-
-def _validate_sqlite_db(db_path: str) -> bool:
-    """Check if a file is a valid SQLite database."""
-    if not os.path.exists(db_path) or os.path.getsize(db_path) < 100:
-        return False
-    try:
-        import sqlite3 as _sqlite3
-        conn = _sqlite3.connect(db_path)
-        conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
-        conn.close()
-        return True
-    except _sqlite3.DatabaseError:
-        return False
-
-
-def _read_manifest_plist(device_dir: str, domain: str, rel_path: str):
-    """Load a plist the way the fresh backup stored it (payload <aa>/<fileID>)."""
-    import sqlite3 as _sqlite3
-    manifest_path = os.path.join(device_dir, "Manifest.db")
-    if not _validate_sqlite_db(manifest_path):
-        log_error(f"Manifest.db at {manifest_path} is not a valid SQLite database.")
-        return {}
-    file_id = hashlib.sha1(f"{domain}-{rel_path}".encode("utf-8")).hexdigest()
-    payload = os.path.join(device_dir, file_id[:2], file_id)
-    conn = _sqlite3.connect(manifest_path)
-    try:
-        row = conn.execute(
-            "SELECT file FROM Files WHERE fileID = ?", (file_id,)
-        ).fetchone()
-    finally:
-        conn.close()
-    data = None
-    if os.path.exists(payload):
-        data = open(payload, "rb").read()
-    if data is None and row is not None and row[0] is not None:
-        try:
-            blob = plistlib.loads(row[0])
-            if "Digest" in blob["$objects"][1]:
-                digest = blob["$objects"][blob["$objects"][1]["Digest"]]
-                data = bytes(digest)
-        except Exception:
-            data = None
-    if data is None:
-        return {}
-    try:
-        return plistlib.loads(data)
-    except Exception:
-        return {}
 
 
 def _scaled_callback(progress_callback, lo: float, hi: float):
@@ -477,7 +426,6 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
     # add the file paths
     last_domain = ""
     last_path = ""
-    exploit_only = True
     # extra check for system version to prevent sparserestore from restoring on iOS 18.1+
     passed_version_check = has_sparserestore_capability(lockdown_client)
     for file in sorted_files:
@@ -486,7 +434,6 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
                 last_domain = concat_exploit_file(file, files_list, last_domain)
         else:
             last_domain, last_path = concat_regular_file(file, files_list, last_domain, last_path)
-            exploit_only = False
             # add the app bundle to the list
             if last_domain.startswith("AppDomain"):
                 bundle_id = last_domain.removeprefix("AppDomain-")
@@ -517,45 +464,8 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
                         )
                         active_bundle_ids.append(bundle_id)
 
-    # crash the restore to skip the setup (only works for exploit files, NOT on iOS 27+)
-    # iOS 26.2+ (iOS 27 era) doesn't need this
-
     # create the backup
     back = backup.Backup(files=files_list, apps=apps_list)
 
     # iOS 26.2+ (iOS 27 era) uses three-phase protective backup + restore
     await _restore_ios27(back, reboot, lockdown_client, progress_callback, backup_password=backup_password)
-
-
-def restore_file(fp: str, restore_path: str, restore_name: str, reboot: bool = False, lockdown_client: LockdownClient = None):
-    # open the file and read the contents
-    contents = open(fp, "rb").read()
-
-    base_path = "/var/mobile/backup"
-
-    # create the backup
-    back = backup.Backup(files=[
-        # backup.Directory("", "HomeDomain"),
-        # backup.Directory("Library", "HomeDomain"),
-        # backup.Directory("Library/Preferences", "HomeDomain"),
-        # backup.ConcreteFile("Library/Preferences/temp", "HomeDomain", owner=501, group=501, contents=contents, inode=0),
-        backup.Directory(
-                "",
-                f"SysContainerDomain-../../../../../../../..{base_path}{restore_path}",
-                owner=501,
-                group=501
-            ),
-        backup.ConcreteFile(
-                "",
-                f"SysContainerDomain-../../../../../../../..{base_path}{restore_path}{restore_name}",
-                owner=501,
-                group=501,
-                contents=contents#b"",
-                # inode=0
-            ),
-    ])
-
-    try:
-        asyncio.run(perform_restore(backup=back, reboot=reboot, lockdown_client=lockdown_client))
-    except (ConnectionTerminatedError, ssl.SSLEOFError, ConnectionAbortedError, ConnectionResetError):
-        pass

@@ -44,7 +44,6 @@ class PBHelpDialog(QDialog):
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QToolButton, QSizePolicy, QScrollArea, QFrame
 from PySide6.QtGui import QFont, QIcon, QPixmap, QDesktopServices
 from PySide6.QtCore import QSize, Qt, QUrl
-from PySide6.QtCore import QStandardPaths
 
 from webbrowser import open_new_tab
 
@@ -210,14 +209,6 @@ class AboutProgramDialog(QDialog):
         github_btn.setStyleSheet("QToolButton { color: #007AFF; font-size: 14px; font-weight: 500; background: none; border: none; padding: 4px 8px; } QToolButton:hover { text-decoration: underline; }")
         github_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/awesomenull-dev/GoldenNugget")))
         links_layout.addWidget(github_btn)
-        
-        discord_btn = QToolButton()
-        discord_btn.setText("Discord")
-        discord_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        discord_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        discord_btn.setStyleSheet("QToolButton { color: #007AFF; font-size: 14px; font-weight: 500; background: none; border: none; padding: 4px 8px; } QToolButton:hover { text-decoration: underline; }")
-        discord_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://discord.gg/gWtzTVhMvh")))
-        links_layout.addWidget(discord_btn)
         
         website_btn = QToolButton()
         website_btn.setText("Wallpapers")

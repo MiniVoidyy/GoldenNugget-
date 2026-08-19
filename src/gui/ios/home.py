@@ -1,7 +1,7 @@
-from PySide6.QtCore import Qt, QCoreApplication, Slot
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtCore import Qt, QCoreApplication, Slot, QTimer
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QMenu, QComboBox, QFrame
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox, QFrame
 )
 
 from src.gui.ios.components import IOSCard, IOSPrimaryButton
@@ -238,10 +238,13 @@ class IOSHomePage(QWidget):
         reset_btn.clicked.connect(self.reset_tweaks)
         layout.addWidget(reset_btn)
 
-        # Revert Last Apply button
-        revert_btn = IOSPrimaryButton(QCoreApplication.translate("IOSHomePage", "Revert Last Apply"))
-        revert_btn.clicked.connect(self.revert_last_apply)
-        layout.addWidget(revert_btn)
+        # Process status indicator (apply/reset progress + completion)
+        self.process_status_lbl = QLabel("", self)
+        self.process_status_lbl.setWordWrap(True)
+        self.process_status_lbl.setAlignment(Qt.AlignCenter)
+        self.process_status_lbl.setStyleSheet("font-size: 14px; font-weight: 600; color: #30D158;")
+        self.process_status_lbl.hide()
+        layout.addWidget(self.process_status_lbl)
 
         layout.addStretch()
 
@@ -256,9 +259,7 @@ class IOSHomePage(QWidget):
             devices = self.window.device_manager.devices
             if devices:
                 for device in devices:
-                    tag = ""
-                    if self.window.device_manager.pref_manager.apply_over_wifi:
-                        tag = " (@ USB)" if device.connected_via_usb else " (@ WiFi)"
+                    tag = " (@ USB)" if device.connected_via_usb else " (@ WiFi)"
                     self.device_combo.addItem(f"{device.name}{tag}")
             else:
                 self.device_combo.addItem(QCoreApplication.translate("QCoreApplication", "No Device"))
@@ -300,9 +301,26 @@ class IOSHomePage(QWidget):
             pages = [Page.Posterboard, Page.Tweaks, Page.Springboard, Page.Daemons, Page.StatusBar]
             self.window.apply_changes(reset_pages=pages)
 
-    def revert_last_apply(self):
-        """Revert last apply."""
-        self.window.revert_last_apply()
+    def show_process_status(self, text: str, success: bool = None):
+        """Show a status message for apply/reset operations.
+
+        ``success``: True -> green, False -> red, None -> neutral progress.
+        The message auto-hides after a few seconds.
+        """
+        if success is True:
+            color = "#30D158"
+        elif success is False:
+            color = "#FF453A"
+        else:
+            color = "#007AFF"
+        self.process_status_lbl.setStyleSheet(
+            f"font-size: 14px; font-weight: 600; color: {color};")
+        self.process_status_lbl.setText(text)
+        self.process_status_lbl.show()
+        QTimer.singleShot(6000, self.hide_process_status)
+
+    def hide_process_status(self):
+        self.process_status_lbl.hide()
 
     def update_status(self):
         try:

@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, QCoreApplication
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QDialog, QDialogButtonBox,
-    QLineEdit, QSpinBox, QFormLayout, QLabel, QHBoxLayout, QFrame
+    QLineEdit, QSpinBox, QLabel, QHBoxLayout, QFrame
 )
 
 from src.gui.ios.components import (
@@ -28,7 +28,7 @@ class TextInputDialog(QDialog):
             }
             QLabel { color: #FFFFFF; font-size: 15px; }
             QLineEdit {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -89,7 +89,7 @@ class NumberInputDialog(QDialog):
             QDialog { background-color: #1e1e1e; }
             QLabel { color: #FFFFFF; font-size: 15px; }
             QSpinBox {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -120,7 +120,7 @@ class NumberInputDialog(QDialog):
         self.spin.setButtonSymbols(QSpinBox.NoButtons)
         self.spin.setStyleSheet("""
             QSpinBox {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -327,10 +327,6 @@ class IOSTweaksPage(QWidget):
         make_switch(TweakID.EnableWakeGestureHaptic, QCoreApplication.translate("Nugget", "Vibrate on Raise-to-Wake"))
         make_switch(TweakID.PlaySoundOnPaste, QCoreApplication.translate("Nugget", "Play Sound on Paste"))
         make_switch(TweakID.AnnounceAllPastes, QCoreApplication.translate("Nugget", "Show Notifications for System Pastes"))
-
-        # Risky / Advanced
-        content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Risky Options")))
-        make_switch(TweakID.DisableOTAFile, QCoreApplication.translate("Nugget", "Disable OTA Updates (file)"))
 
         content_layout.addStretch()
 

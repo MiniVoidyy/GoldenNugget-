@@ -1,8 +1,6 @@
 from PySide6.QtCore import Qt, QCoreApplication, Signal as pyqtSignal
-from PySide6.QtGui import QFontDatabase, QFont, QIcon
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFrame, QDialog,
-    QDialogButtonBox, QLineEdit, QSpinBox, QFormLayout, QScrollArea
+    QWidget, QHBoxLayout, QLabel, QPushButton, QFrame,
 )
 
 

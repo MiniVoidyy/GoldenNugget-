@@ -2,16 +2,15 @@ import base64
 import json
 import os
 import time
-from datetime import datetime
-from typing import Optional, Any
+from typing import Optional
 
-from PySide6.QtCore import QStandardPaths, QCoreApplication
+from PySide6.QtCore import QStandardPaths
 
 from src.tweaks.tweak_names import TweakID
 from src.tweaks import tweak_loader
 from src.tweaks.tweaks import tweaks
 from src.tweaks.tweak_classes import (
-    FeatureFlagTweak, BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak,
+    BasicPlistTweak, AdvancedPlistTweak,
 )
 from src.tweaks.posterboard.posterboard_tweak import PosterboardTweak
 from src.tweaks.posterboard.template_options.templates_tweak import TemplatesTweak

@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt, QCoreApplication
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel, QFrame,
+    QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel,
     QDialog, QDialogButtonBox, QLineEdit, QSpinBox
 )
 
@@ -21,7 +21,7 @@ class _TextDialog(QDialog):
             QDialog { background-color: #1e1e1e; }
             QLabel { color: #FFFFFF; font-size: 15px; }
             QLineEdit {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -65,7 +65,7 @@ class _NumDialog(QDialog):
             QDialog { background-color: #1e1e1e; }
             QLabel { color: #FFFFFF; font-size: 15px; }
             QSpinBox {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -94,7 +94,7 @@ class _NumDialog(QDialog):
         self.spin.setButtonSymbols(QSpinBox.NoButtons)
         self.spin.setStyleSheet("""
             QSpinBox {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;

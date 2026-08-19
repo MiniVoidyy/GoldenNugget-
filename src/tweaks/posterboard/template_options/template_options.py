@@ -1,6 +1,5 @@
 from enum import Enum
 from dataclasses import dataclass
-from shutil import rmtree
 from typing import Optional
 from PySide6.QtWidgets import QVBoxLayout, QWidget, QLabel
 
