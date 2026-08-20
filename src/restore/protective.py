@@ -83,6 +83,55 @@ def check_disk_space(path: str = None, min_free_bytes: int = None) -> None:
         )
     return usage
 
+
+async def _get_device_used_storage(lockdown_client) -> Optional[int]:
+    """Return the device's used data storage in bytes, or ``None`` if unreadable.
+
+    Queries the diagnostics relay's ``All`` report. ``TotalDataCapacity`` is the
+    total size of the data partition and ``TotalDataSpace`` is its free space, so
+    the difference is how much data a full device backup would carry. A full
+    backup mirrors roughly the used capacity, so this is the disk space a backup
+    needs to be written to the computer without exhausting it.
+    """
+    try:
+        from pymobiledevice3.services.diagnostics import DiagnosticsService
+        async with DiagnosticsService(lockdown_client) as diag:
+            report = await diag.info("All")
+        if not isinstance(report, dict):
+            return None
+        capacity = report.get("TotalDataCapacity")
+        free = report.get("TotalDataSpace")
+        if capacity is None or free is None:
+            nested = report.get("DiskUsage")
+            if isinstance(nested, dict):
+                capacity = nested.get("TotalDataCapacity", capacity)
+                free = nested.get("TotalDataSpace", free)
+        if capacity is None or free is None:
+            return None
+        used = int(capacity) - int(free)
+        return used if used > 0 else None
+    except Exception:
+        return None
+
+
+async def check_disk_space_for_backup(lockdown_client=None, path: str = None,
+                                      min_free_bytes: int = None) -> int:
+    """Check free disk space before a device backup, sized to the device's data.
+
+    The required free space is derived from the amount of data actually stored
+    on the device (a full backup mirrors used capacity), never below the
+    ``MIN_FREE_DISK_GB`` floor. If the device cannot be queried, the floor is
+    used. Returns the required free space in bytes that was enforced.
+    """
+    if min_free_bytes is None:
+        min_free_bytes = _min_free_disk_bytes()
+        if lockdown_client is not None:
+            used = await _get_device_used_storage(lockdown_client)
+            if used is not None:
+                min_free_bytes = max(min_free_bytes, used)
+    check_disk_space(path=path, min_free_bytes=min_free_bytes)
+    return min_free_bytes
+
 # Bump SSL handshake timeout — the default 10 seconds is too short for
 # mobilebackup2 service startup on busy or post-reboot devices (iOS 27+).
 # Importing this module applies it process-wide.
@@ -392,7 +441,7 @@ async def perform_protective_backup(
 
     is_encrypted = False
 
-    check_disk_space(path=backup_root)
+    await check_disk_space_for_backup(lockdown_client, path=backup_root)
 
     shutil.rmtree(backup_root, ignore_errors=True)
     Path(backup_root).mkdir(parents=True, exist_ok=True)

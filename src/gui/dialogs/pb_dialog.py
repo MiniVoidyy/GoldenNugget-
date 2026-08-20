@@ -23,7 +23,7 @@ from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 from shutil import rmtree
 
-from src.restore.protective import check_disk_space
+from src.restore.protective import check_disk_space_for_backup
 
 from src.exceptions.nugget_exception import NuggetException
 from src.devicemanagement.constants import is_supported_by_fork
@@ -48,7 +48,6 @@ async def backup_posterboard_database(udid: str, update_label=lambda x: None, up
     app_data_path = path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), 'Backups')
     if not path.exists(app_data_path):
         makedirs(app_data_path)
-    check_disk_space(path=app_data_path)
     backup_folder = path.join(app_data_path, udid)
     # check if a full backup is needed (makes it faster)
     needs_full = False
@@ -63,6 +62,8 @@ async def backup_posterboard_database(udid: str, update_label=lambda x: None, up
     for attempt in range(1, max_retries + 1):
         service_provider = await create_using_usbmux(serial=udid)
         try:
+            if attempt == 1:
+                await check_disk_space_for_backup(service_provider, path=app_data_path)
             # hard-block fetching the database from an unsupported (old) iOS version
             if not is_supported_by_fork(service_provider.all_values.get("ProductVersion", "0.0")):
                 raise NuggetException(
