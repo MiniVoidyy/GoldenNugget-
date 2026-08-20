@@ -7,19 +7,6 @@ class TweakID(Enum):
     StatusBar = auto()
     Passcode = auto()
 
-    # feature flags
-    ClockAnim = auto()
-    Lockscreen = auto()
-    SolariumFFSwiftUI = auto()
-    SolariumFFSpringBoard = auto()
-    SolariumFFIconServices = auto()
-    SolariumFFPhotos = auto()
-    SolariumFFDocumentCamera = auto()
-    SolariumFFAppleMediaServices = auto()
-    SolariumFFSharing = auto()
-    SolariumFFMail = auto()
-    KioskMode = auto()
-
     # springboard
     LockScreenFootnote = auto()
     WatchOSCompatibility = auto()

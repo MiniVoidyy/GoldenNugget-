@@ -85,11 +85,6 @@ Use at your own risk!</source>
             <translation>     Mobile Gestalt</translation>
         </message>
         <message>
-            <location line="+47" />
-            <source>    Feature Flags</source>
-            <translation>    Флаги Функций</translation>
-        </message>
-        <message>
             <location line="+32" />
             <source>    Eligibility</source>
             <translation>    Приемлемость</translation>
@@ -437,64 +432,6 @@ Note: OTA updates will be broken until this is disabled.</source>
 what you are doing.</source>
             <translation>Предупреждение: Неправильное использование этой функции может привести к невозможности загрузить iOS и потере данных. 
 Используйте только в том случае, если вы знаете, что делаете.</translation>
-        </message>
-        <message>
-            <location filename="../../gui/ios/tweaks.py" line="+318" />
-            <location filename="../mainwindow.ui" line="+133" />
-            <source>Feature Flags</source>
-            <translation>Функции особенности</translation>
-        </message>
-        <message>
-            <location filename="../mainwindow.ui" line="+168" />
-            <source>Enables an animation when the lock screen clock changes time or style.</source>
-            <translation>Включает анимацию при изменении времени или стиля часов на экране блокировки.</translation>
-        </message>
-        <message>
-            <location filename="../../gui/ios/tweaks.py" line="+1" />
-            <location filename="../mainwindow.ui" line="+3" />
-            <source>Enable Lockscreen Clock Animation</source>
-            <translation>Включить анимацию часов на экране блокировки</translation>
-        </message>
-        <message>
-            <location filename="../mainwindow.ui" line="+10" />
-            <source>Enables a button to duplicate the lock screen page in edit mode.
-Enables quickly switching lock screens by holding down and swiping.</source>
-            <translation>Включает кнопку для дублирования страницы экрана блокировки в режиме редактирования.
-Включает быстрое переключение экранов блокировки путем удержания и пролистывания.</translation>
-        </message>
-        <message>
-            <location filename="../../gui/ios/tweaks.py" line="+1" />
-            <location filename="../mainwindow.ui" line="+4" />
-            <source>Enable Duplicate Lockscreen Button and Lockscreen Quickswitch</source>
-            <translation>Включить кнопку дублирования экрана блокировки и быстрое переключение экрана блокировки</translation>
-        </message>
-        <message>
-            <location filename="../mainwindow.ui" line="+28" />
-            <source>Revert the photos app to the iOS 17 style.
-
-Does not work on iOS 18.0 RC.</source>
-            <translation>Вернуть приложение «Фото» к стилю iOS 17.
-
-Не работает на iOS 18.0 RC.</translation>
-        </message>
-        <message>
-            <location line="+5" />
-            <source>Enable Old Photo UI</source>
-            <translation>Включить интерфейс старых фотографий</translation>
-        </message>
-        <message>
-            <location line="+10" />
-            <source>Enable the new Siri UI.
-
-Only works on iOS 18.0 beta 1-2.</source>
-            <translation>Включить новый интерфейс Siri.
-
-Работает только на iOS 18.0 beta 1-2.</translation>
-        </message>
-        <message>
-            <location line="+5" />
-            <source>Enable Apple Intelligence</source>
-            <translation>Включить Apple Intelligence</translation>
         </message>
         <message>
             <location line="+101" />
@@ -2740,39 +2677,10 @@ bl_sbx</translation>
             <translation>Включить Dynamic Island (Альтернативный способ)</translation>
         </message>
         <message>
-            <location line="+604" />
-            <source>Create Feature Flags Folder</source>
-            <translation>Создать папку Флаги Функций</translation>
-        </message>
-        <message>
             <location line="+7" />
             <location line="+520" />
             <source>^ Enable this if Feature Flag/Eligibility tweaks do not apply</source>
             <translation>^ Включите это если твики Флаги Функций/Приемлемости не применяются</translation>
-        </message>
-        <message>
-            <location filename="../../gui/ios/tweaks.py" line="+9" />
-            <location filename="../mainwindow.ui" line="-492" />
-            <source>Disable Solarium (Liquid Glass) (Feature Flag Method)</source>
-            <translation>Выключить Solarium (Жидкое Стекло) (Способ Флаги Функций)</translation>
-        </message>
-        <message>
-            <location line="+3" />
-            <location filename="../mainwindow.ui" line="+10" />
-            <source>Disable Liquid Glass in Documents Camera</source>
-            <translation>Выключить жидкое стекло в галереи камеры</translation>
-        </message>
-        <message>
-            <location line="+3" />
-            <location filename="../mainwindow.ui" line="+10" />
-            <source>Disable Liquid Glass in Share Sheet</source>
-            <translation>Выключить жидкое стекло во вкладке поделиться</translation>
-        </message>
-        <message>
-            <location line="-9" />
-            <location filename="../mainwindow.ui" line="+10" />
-            <source>Enable Kiosk Mode</source>
-            <translation>Включить режим Kiosk</translation>
         </message>
         <message>
             <location filename="../mainwindow.ui" line="+455" />

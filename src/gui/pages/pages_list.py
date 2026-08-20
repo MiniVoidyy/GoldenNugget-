@@ -5,26 +5,24 @@ from src.devicemanagement.constants import Version
 class Page(Enum):
     Home = 0
     Gestalt = 1
-    FeatureFlags = 2
-    EUEnabler = 3
-    StatusBar = 4
-    Springboard = 5
-    InternalOptions = 6
-    LiquidGlass = 7
-    Daemons = 8
-    Posterboard = 9
-    Templates = 10
-    Passcode = 11
-    RiskyTweaks = 12
-    Tweaks = 13
-    Apply = 14
-    Settings = 15
+    EUEnabler = 2
+    StatusBar = 3
+    Springboard = 4
+    InternalOptions = 5
+    LiquidGlass = 6
+    Daemons = 7
+    Posterboard = 8
+    Templates = 9
+    Passcode = 10
+    RiskyTweaks = 11
+    Tweaks = 12
+    Apply = 13
+    Settings = 14
 
     def getPageName(self) -> str:
         name_map = [
             "Home",
             "Mobile Gestalt",
-            "Feature Flags",
             "Eligibility",
             "Status Bar",
             "Springboard",
@@ -49,9 +47,5 @@ def get_resettable_pages(device_manager) -> list[Page]:
     # so the feature is hidden on iOS 27+
     if device_ver < Version("27.0"):
         page_list.insert(0, Page.StatusBar)
-
-    # add the exploit related pages
-    if not device_manager.get_current_device_patched():
-        page_list.insert(0, Page.FeatureFlags)
 
     return page_list

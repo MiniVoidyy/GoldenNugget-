@@ -58,7 +58,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.euEnablerPageBtn.hide()
         self.ui.enableiPadOSChk.hide()
         self.ui.ipadOSAlphaWarningLbl.hide()
-        self.ui.featureFlagsPageBtn.hide()
         self.ui.statusBarPageBtn.hide()
         self.ui.springboardOptionsPageBtn.hide()
         self.ui.internalOptionsPageBtn.hide()
@@ -74,7 +73,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pages = {
             Page.Home: Pages.Home(window=self, ui=self.ui),
             Page.Posterboard: Pages.Posterboard(window=self, ui=self.ui),
-            Page.FeatureFlags: Pages.FeatureFlags(ui=self.ui),
             Page.StatusBar: Pages.StatusBar(ui=self.ui),
             Page.Springboard: Pages.Springboard(ui=self.ui),
             Page.InternalOptions: Pages.Internal(ui=self.ui),
@@ -155,7 +153,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         ## SIDE BAR ACTIONS
         self.ui.homePageBtn.clicked.connect(self.on_homePageBtn_clicked)
-        self.ui.featureFlagsPageBtn.clicked.connect(self.on_featureFlagsPageBtn_clicked)
         self.ui.statusBarPageBtn.clicked.connect(self.on_statusBarPageBtn_clicked)
         self.ui.springboardOptionsPageBtn.clicked.connect(self.on_springboardOptionsPageBtn_clicked)
         self.ui.internalOptionsPageBtn.clicked.connect(self.on_internalOptionsPageBtn_clicked)
@@ -241,7 +238,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.sidebarDiv1.hide()
 
             self.ui.gestaltPageBtn.hide()
-            self.ui.featureFlagsPageBtn.hide()
             self.ui.statusBarPageBtn.hide()
             self.ui.springboardOptionsPageBtn.hide()
             self.ui.internalOptionsPageBtn.hide()
@@ -281,7 +277,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.sidebarDiv2.show()
             self.ui.applyPageBtn.show()
 
-            self.ui.featureFlagsPageContent.setDisabled(False)
             self.ui.springboardOptionsPageContent.setDisabled(False)
             self.ui.internalOptionsPageContent.setDisabled(False)
             self.ui.advancedOptionsPageContent.setDisabled(False)
@@ -302,7 +297,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.device_manager.set_current_device(index=index)
             # hide options that are for newer versions
             MinTweakVersions = {
-                "no_patch": [self.ui.chooseGestaltBtn, self.ui.gestaltPageBtn, self.ui.gestaltLocationLbl, self.ui.gestaltLocationTitleLbl, self.ui.featureFlagsPageBtn],
+                "no_patch": [self.ui.chooseGestaltBtn, self.ui.gestaltPageBtn, self.ui.gestaltLocationLbl, self.ui.gestaltLocationTitleLbl],
                 "exploit": [("1.0", self.ui.regularDomainsLbl)],
                 "17.4": [self.ui.supportsDIChk],
                 "18.0": [self.ui.aodChk, self.ui.aodVibrancyChk, self.ui.iphone16SettingsChk],
@@ -529,10 +524,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def on_homePageBtn_clicked(self):
         self.ui.pages.setCurrentIndex(Page.Home.value)
-    
-    def on_featureFlagsPageBtn_clicked(self):
-        self.pages[Page.FeatureFlags].load()
-        self.ui.pages.setCurrentIndex(Page.FeatureFlags.value)
     
     def on_statusBarPageBtn_clicked(self):
         self.pages[Page.StatusBar].load()

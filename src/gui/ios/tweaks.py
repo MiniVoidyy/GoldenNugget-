@@ -1,7 +1,7 @@
-from PySide6.QtCore import Qt, QCoreApplication
+from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QDialog, QDialogButtonBox,
-    QLineEdit, QSpinBox, QLabel, QHBoxLayout, QFrame
+    QLineEdit, QSpinBox, QLabel, QHBoxLayout
 )
 
 from src.gui.ios.components import (
@@ -11,7 +11,7 @@ from src.gui.ios.components import (
 from src.gui.ios.compat import is_tweak_compatible
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.tweak_loader import (
-    load_featureflags, load_internal, load_liquidglass, load_springboard
+    load_internal, load_liquidglass, load_springboard
 )
 
 
@@ -176,19 +176,7 @@ class IOSTweaksPage(QWidget):
         content_layout.setContentsMargins(16, 16, 16, 32)
         content_layout.setSpacing(8)
 
-        # Page header matching card background
-        page_header = QFrame()
-        page_header.setFixedHeight(56)
-        page_header.setStyleSheet("background-color: #1C1C1E;")
-        page_header_layout = QHBoxLayout(page_header)
-        page_header_layout.setContentsMargins(16, 8, 16, 8)
-        page_title = QLabel(QCoreApplication.translate("Nugget", "Tweaks"), page_header)
-        page_title.setStyleSheet("font-size: 17px; font-weight: 600; color: #FFFFFF;")
-        page_header_layout.addWidget(page_title, 1, Qt.AlignCenter)
-        content_layout.addWidget(page_header)
-
         # Load tweaks (idempotent) so the sections below actually populate
-        load_featureflags()
         load_internal()
         load_liquidglass()
         load_springboard()
@@ -252,31 +240,6 @@ class IOSTweaksPage(QWidget):
             card_layout.addWidget(row)
             content_layout.addWidget(card)
 
-        # Helper for grouped feature flag tweaks
-        def make_ff_group(tweak_ids: list, title: str):
-            available = [tid for tid in tweak_ids if tid in tweaks and is_compatible(tid)]
-            if not available:
-                return
-            card = IOSCard()
-            row_layout = QHBoxLayout(card)
-            row_layout.setContentsMargins(0, 0, 0, 0)
-            row_layout.setSpacing(12)
-
-            label = QLabel(title)
-            label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
-            row_layout.addWidget(label, 1)
-
-            switch = IOSSwitch(all(tweaks[tid].enabled for tid in available))
-
-            def on_toggled(checked: bool, ids=available):
-                for tid in ids:
-                    tweaks[tid].set_enabled(checked)
-
-            switch.toggled.connect(on_toggled)
-            row_layout.addWidget(switch)
-
-            content_layout.addWidget(card)
-
         # Helper for number input tweaks
         def make_number_input(tweak_id: TweakID, title: str, min_val: int = 0, max_val: int = 999):
             if tweak_id not in tweaks:
@@ -313,21 +276,6 @@ class IOSTweaksPage(QWidget):
         make_switch(TweakID.DisableSpecularMotion, QCoreApplication.translate("Nugget", "Disable Specular Motion"))
         make_switch(TweakID.DisableOuterRefraction, QCoreApplication.translate("Nugget", "Disable Outer Refraction"))
         make_switch(TweakID.DisableSolariumHDR, QCoreApplication.translate("Nugget", "Disable Solarium HDR"))
-
-        # Feature Flags section
-        content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Feature Flags")))
-        make_switch(TweakID.ClockAnim, QCoreApplication.translate("Nugget", "Enable Lockscreen Clock Animation"))
-        make_switch(TweakID.Lockscreen, QCoreApplication.translate("Nugget", "Enable Duplicate Lockscreen Button and Lockscreen Quickswitch"))
-        make_switch(TweakID.KioskMode, QCoreApplication.translate("Nugget", "Enable Kiosk Mode"))
-        make_ff_group(
-            [TweakID.SolariumFFSwiftUI, TweakID.SolariumFFSpringBoard, TweakID.SolariumFFIconServices],
-            QCoreApplication.translate("Nugget", "Disable Solarium (Liquid Glass) (Feature Flag Method)"))
-        make_ff_group(
-            [TweakID.SolariumFFDocumentCamera, TweakID.SolariumFFPhotos, TweakID.SolariumFFAppleMediaServices],
-            QCoreApplication.translate("Nugget", "Disable Liquid Glass in Documents Camera"))
-        make_ff_group(
-            [TweakID.SolariumFFSharing, TweakID.SolariumFFMail],
-            QCoreApplication.translate("Nugget", "Disable Liquid Glass in Share Sheet"))
 
         # SpringBoard section
         content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "SpringBoard")))

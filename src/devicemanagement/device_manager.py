@@ -50,7 +50,7 @@ from src.controllers.path_handler import fix_windows_path
 
 from src.exceptions.nugget_exception import NuggetException
 
-from src.tweaks.tweaks import tweaks, TweakID, FeatureFlagTweak, BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak, StatusBarTweak, PasscodeThemeTweak
+from src.tweaks.tweaks import tweaks, TweakID, BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak, StatusBarTweak, PasscodeThemeTweak
 from src.tweaks.posterboard.posterboard_tweak import PosterboardTweak
 from src.tweaks.posterboard.template_options.templates_tweak import TemplatesTweak
 from src.tweaks.basic_plist_locations import FileLocation
@@ -739,9 +739,7 @@ class DeviceManager:
             # set the plist keys
             for tweak_name in tweaks:
                 tweak = tweaks[tweak_name]
-                if isinstance(tweak, FeatureFlagTweak):
-                    flag_plist = tweak.apply_tweak(flag_plist)
-                elif isinstance(tweak, PasscodeThemeTweak):
+                if isinstance(tweak, PasscodeThemeTweak):
                     passcode_files = tweak.apply_tweak()
                     if passcode_files is not None and len(passcode_files) > 0:
                         files_to_restore.extend(passcode_files)
@@ -909,18 +907,7 @@ class DeviceManager:
 
             # use if-statements instead of match (switch) statements for compatibility with Python 3.9
             for page in reset_pages:
-                if page == Page.FeatureFlags:
-                    ## FEATURE FLAGS
-                    self.concat_file(
-                        contents=plistlib.dumps({
-                            "Nugget": {
-                                'Enabled': False
-                            }
-                        }),
-                        path=FileLocation.featureflags.value,
-                        files_to_restore=files_to_restore
-                    )
-                elif page == Page.StatusBar:
+                if page == Page.StatusBar:
                     ## STATUS BAR
                     # iOS 26.2+ (iOS 27 era): the status bar is Speakeasy, a SpringBoard
                     # feature flag — disable it instead of writing the

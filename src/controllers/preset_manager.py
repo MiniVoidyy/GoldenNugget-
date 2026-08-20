@@ -242,7 +242,7 @@ class PresetManager:
             data["language_code"] = tweak.language_code
             data["big_keys"] = tweak.big_keys
             data["current_size"] = tweak.current_size
-        # FeatureFlagTweak, NullifyFileTweak only need "enabled"
+        # NullifyFileTweak only needs "enabled"
         return data
 
     ## DESERIALIZATION
@@ -276,7 +276,6 @@ class PresetManager:
 
     def _load_all_tweaks(self):
         # idempotent: the loaders return early if the tweaks already exist
-        tweak_loader.load_featureflags()
         tweak_loader.load_internal()
         tweak_loader.load_springboard()
         tweak_loader.load_liquidglass()

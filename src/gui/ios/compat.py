@@ -21,15 +21,6 @@ TWEAK_MIN_VERSION = {
     TweakID.IgnoreSolariumHardwareCheck: "27.0",
     TweakID.IgnoreSolariumOptOut: "27.0",
     TweakID.DisableSpecularEverywhere: "27.0",
-    # Solarium feature flags
-    TweakID.SolariumFFSwiftUI: "26.0",
-    TweakID.SolariumFFSpringBoard: "26.0",
-    TweakID.SolariumFFIconServices: "26.0",
-    TweakID.SolariumFFDocumentCamera: "26.0",
-    TweakID.SolariumFFPhotos: "26.0",
-    TweakID.SolariumFFAppleMediaServices: "26.0",
-    TweakID.SolariumFFSharing: "26.0",
-    TweakID.SolariumFFMail: "26.0",
     # Dynamic Island options (iOS 17.4+)
     TweakID.SBAlwaysShowSystemApertureInSnapshots: "17.4",
     TweakID.HideDICompletely: "17.4",
