@@ -5713,20 +5713,6 @@ class Ui_Nugget(object):
 
         self.verticalLayout_241.addWidget(self.line_51)
 
-        self.restartUACContent = QHBoxLayout()
-        self.restartUACContent.setObjectName(u"restartUACContent")
-        self.restartUACContent.setContentsMargins(-1, -1, -1, 0)
-        self.restartUACBtn = QToolButton(self.verticalWidget_7)
-        self.restartUACBtn.setObjectName(u"restartUACBtn")
-        self.restartUACBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.restartUACBtn.setIcon(icon1)
-        self.restartUACBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-
-        self.restartUACContent.addWidget(self.restartUACBtn)
-
-
-        self.verticalLayout_241.addLayout(self.restartUACContent)
-
         self.verticalSpacer_101 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         self.verticalLayout_241.addItem(self.verticalSpacer_101)
@@ -6657,7 +6643,6 @@ class Ui_Nugget(object):
         self.liquidGlassPageBtn.setText(QCoreApplication.translate("Nugget", u"Liquid Glass", None))
         self.statusBarLbl_51.setText(QCoreApplication.translate("Nugget", u"Apply", None))
         self.label_161.setText("")
-        self.restartUACBtn.setText(QCoreApplication.translate("Nugget", u" Restart as Admin", None))
         self.gestaltLocationTitleLbl.setText(QCoreApplication.translate("Nugget", u"Current gestalt file location:", None))
         self.chooseGestaltBtn.setText(QCoreApplication.translate("Nugget", u"  Choose Gestalt File", None))
         self.applyTweaksBtn.setText(QCoreApplication.translate("Nugget", u"  Apply Changes", None))

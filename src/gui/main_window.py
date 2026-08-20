@@ -1,5 +1,4 @@
 from PySide6 import QtCore, QtWidgets
-import os
 from typing import Optional
 
 from src.qt.mainwindow_ui import Ui_Nugget
@@ -166,7 +165,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         ## APPLY PAGE ACTIONS
         self.ui.applyTweaksBtn.clicked.connect(self.on_applyTweaksBtn_clicked)
-        self.ui.restartUACBtn.clicked.connect(self.on_restartUACBtn_clicked)
         self.ui.removeTweaksBtn.clicked.connect(self.on_removeTweaksBtn_clicked)
 
 
@@ -581,13 +579,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_removeTweaksBtn_clicked(self):
         dialog = ResetDialog(device_manager=self.device_manager, apply_reset=self.apply_changes)
         dialog.exec()
-    def on_restartUACBtn_clicked(self):
-        if os.name != 'nt':
-            return
-        import pyuac
-        import sys
-        pyuac.runAsAdmin()
-        os.execl(sys.executable, sys.executable, *sys.argv)
 
     @QtCore.Slot()
     def on_applyTweaksBtn_clicked(self):

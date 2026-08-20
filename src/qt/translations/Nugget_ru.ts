@@ -2662,11 +2662,6 @@ bl_sbx</translation>
             <translation>ПРЕДУПРЕЖДЕНИЕ: Не включайте iPadOS, если у вас не цифровой пароль.</translation>
         </message>
         <message>
-            <location line="+8945" />
-            <source> Restart as Admin</source>
-            <translation>Перезапустить от имени администратора</translation>
-        </message>
-        <message>
             <location line="-10670" />
             <source>    Passcode Themes</source>
             <translation>Темы на пароль</translation>
