@@ -59,39 +59,3 @@ if _log_file:
 else:
     # Only console logging by default
     _logger = setup_logging(level=logging.WARNING)  # Quiet by default
-
-
-# Context manager for operation logging
-class LoggedOperation:
-    """Context manager for logging operation start/end/errors."""
-
-    def __init__(self, logger: logging.Logger, operation: str, **context):
-        self.logger = logger
-        self.operation = operation
-        self.context = context
-
-    def __enter__(self):
-        self.logger.info("Starting %s | %s", self.operation, self._fmt_context())
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type:
-            self.logger.error(
-                "Failed %s | %s | error=%s",
-                self.operation,
-                self._fmt_context(),
-                exc_val,
-                exc_info=(exc_type, exc_val, None)
-            )
-        else:
-            self.logger.info("Completed %s | %s", self.operation, self._fmt_context())
-        return False  # Don't suppress exceptions
-
-    def _fmt_context(self) -> str:
-        return " | ".join(f"{k}={v}" for k, v in self.context.items())
-
-
-# Convenience function
-def log_exception(logger: logging.Logger, msg: str, *args, **kwargs):
-    """Log an exception with full traceback."""
-    logger.exception(msg, *args, **kwargs)

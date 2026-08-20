@@ -269,10 +269,6 @@ class IOSPosterboardPage(QWidget):
         for template in templates:
             template.create_ui(self.window, tweaks[TweakID.Templates], widgets, self.templates_layout)
 
-    def refresh_templates(self):
-        """Refresh templates list (alias for _load_templates_list)"""
-        self._load_templates_list()
-
     def _create_video_tab(self) -> QWidget:
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)

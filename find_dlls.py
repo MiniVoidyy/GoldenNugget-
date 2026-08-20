@@ -1,6 +1,5 @@
 import os
 import shutil
-import sys
 
 required_dlls = ["libgcc_s_seh-1.dll", "libstdc++-6.dll", "libwinpthread-1.dll"]
 

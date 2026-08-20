@@ -78,11 +78,6 @@ class PosterboardPage(Page, QtCore.QObject):
         #     self.load_pb_templates()
 
     ## ACTIONS
-    def delete_pb_file(self, file, widget):
-        if file in tweaks[TweakID.PosterBoard].tendies:
-            tweaks[TweakID.PosterBoard].tendies.remove(file)
-        widget.deleteLater()
-
     def create_title_widget(self, tendie, widget: QtWidgets.QWidget) -> QtWidgets.QToolButton:
         titleBtn = QtWidgets.QToolButton(widget)
         titleBtn.setIcon(QtGui.QIcon(tendie.get_icon()))

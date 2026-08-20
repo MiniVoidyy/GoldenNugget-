@@ -535,10 +535,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pages[Page.Templates].load()
         self.ui.pages.setCurrentIndex(Page.Templates.value)
 
-    def on_passcodePageBtn_clicked(self):
-        self.pages[Page.Passcode].load()
-        self.ui.pages.setCurrentIndex(Page.Passcode.value)
-
     def on_tweaksPageBtn_clicked(self):
         self.ui.pages.setCurrentIndex(Page.Tweaks.value)
 
@@ -548,13 +544,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_settingsPageBtn_clicked(self):
         self.pages[Page.Settings].load()
         self.ui.pages.setCurrentIndex(Page.Settings.value)
-
-    def update_side_btn_color(self, btn: QtWidgets.QToolButton, toggled: bool):
-        if toggled:
-            btn.setStyleSheet("QToolButton {\ncolor: #00FF00;\n}")
-        else:
-            btn.setStyleSheet("")
-
 
     ## APPLY PAGE
 
@@ -570,8 +559,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.ios_home.show_process_status(txt)
         except Exception:
             pass
-    def update_bar(self, percent):
-        self.ui.restoreProgressBar.setValue(int(percent))
     def on_removeTweaksBtn_clicked(self):
         dialog = ResetDialog(device_manager=self.device_manager, apply_reset=self.apply_changes)
         dialog.exec()

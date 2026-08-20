@@ -301,17 +301,6 @@ class SettingsPage(Page):
             idx = 0
         self.ui.langDrp.setCurrentIndex(idx)
 
-    # Toggle the UAC info
-    def toggle_UAC_btn(self, visible: bool):
-        if os.name != 'nt':
-            self.ui.restartUACLbl.hide()
-            self.ui.restartUACBtn.hide()
-            return
-        import pyuac
-        show_btn = visible and not pyuac.isUserAdmin()
-        self.ui.restartUACLbl.setVisible(show_btn)
-        self.ui.restartUACBtn.setVisible(show_btn)
-
     ## ACTIONS
     def on_langDrp_activated(self, index: int):
         new_lang = self.lang_indexes[index]
