@@ -1,11 +1,11 @@
 from PySide6.QtCore import Qt, QCoreApplication
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel,
-    QDialog, QDialogButtonBox, QLineEdit, QSpinBox, QPushButton
+    QDialog, QDialogButtonBox, QLineEdit, QSpinBox
 )
 
 from src.gui.ios.components import (
-    IOSNavBar, IOSSectionHeader, IOSCard, IOSSwitch, IOSSettingsRow
+    IOSNavBar, IOSSectionHeader, IOSSwitch, IOSSettingsRow
 )
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.status_bar.status_setter import StatusBarItem
@@ -198,23 +198,6 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.set_secondary_service_badge, self.status_manager.unset_secondary_service_badge,
         )
 
-        # Cellular service show/hide
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSStatusBarPage", "Cellular Service")))
-        self._make_service_row(
-            QCoreApplication.translate("IOSStatusBarPage", "Primary Cellular Service"),
-            self.status_manager.is_cellular_service_overridden(),
-            self.status_manager.get_cellular_service_override(),
-            self.status_manager.set_cellular_service,
-            self.status_manager.unset_cellular_service,
-        )
-        self._make_service_row(
-            QCoreApplication.translate("IOSStatusBarPage", "Secondary Cellular Service"),
-            self.status_manager.is_secondary_cellular_service_overridden(),
-            self.status_manager.get_secondary_cellular_service_override(),
-            self.status_manager.set_secondary_cellular_service,
-            self.status_manager.unset_secondary_cellular_service,
-        )
-
         # Number rows
         self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSStatusBarPage", "Levels")))
         self.gsm_row = self._make_number_row(
@@ -278,6 +261,7 @@ class IOSStatusBarPage(QWidget):
         for name, item in [
             (QCoreApplication.translate("Nugget", "Focus Mode Icon"), StatusBarItem.QuietModeStatusBarItem),
             (QCoreApplication.translate("Nugget", "Airplane Mode"), StatusBarItem.AirplaneModeStatusBarItem),
+            (QCoreApplication.translate("IOSStatusBarPage", "Cellular Service"), StatusBarItem.CellularServiceStatusBarItem),
             (QCoreApplication.translate("Nugget", "Wi-Fi Icon"), StatusBarItem.CellularDataNetworkStatusBarItem),
             (QCoreApplication.translate("Nugget", "Battery Icon"), StatusBarItem.MainBatteryStatusBarItem),
             (QCoreApplication.translate("Nugget", "Bluetooth Icon"), StatusBarItem.BluetoothStatusBarItem),
@@ -286,7 +270,6 @@ class IOSStatusBarPage(QWidget):
             (QCoreApplication.translate("Nugget", "Rotation Lock Icon"), StatusBarItem.RotationLockStatusBarItem),
             (QCoreApplication.translate("Nugget", "AirPlay Icon"), StatusBarItem.AirPlayStatusBarItem),
             (QCoreApplication.translate("Nugget", "CarPlay Icon"), StatusBarItem.CarPlayStatusBarItem),
-            (QCoreApplication.translate("Nugget", "Student Icon"), StatusBarItem.StudentStatusBarItem),
             (QCoreApplication.translate("Nugget", "VPN Icon"), StatusBarItem.VPNStatusBarItem),
             (QCoreApplication.translate("Nugget", "Voice Control Icon"), StatusBarItem.VoiceControlStatusBarItem),
             (QCoreApplication.translate("Nugget", "Liquid Detection Warning Icon"), StatusBarItem.LiquidDetectionStatusBarItem),
@@ -321,7 +304,7 @@ class IOSStatusBarPage(QWidget):
         return handler
 
     def _make_switch(self, title: str, checked: bool, on_toggled):
-        card = IOSCard()
+        card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
@@ -334,53 +317,8 @@ class IOSStatusBarPage(QWidget):
         self.content_layout.addWidget(card)
         return switch
 
-    def _make_service_row(self, title: str, overridden: bool, shown: bool, setter, unsetter):
-        card = IOSCard()
-        row = QHBoxLayout(card)
-        row.setContentsMargins(16, 10, 16, 10)
-        row.setSpacing(12)
-
-        label = QLabel(title)
-        label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
-        row.addWidget(label, 1)
-
-        state = 1 if (overridden and shown) else (0 if overridden else -1)
-
-        def make_segment(text, checked, callback):
-            btn = QPushButton(text)
-            btn.setCheckable(True)
-            btn.setAutoExclusive(True)
-            btn.setChecked(checked)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.setFixedHeight(30)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #2C2C2E;
-                    border: none;
-                    border-radius: 6px;
-                    color: #FFFFFF;
-                    font-size: 13px;
-                    padding: 0 12px;
-                }
-                QPushButton:checked { background-color: #007AFF; color: #FFFFFF; }
-            """)
-            btn.clicked.connect(callback)
-            return btn
-
-        seg_row = QHBoxLayout()
-        seg_row.setSpacing(4)
-        seg_row.addWidget(make_segment(
-            QCoreApplication.translate("Nugget", "Default"), state == -1, lambda: unsetter()))
-        seg_row.addWidget(make_segment(
-            QCoreApplication.translate("Nugget", "Show"), state == 1, lambda: setter(True)))
-        seg_row.addWidget(make_segment(
-            QCoreApplication.translate("Nugget", "Hide"), state == 0, lambda: setter(False)))
-        row.addLayout(seg_row)
-
-        self.content_layout.addWidget(card)
-
     def _make_text_row(self, title: str, overridden: bool, current: str, setter, unsetter):
-        card = IOSCard()
+        card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
@@ -430,7 +368,7 @@ class IOSStatusBarPage(QWidget):
             label.setText(title)
 
     def _make_number_row(self, title: str, overridden: bool, current: int, setter, unsetter, min_val: int, max_val: int):
-        card = IOSCard()
+        card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
