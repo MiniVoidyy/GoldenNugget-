@@ -5895,11 +5895,6 @@ class Ui_Nugget(object):
         self.restartUACContent = QHBoxLayout()
         self.restartUACContent.setObjectName(u"restartUACContent")
         self.restartUACContent.setContentsMargins(-1, -1, -1, 0)
-        self.restartUACLbl = QLabel(self.verticalWidget_7)
-        self.restartUACLbl.setObjectName(u"restartUACLbl")
-
-        self.restartUACContent.addWidget(self.restartUACLbl)
-
         self.restartUACBtn = QToolButton(self.verticalWidget_7)
         self.restartUACBtn.setObjectName(u"restartUACBtn")
         self.restartUACBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -6114,9 +6109,9 @@ class Ui_Nugget(object):
 "	border-radius: 0px;\n"
 "}")
         self.langIcn.setText(u"")
-        icon33 = QIcon()
-        icon33.addFile(u":/icon/translate.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.langIcn.setIcon(icon33)
+        icon32 = QIcon()
+        icon32.addFile(u":/icon/translate.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.langIcn.setIcon(icon32)
         self.langIcn.setIconSize(QSize(20, 20))
 
         self.horizontalLayout_3.addWidget(self.langIcn)
@@ -6147,12 +6142,25 @@ class Ui_Nugget(object):
 
         self._21.addWidget(self.languageWidget)
 
+        self.allowWifiApplyingChk = QCheckBox(self.settingsPageContent)
+        self.allowWifiApplyingChk.setObjectName(u"allowWifiApplyingChk")
+        self.allowWifiApplyingChk.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.allowWifiApplyingChk.setChecked(False)
+
+        self._21.addWidget(self.allowWifiApplyingChk)
+
         self.autoRebootChk = QCheckBox(self.settingsPageContent)
         self.autoRebootChk.setObjectName(u"autoRebootChk")
         self.autoRebootChk.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.autoRebootChk.setChecked(True)
 
         self._21.addWidget(self.autoRebootChk)
+
+        self.showAllSpoofableChk = QCheckBox(self.settingsPageContent)
+        self.showAllSpoofableChk.setObjectName(u"showAllSpoofableChk")
+        self.showAllSpoofableChk.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+
+        self._21.addWidget(self.showAllSpoofableChk)
 
         self.ignorePBFrameLimitChk = QCheckBox(self.settingsPageContent)
         self.ignorePBFrameLimitChk.setObjectName(u"ignorePBFrameLimitChk")
@@ -6172,6 +6180,12 @@ class Ui_Nugget(object):
 
         self._21.addWidget(self.forcePBRefreshChk)
 
+        self.rebuildSBApplicationStateDBChk = QCheckBox(self.settingsPageContent)
+        self.rebuildSBApplicationStateDBChk.setObjectName(u"rebuildSBApplicationStateDBChk")
+        self.rebuildSBApplicationStateDBChk.setChecked(False)
+
+        self._21.addWidget(self.rebuildSBApplicationStateDBChk)
+
         self.line_24 = QFrame(self.settingsPageContent)
         self.line_24.setObjectName(u"line_24")
         self.line_24.setStyleSheet(u"QFrame {\n"
@@ -6181,6 +6195,13 @@ class Ui_Nugget(object):
         self.line_24.setFrameShape(QFrame.Shape.HLine)
 
         self._21.addWidget(self.line_24)
+
+        self.trustStoreChk = QCheckBox(self.settingsPageContent)
+        self.trustStoreChk.setObjectName(u"trustStoreChk")
+        self.trustStoreChk.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.trustStoreChk.setChecked(False)
+
+        self._21.addWidget(self.trustStoreChk)
 
         self.skipSetupChk = QCheckBox(self.settingsPageContent)
         self.skipSetupChk.setObjectName(u"skipSetupChk")
@@ -6844,7 +6865,6 @@ class Ui_Nugget(object):
         self.liquidGlassPageBtn.setText(QCoreApplication.translate("Nugget", u"Liquid Glass", None))
         self.statusBarLbl_51.setText(QCoreApplication.translate("Nugget", u"Apply", None))
         self.label_161.setText("")
-        self.restartUACLbl.setText(QCoreApplication.translate("Nugget", u"Administrator permission is required to apply tweaks with AFC.", None))
         self.restartUACBtn.setText(QCoreApplication.translate("Nugget", u" Restart as Admin", None))
         self.gestaltLocationTitleLbl.setText(QCoreApplication.translate("Nugget", u"Current gestalt file location:", None))
         self.chooseGestaltBtn.setText(QCoreApplication.translate("Nugget", u"  Choose Gestalt File", None))
@@ -6854,7 +6874,18 @@ class Ui_Nugget(object):
         self.removeTweaksBtn.setText(QCoreApplication.translate("Nugget", u"Remove Tweaks", None))
         self.springboardOptionsLbl1.setText(QCoreApplication.translate("Nugget", u"Nugget Settings", None))
         self.langLbl.setText(QCoreApplication.translate("Nugget", u"App Language", None))
+        self.allowWifiApplyingChk.setText(QCoreApplication.translate("Nugget", u"Allow Applying Over WiFi", None))
         self.autoRebootChk.setText(QCoreApplication.translate("Nugget", u"Auto Reboot After Applying", None))
+#if QT_CONFIG(tooltip)
+        self.showAllSpoofableChk.setToolTip(QCoreApplication.translate("Nugget", u"Show models for other device types in the AI device spoofing tab.", None))
+#endif // QT_CONFIG(tooltip)
+#if QT_CONFIG(statustip)
+        self.showAllSpoofableChk.setStatusTip("")
+#endif // QT_CONFIG(statustip)
+#if QT_CONFIG(whatsthis)
+        self.showAllSpoofableChk.setWhatsThis("")
+#endif // QT_CONFIG(whatsthis)
+        self.showAllSpoofableChk.setText(QCoreApplication.translate("Nugget", u"Show All Spoofable Models", None))
         self.ignorePBFrameLimitChk.setText(QCoreApplication.translate("Nugget", u"Ignore Posterboard Frame Limit", None))
 #if QT_CONFIG(tooltip)
         self.disableTendiesLimitChk.setToolTip(QCoreApplication.translate("Nugget", u"Disables the tendies file limit of 2. There is still the descriptor limit.\n"
@@ -6863,9 +6894,19 @@ class Ui_Nugget(object):
 #endif // QT_CONFIG(tooltip)
         self.disableTendiesLimitChk.setText(QCoreApplication.translate("Nugget", u"Disable Tendies Limit", None))
         self.forcePBRefreshChk.setText(QCoreApplication.translate("Nugget", u"Force PosterBoard Refresh", None))
+        self.rebuildSBApplicationStateDBChk.setText(QCoreApplication.translate("Nugget", u"Rebuild SpringBoard Application State DB", None))
+#if QT_CONFIG(tooltip)
+        self.rebuildSBApplicationStateDBChk.setToolTip(QCoreApplication.translate("Nugget", u"Replaces applicationState.db with an empty file, causing SpringBoard to rebuild it.\n"
+"\n"
+"This is necessary if badges persist on the Settings app after disabling FollowUp.", None))
+#endif // QT_CONFIG(tooltip)
 #if QT_CONFIG(tooltip)
         self.line_24.setToolTip("")
 #endif // QT_CONFIG(tooltip)
+#if QT_CONFIG(tooltip)
+        self.trustStoreChk.setToolTip(QCoreApplication.translate("Nugget", u"Restores the SSL config that does something idk", None))
+#endif // QT_CONFIG(tooltip)
+        self.trustStoreChk.setText(QCoreApplication.translate("Nugget", u"Restore TrustStore (SSL Configuration Profiles)", None))
         self.skipSetupChk.setText(QCoreApplication.translate("Nugget", u"Skip Setup * (non-exploit files only)", None))
         self.supervisionChk.setText(QCoreApplication.translate("Nugget", u"Enable Supervision * (requires Skip Setup)", None))
         self.supervisionOrganization.setPlaceholderText(QCoreApplication.translate("Nugget", u"Enter Organization Name", None))
