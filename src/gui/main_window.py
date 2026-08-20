@@ -109,6 +109,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.theme_manager.set_ios_widget(self.ios_pages)
         self.setCentralWidget(self.theme_manager.stack)
 
+        # Back navigation: ESC key and mouse back button go to the home page
+        QtWidgets.QApplication.instance().installEventFilter(self)
+
         # Check for an update
         if is_update_available(App_Version, App_Build):
             # notify with prompt to download the new version from github
@@ -490,6 +493,35 @@ class MainWindow(QtWidgets.QMainWindow):
     ## SIDE BAR FUNCTIONS
     def is_ios_theme(self) -> bool:
         return self.theme_manager.current_theme == ThemeManager.IOS
+
+    def eventFilter(self, obj, event):
+        """Handle ESC and the mouse back button as navigation-back.
+
+        Installed app-wide so it works regardless of which widget has focus.
+        Modal dialogs (QInputDialog, QMessageBox, file pickers, ...) are left
+        untouched so ESC keeps closing them.
+        """
+        if QtWidgets.QApplication.activeModalWidget() is not None:
+            return super().eventFilter(obj, event)
+        etype = event.type()
+        if etype == QtCore.QEvent.Type.KeyPress and event.key() == QtCore.Qt.Key.Key_Escape:
+            return self._go_back()
+        if etype == QtCore.QEvent.Type.MouseButtonPress and event.button() in (
+                QtCore.Qt.MouseButton.BackButton, QtCore.Qt.MouseButton.ExtraButton1):
+            return self._go_back()
+        return super().eventFilter(obj, event)
+
+    def _go_back(self) -> bool:
+        """Navigate back to the home page. Returns True if the event was consumed."""
+        if self.is_ios_theme():
+            if self.ios_pages.currentIndex() != 0:
+                self.ios_pages.setCurrentIndex(0)
+                return True
+        else:
+            if self.ui.pages.currentIndex() != Page.Home.value:
+                self.ui.pages.setCurrentIndex(Page.Home.value)
+                return True
+        return False
 
     def on_homePageBtn_clicked(self):
         self.ui.pages.setCurrentIndex(Page.Home.value)
