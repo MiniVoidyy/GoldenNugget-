@@ -88,6 +88,7 @@ class AdvancedPlistTweak(BasicPlistTweak):
     def set_multiple_values(self, keys: list[str], value: any):
         for key in keys:
             self.value[key] = value
+        _notify_tweak_change()
 
     def apply_tweak(self, other_tweaks: dict) -> dict:
         if not self.enabled:
