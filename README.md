@@ -1,7 +1,7 @@
 ![Artboard][NuggetLogo]
 
 # GoldenNugget
-Continuation of Nugget legacy\
+Continuation of Nugget legacy,
 Unlock your device's full potential, with iOS 27 support!
 
 Customize your device with animated wallpapers, disable pesky daemons, and more!
@@ -67,6 +67,7 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - Show Notifications for System Pastes
 - Disable Liquid Glass (iOS 26.0+):
   - Ignore Liquid Glass App Build Check (iOS 26.0+)
+  - Force Solarium Fallback (iOS 26.0+, doesn't work on iOS 27 anymore)
 - Disable Daemons:
   - OTAd
   - UsageTrackingAgent
