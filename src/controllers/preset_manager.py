@@ -216,6 +216,10 @@ class PresetManager:
     def _serialize(self) -> dict:
         tweak_data = {}
         for key, tweak in tweaks.items():
+            # PosterBoard is excluded from presets: wallpapers are
+            # device-specific and heavy, so they must not travel with a preset.
+            if key == TweakID.PosterBoard:
+                continue
             try:
                 tweak_data[key.name] = self._serialize_tweak(tweak)
             except Exception as e:
@@ -270,6 +274,10 @@ class PresetManager:
                     except KeyError:
                         continue
                     if key not in tweaks:
+                        continue
+                    # PosterBoard is excluded from presets (see _serialize); skip
+                    # it on load too so old presets cannot restore wallpapers.
+                    if key == TweakID.PosterBoard:
                         continue
                     try:
                         self._apply_tweak(tweaks[key], tweak_data)
