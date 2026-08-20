@@ -512,15 +512,16 @@ class MainWindow(QtWidgets.QMainWindow):
         return super().eventFilter(obj, event)
 
     def _go_back(self) -> bool:
-        """Navigate back to the home page. Returns True if the event was consumed."""
-        if self.is_ios_theme():
-            if self.ios_pages.currentIndex() != 0:
-                self.ios_pages.setCurrentIndex(0)
-                return True
-        else:
-            if self.ui.pages.currentIndex() != Page.Home.value:
-                self.ui.pages.setCurrentIndex(Page.Home.value)
-                return True
+        """Navigate back to the iOS home page. Returns True if the event was consumed.
+
+        Only applies to the new iOS UI; the classic UI keeps its own sidebar
+        navigation and does not react to ESC / mouse back button.
+        """
+        if not self.is_ios_theme():
+            return False
+        if self.ios_pages.currentIndex() != 0:
+            self.ios_pages.setCurrentIndex(0)
+            return True
         return False
 
     def on_homePageBtn_clicked(self):
