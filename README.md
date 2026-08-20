@@ -88,6 +88,20 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - Voice Control
 </details>
 
+## Contributors 
+
+<div align="center">
+
+**Thanks everyone who contributes to project!** 🎉
+
+<a href="https://github.com/awesomenull-dev/GoldenNugget/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=awesomenull-dev/GoldenNugget" alt="Contributors" />
+</a>
+
+Want to see your name here? Open [Pull Request](https://github.com/awesomenull-dev/GoldenNugget/pulls)!
+
+</div>
+
 ## Star History
 
 <a href="https://www.star-history.com/?type=date&repos=awesomenull-dev%2FGoldenNugget">
