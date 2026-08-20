@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, QCoreApplication
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QComboBox, QLineEdit, QListWidget, QMessageBox, QInputDialog,
+    QComboBox, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QInputDialog,
     QFileDialog, QDialog
 )
 
@@ -526,7 +526,8 @@ class IOSSettingsPage(QWidget):
                 item_text = f"{name}\n  {desc}  ({model} • iOS {ios}){tag_str}"
             else:
                 item_text = f"{name}  ({model} • iOS {ios}){tag_str}"
-            item = self.preset_list.addItem(item_text)
+            item = QListWidgetItem(item_text)
+            self.preset_list.addItem(item)
             item.setData(Qt.UserRole, name)
 
     def _on_preset_save(self):
