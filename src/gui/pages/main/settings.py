@@ -7,7 +7,7 @@ from src.qt.mainwindow_ui import Ui_Nugget
 
 from PySide6.QtCore import QCoreApplication, QSize, Qt
 from PySide6.QtWidgets import (
-    QFileDialog, QFrame, QHBoxLayout, QInputDialog, QLabel,
+    QFileDialog, QFrame, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QMessageBox, QSizePolicy, QSpacerItem,
     QToolButton, QVBoxLayout, QWidget,
 )
@@ -363,33 +363,22 @@ class SettingsPage(Page):
                 item_text = f"{name}\n  {desc}  ({model} • iOS {ios}){tag_str}"
             else:
                 item_text = f"{name}  ({model} • iOS {ios}){tag_str}"
-            self.presetList.addItem(item_text)
+            item = self.presetList.addItem(item_text)
+            item.setData(Qt.UserRole, name)
 
     def on_presetSaveBtn_clicked(self):
-        default_name = self.presetNameTxt.text().strip()
-        default_desc = self.presetDescTxt.text().strip()
-        name, ok = QInputDialog.getText(
-            self.window, QCoreApplication.tr("Save Preset"),
-            QCoreApplication.tr("Enter a name for this preset:"),
-            text=default_name
-        )
-        if not ok or name.strip() == "":
+        name = self.presetNameTxt.text().strip()
+        desc = self.presetDescTxt.text().strip()
+        if not name:
+            QMessageBox.warning(
+                self.window, QCoreApplication.tr("Save Preset"),
+                QCoreApplication.tr("Enter a name for this preset.")
+            )
             return
-        desc, ok2 = QInputDialog.getText(
-            self.window, QCoreApplication.tr("Save Preset"),
-            QCoreApplication.tr("Enter a description (optional):"),
-            text=default_desc
-        )
-        if not ok2:
-            desc = default_desc
-        if self.preset_manager.save_preset(name.strip(), desc.strip(), tags=[]):
+        if self.preset_manager.save_preset(name, desc, tags=[]):
             self.presetNameTxt.clear()
             self.presetDescTxt.clear()
             self.refresh_presets()
-            QMessageBox.information(
-                self.window, QCoreApplication.tr("Save Preset"),
-                QCoreApplication.tr("Preset \"{0}\" saved successfully.").format(name.strip())
-            )
         else:
             QMessageBox.critical(
                 self.window, QCoreApplication.tr("Save Preset"),
@@ -405,7 +394,7 @@ class SettingsPage(Page):
             return
         # Extract name from the first line of the item text
         item_text = self.presetList.currentItem().text()
-        name = item_text.split("\n")[0].strip()
+        name = self.presetList.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
         meta = self.preset_manager.get_preset_metadata(name)
         desc = meta.get("description", "") if meta else ""
         model = meta.get("device_model", "Unknown") if meta else "Unknown"
@@ -440,7 +429,7 @@ class SettingsPage(Page):
             )
             return
         item_text = self.presetList.currentItem().text()
-        name = item_text.split("\n")[0].strip()
+        name = self.presetList.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
         confirm = QMessageBox.question(
             self.window, QCoreApplication.tr("Delete Preset"),
             QCoreApplication.tr("Delete preset \"{0}\"?").format(name)
@@ -466,7 +455,7 @@ class SettingsPage(Page):
             )
             return
         item_text = self.presetList.currentItem().text()
-        name = item_text.split("\n")[0].strip()
+        name = self.presetList.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
         file_path, _ = QFileDialog.getSaveFileName(
             self.window, QCoreApplication.tr("Export Preset"),
             f"{name}.json",

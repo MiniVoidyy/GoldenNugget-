@@ -526,30 +526,21 @@ class IOSSettingsPage(QWidget):
                 item_text = f"{name}\n  {desc}  ({model} • iOS {ios}){tag_str}"
             else:
                 item_text = f"{name}  ({model} • iOS {ios}){tag_str}"
-            self.preset_list.addItem(item_text)
+            item = self.preset_list.addItem(item_text)
+            item.setData(Qt.UserRole, name)
 
     def _on_preset_save(self):
-        default_name = self.preset_name_txt.text().strip()
-        default_desc = self.preset_desc_txt.text().strip()
-        name, ok = QInputDialog.getText(
-            self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
-            QCoreApplication.translate("IOSSettingsPage", "Enter a name for this preset:"),
-            text=default_name)
-        if not ok or name.strip() == "":
+        name = self.preset_name_txt.text().strip()
+        desc = self.preset_desc_txt.text().strip()
+        if not name:
+            QMessageBox.warning(
+                self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
+                QCoreApplication.translate("IOSSettingsPage", "Enter a name for this preset."))
             return
-        desc, ok2 = QInputDialog.getText(
-            self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
-            QCoreApplication.translate("IOSSettingsPage", "Enter a description (optional):"),
-            text=default_desc)
-        if not ok2:
-            desc = default_desc
-        if self.preset_manager.save_preset(name.strip(), desc.strip(), tags=[]):
+        if self.preset_manager.save_preset(name, desc, tags=[]):
             self.preset_name_txt.clear()
             self.preset_desc_txt.clear()
             self.refresh_presets()
-            QMessageBox.information(
-                self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Preset \"{0}\" saved successfully.").format(name.strip()))
         else:
             QMessageBox.critical(
                 self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
@@ -562,7 +553,7 @@ class IOSSettingsPage(QWidget):
                 QCoreApplication.translate("IOSSettingsPage", "Select a preset to load first."))
             return
         item_text = self.preset_list.currentItem().text()
-        name = item_text.split("\n")[0].strip()
+        name = self.preset_list.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
         meta = self.preset_manager.get_preset_metadata(name)
         desc = meta.get("description", "") if meta else ""
         model = meta.get("device_model", "Unknown") if meta else "Unknown"
@@ -596,7 +587,7 @@ class IOSSettingsPage(QWidget):
                 QCoreApplication.translate("IOSSettingsPage", "Select a preset to delete first."))
             return
         item_text = self.preset_list.currentItem().text()
-        name = item_text.split("\n")[0].strip()
+        name = self.preset_list.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
         confirm = QMessageBox.question(
             self, QCoreApplication.translate("IOSSettingsPage", "Delete Preset"),
             QCoreApplication.translate("IOSSettingsPage", "Delete preset \"{0}\"?").format(name))
@@ -616,7 +607,7 @@ class IOSSettingsPage(QWidget):
                 QCoreApplication.translate("IOSSettingsPage", "Select a preset to export first."))
             return
         item_text = self.preset_list.currentItem().text()
-        name = item_text.split("\n")[0].strip()
+        name = self.preset_list.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
         file_path, _ = QFileDialog.getSaveFileName(
             self, QCoreApplication.translate("IOSSettingsPage", "Export Preset"),
             f"{name}.json",
