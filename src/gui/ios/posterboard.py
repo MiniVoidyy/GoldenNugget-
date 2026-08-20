@@ -41,9 +41,9 @@ class IOSPosterboardPage(QWidget):
 
         # Nav bar with add tendies button
         nav = IOSNavBar(
-            QCoreApplication.translate("IOSPosterboardPage", "PosterBoard"),
+            QCoreApplication.translate("Nugget", "PosterBoard"),
             window=self.window,
-            right_action=(QCoreApplication.translate("IOSPosterboardPage", "+ Add Tendies"), self.show_add_tendies_dialog)
+            right_action=(QCoreApplication.translate("Nugget", "+ Add Tendies"), self.show_add_tendies_dialog)
         )
         layout.addWidget(nav)
 
@@ -54,7 +54,7 @@ class IOSPosterboardPage(QWidget):
         reset_layout.setContentsMargins(16, 12, 16, 12)
         reset_layout.setSpacing(8)
 
-        reset_btn = QPushButton(QCoreApplication.translate("IOSPosterboardPage", "Reset PosterBoard"))
+        reset_btn = QPushButton(QCoreApplication.translate("Nugget", "Reset PosterBoard"))
         reset_btn.setCursor(Qt.PointingHandCursor)
         reset_btn.setStyleSheet("""
             QPushButton {
@@ -72,7 +72,7 @@ class IOSPosterboardPage(QWidget):
         reset_layout.addWidget(reset_btn)
 
         reset_caption = QLabel(QCoreApplication.translate(
-            "IOSPosterboardPage",
+            "Nugget",
             "Emergency reset for when PosterBoard behaves strangely or the "
             "database won't load after a restore. Resets on the next apply."
         ))
@@ -106,9 +106,9 @@ class IOSPosterboardPage(QWidget):
         tab_layout.setContentsMargins(0, 0, 0, 0)
         tab_layout.setSpacing(0)
 
-        self.tendies_tab_btn = self._make_tab_button(QCoreApplication.translate("IOSPosterboardPage", "Tendies"), ":/icon/wallpaper.svg", 0)
+        self.tendies_tab_btn = self._make_tab_button(QCoreApplication.translate("Nugget", "Tendies"), ":/icon/wallpaper.svg", 0)
         self.templates_tab_btn = self._make_tab_button(QCoreApplication.translate("Nugget", "Templates"), ":/icon/photo-stack.svg", 1)
-        self.video_tab_btn = self._make_tab_button(QCoreApplication.translate("IOSPosterboardPage", "Video"), ":/icon/play-circle.svg", 2)
+        self.video_tab_btn = self._make_tab_button(QCoreApplication.translate("Nugget", "Video"), ":/icon/play-circle.svg", 2)
 
         tab_layout.addWidget(self.tendies_tab_btn, 1)
         tab_layout.addWidget(self.templates_tab_btn, 1)
@@ -219,7 +219,7 @@ class IOSPosterboardPage(QWidget):
         self.templates_import_btn = import_btn
         self.templates_layout.addWidget(import_btn)
 
-        self.templates_placeholder = QLabel(QCoreApplication.translate("IOSPosterboardPage", "No templates added yet"))
+        self.templates_placeholder = QLabel(QCoreApplication.translate("Nugget", "No templates added yet"))
         self.templates_placeholder.setStyleSheet("font-size: 15px; color: #8E8E93;")
         self.templates_placeholder.setAlignment(Qt.AlignCenter)
         self.templates_layout.addWidget(self.templates_placeholder)
@@ -233,7 +233,7 @@ class IOSPosterboardPage(QWidget):
         """Port of classic on_importTemplatesBtn_clicked"""
         from PySide6.QtWidgets import QFileDialog, QMessageBox
         selected_files, _ = QFileDialog.getOpenFileNames(
-            self.window, QCoreApplication.translate("IOSPosterboardPage", "Select Nugget Template Files"), "", "Zip Files (*.batter)"
+            self.window, QCoreApplication.translate("Nugget", "Select Nugget Template Files"), "", "Zip Files (*.batter)"
         )
         if selected_files:
             templates_tweak = tweaks[TweakID.Templates]
@@ -282,7 +282,7 @@ class IOSPosterboardPage(QWidget):
 
         # Thumbnail
         thumb_row = QHBoxLayout()
-        thumb_label = QLabel(QCoreApplication.translate("IOSPosterboardPage", "Thumbnail"))
+        thumb_label = QLabel(QCoreApplication.translate("Nugget", "Thumbnail"))
         thumb_label.setStyleSheet("font-size: 15px; color: #FFFFFF; min-width: 100px;")
         self.thumb_btn = QPushButton(QCoreApplication.translate("Nugget", "Choose Freeze Frame (.HEIC)"))
         self.thumb_btn.setCursor(Qt.PointingHandCursor)
@@ -304,7 +304,7 @@ class IOSPosterboardPage(QWidget):
 
         # Video
         video_row = QHBoxLayout()
-        video_label = QLabel(QCoreApplication.translate("IOSPosterboardPage", "Video"))
+        video_label = QLabel(QCoreApplication.translate("Nugget", "Video"))
         video_label.setStyleSheet("font-size: 15px; color: #FFFFFF; min-width: 100px;")
         self.video_btn = QPushButton(QCoreApplication.translate("Nugget", "Choose Video"))
         self.video_btn.setCursor(Qt.PointingHandCursor)
@@ -325,7 +325,7 @@ class IOSPosterboardPage(QWidget):
         v_layout.addLayout(video_row)
 
         # Options
-        v_layout.addWidget(QLabel(QCoreApplication.translate("IOSPosterboardPage", "Options")))
+        v_layout.addWidget(QLabel(QCoreApplication.translate("Nugget", "Options")))
         self.loop_chk = QCheckBox(QCoreApplication.translate("Nugget", "Loop (use CoreAnimation method)"))
         self.loop_chk.setStyleSheet("color: #FFFFFF; font-size: 15px;")
         self.loop_chk.setChecked(tweaks[TweakID.PosterBoard].loop_video)
@@ -346,11 +346,11 @@ class IOSPosterboardPage(QWidget):
 
         # Calculation mode
         calc_row = QHBoxLayout()
-        calc_label = QLabel(QCoreApplication.translate("IOSPosterboardPage", "Calculation Mode"))
+        calc_label = QLabel(QCoreApplication.translate("Nugget", "Calculation Mode"))
         calc_label.setStyleSheet("font-size: 15px; color: #FFFFFF; min-width: 100px;")
         self.calc_mode_drp = QComboBox()
-        self.calc_mode_drp.addItem(QCoreApplication.translate("IOSPosterboardPage", "Linear"))
-        self.calc_mode_drp.addItem(QCoreApplication.translate("IOSPosterboardPage", "Discrete"))
+        self.calc_mode_drp.addItem(QCoreApplication.translate("Nugget", "Linear"))
+        self.calc_mode_drp.addItem(QCoreApplication.translate("Nugget", "Discrete"))
         self.calc_mode_drp.setCurrentIndex(0 if tweaks[TweakID.PosterBoard].calculationMode == 'linear' else 1)
         self.calc_mode_drp.activated.connect(self.on_calc_mode_selected)
         self.calc_mode_drp.setStyleSheet("""
@@ -376,7 +376,7 @@ class IOSPosterboardPage(QWidget):
         v_layout.addLayout(calc_row)
 
         # Export video loop
-        export_btn = IOSPrimaryButton(QCoreApplication.translate("IOSPosterboardPage", "Export Video Loop (.tendies)"))
+        export_btn = IOSPrimaryButton(QCoreApplication.translate("Nugget", "Export Video Loop (.tendies)"))
         export_btn.clicked.connect(self.on_export_video_clicked)
         v_layout.addWidget(export_btn)
 
@@ -384,7 +384,7 @@ class IOSPosterboardPage(QWidget):
         ext_row = QHBoxLayout()
         discover_btn = IOSPrimaryButton(QCoreApplication.translate("Nugget", "Discover Wallpapers"))
         discover_btn.clicked.connect(self.on_discover_wallpapers)
-        help_btn = IOSPrimaryButton(QCoreApplication.translate("IOSPosterboardPage", "Help"))
+        help_btn = IOSPrimaryButton(QCoreApplication.translate("Nugget", "Help"))
         help_btn.clicked.connect(self.on_help)
         ext_row.addWidget(discover_btn)
         ext_row.addWidget(help_btn)
@@ -408,7 +408,7 @@ class IOSPosterboardPage(QWidget):
     def on_choose_thumb_clicked(self):
         from PySide6.QtWidgets import QFileDialog
         selected_file, _ = QFileDialog.getOpenFileName(
-            self.window, QCoreApplication.translate("IOSPosterboardPage", "Select Image File"), "", "Image Files (*.heic)"
+            self.window, QCoreApplication.translate("Nugget", "Select Image File"), "", "Image Files (*.heic)"
         )
         pb = tweaks[TweakID.PosterBoard]
         if selected_file:
@@ -420,7 +420,7 @@ class IOSPosterboardPage(QWidget):
     def on_choose_video_clicked(self):
         from PySide6.QtWidgets import QFileDialog
         selected_file, _ = QFileDialog.getOpenFileName(
-            self.window, QCoreApplication.translate("IOSPosterboardPage", "Select Video File"), "", "Video Files (*.mov *.mp4 *.mkv)"
+            self.window, QCoreApplication.translate("Nugget", "Select Video File"), "", "Video Files (*.mov *.mp4 *.mkv)"
         )
         pb = tweaks[TweakID.PosterBoard]
         if selected_file:
@@ -450,7 +450,7 @@ class IOSPosterboardPage(QWidget):
         from shutil import make_archive, rmtree
         from PySide6.QtWidgets import QFileDialog, QMessageBox
         directory = QFileDialog.getExistingDirectory(
-            self.window, QCoreApplication.translate("IOSPosterboardPage", "Select Directory"), "",
+            self.window, QCoreApplication.translate("Nugget", "Select Directory"), "",
             QFileDialog.ShowDirsOnly)
         if not directory:
             return
@@ -483,7 +483,7 @@ class IOSPosterboardPage(QWidget):
     def show_add_tendies_dialog(self):
         from PySide6.QtWidgets import QFileDialog
         selected_files, _ = QFileDialog.getOpenFileNames(
-            self.window, QCoreApplication.translate("IOSPosterboardPage", "Select PosterBoard Files"), "", "Zip Files (*.tendies)"
+            self.window, QCoreApplication.translate("Nugget", "Select PosterBoard Files"), "", "Zip Files (*.tendies)"
         )
         if selected_files:
             for file in selected_files:
@@ -582,7 +582,7 @@ class IOSPosterboardPage(QWidget):
         )
 
         dialog = QDialog(self.window)
-        dialog.setWindowTitle(QCoreApplication.translate("IOSPosterboardPage", "Reset PosterBoard"))
+        dialog.setWindowTitle(QCoreApplication.translate("Nugget", "Reset PosterBoard"))
         dialog.setMinimumWidth(350)
         dialog.setStyleSheet("""
             QDialog { background-color: #1e1e1e; }
@@ -607,7 +607,7 @@ class IOSPosterboardPage(QWidget):
         layout.setSpacing(16)
 
         desc = QLabel(QCoreApplication.translate(
-            "IOSPosterboardPage",
+            "Nugget",
             "Select what to reset. This is useful if PosterBoard is behaving "
             "strangely or the database is corrupted (malformed) after a restore."
         ))
@@ -615,15 +615,15 @@ class IOSPosterboardPage(QWidget):
         desc.setStyleSheet("color: #8E8E93; font-size: 13px;")
         layout.addWidget(desc)
 
-        reset_collections = QCheckBox(QCoreApplication.translate("IOSPosterboardPage", "Collections"))
+        reset_collections = QCheckBox(QCoreApplication.translate("Nugget", "Collections"))
         reset_collections.setChecked(True)
         layout.addWidget(reset_collections)
 
-        reset_suggested = QCheckBox(QCoreApplication.translate("IOSPosterboardPage", "Suggested Photos"))
+        reset_suggested = QCheckBox(QCoreApplication.translate("Nugget", "Suggested Photos"))
         reset_suggested.setChecked(True)
         layout.addWidget(reset_suggested)
 
-        reset_gallery = QCheckBox(QCoreApplication.translate("IOSPosterboardPage", "Gallery Cache"))
+        reset_gallery = QCheckBox(QCoreApplication.translate("Nugget", "Gallery Cache"))
         reset_gallery.setChecked(True)
         layout.addWidget(reset_gallery)
 
@@ -643,9 +643,9 @@ class IOSPosterboardPage(QWidget):
             tweaks[TweakID.PosterBoard].resetModes = selected
             QMessageBox.information(
                 self.window,
-                QCoreApplication.translate("IOSPosterboardPage", "Reset Scheduled"),
+                QCoreApplication.translate("Nugget", "Reset Scheduled"),
                 QCoreApplication.translate(
-                    "IOSPosterboardPage",
+                    "Nugget",
                     "PosterBoard reset has been scheduled. The selected items "
                     "will be cleared on the next apply. Apply your tweaks to "
                     "execute the reset.")

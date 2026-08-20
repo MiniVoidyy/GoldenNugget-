@@ -42,7 +42,7 @@ class IOSSettingsPage(QWidget):
         self.content_layout.setSpacing(8)
 
         # Appearance
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "Appearance")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Appearance")))
 
         def on_theme_toggled(ios_enabled: bool):
             if ios_enabled:
@@ -57,7 +57,7 @@ class IOSSettingsPage(QWidget):
 
         theme_on = self.window.theme_manager.current_theme == ThemeManager.IOS
         self.theme_switch = self._make_switch(
-            QCoreApplication.translate("IOSSettingsPage", "iOS-style Interface"),
+            QCoreApplication.translate("Nugget", "iOS-style Interface"),
             theme_on, on_theme_toggled,
         )
 
@@ -66,7 +66,7 @@ class IOSSettingsPage(QWidget):
         self._make_language_row()
 
         # Device
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "Device")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Device")))
         pref = self.window.device_manager.pref_manager
 
         self._make_switch(
@@ -80,7 +80,7 @@ class IOSSettingsPage(QWidget):
         self.content_layout.addWidget(reset_pairing_btn)
 
         # PosterBoard
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "PosterBoard")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "PosterBoard")))
 
         self._make_switch(
             QCoreApplication.translate("Nugget", "Ignore Posterboard Frame Limit"),
@@ -107,16 +107,16 @@ class IOSSettingsPage(QWidget):
         self._make_pb_setup_section()
 
         # Backup
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "Backup")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Backup")))
 
         self._make_switch(
-            QCoreApplication.translate("IOSSettingsPage", "Use Encrypted Backups (Experimental)"),
+            QCoreApplication.translate("Nugget", "Use Encrypted Backups (Experimental)"),
             pref.use_encrypted_backup,
             self._make_setting_handler("use_encrypted_backup"),
         )
 
         # Setup
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "Setup")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Setup")))
 
         self._make_switch(
             QCoreApplication.translate("Nugget", "Skip Setup * (non-exploit files only)"),
@@ -140,9 +140,9 @@ class IOSSettingsPage(QWidget):
         self._make_presets_section()
 
         # About
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSettingsPage", "About")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "About")))
 
-        about_btn = IOSPrimaryButton(QCoreApplication.translate("IOSSettingsPage", "About GoldenNugget"))
+        about_btn = IOSPrimaryButton(QCoreApplication.translate("Nugget", "About GoldenNugget"))
         about_btn.clicked.connect(self.show_about)
         self.content_layout.addWidget(about_btn)
 
@@ -201,7 +201,7 @@ class IOSSettingsPage(QWidget):
     def _on_text_row_edit(self, title: str, on_submit):
         dialog = QInputDialog(self)
         dialog.setWindowTitle(title)
-        dialog.setLabelText(QCoreApplication.translate("IOSSettingsPage", "Enter value:"))
+        dialog.setLabelText(QCoreApplication.translate("Nugget", "Enter value:"))
         dialog.setTextValue(self.window.device_manager.pref_manager.organization_name)
         dialog.setStyleSheet("""
             QDialog, QInputDialog { background-color: #1e1e1e; }
@@ -286,7 +286,7 @@ class IOSSettingsPage(QWidget):
 
     def _make_pb_setup_section(self):
         self.content_layout.addWidget(IOSSectionHeader(
-            QCoreApplication.translate("IOSSettingsPage", "PosterBoard Database")
+            QCoreApplication.translate("Nugget", "PosterBoard Database")
         ))
 
         # apply method
@@ -295,7 +295,7 @@ class IOSSettingsPage(QWidget):
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
 
-        label = QLabel(QCoreApplication.translate("IOSSettingsPage", "Apply Method"))
+        label = QLabel(QCoreApplication.translate("Nugget", "Apply Method"))
         label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
         row.addWidget(label, 1)
 
@@ -304,14 +304,14 @@ class IOSSettingsPage(QWidget):
         row.addWidget(self.use_configs_switch)
         self.content_layout.addWidget(card)
 
-        self._make_label_row(QCoreApplication.translate("IOSSettingsPage", "Database"), "sqlite: None")
+        self._make_label_row(QCoreApplication.translate("Nugget", "Database"), "sqlite: None")
 
         self._make_button_row(
-            QCoreApplication.translate("IOSSettingsPage", "Get Database from Device"),
+            QCoreApplication.translate("Nugget", "Get Database from Device"),
             self._on_pb_get_db,
         )
         self._make_button_row(
-            QCoreApplication.translate("IOSSettingsPage", "Select Database File"),
+            QCoreApplication.translate("Nugget", "Select Database File"),
             self._on_pb_select_db,
         )
 
@@ -320,7 +320,7 @@ class IOSSettingsPage(QWidget):
         ids_layout = QVBoxLayout(ids_card)
         ids_layout.setContentsMargins(16, 12, 16, 12)
         ids_layout.setSpacing(8)
-        ids_title = QLabel(QCoreApplication.translate("IOSSettingsPage", "Saved Configuration IDs"))
+        ids_title = QLabel(QCoreApplication.translate("Nugget", "Saved Configuration IDs"))
         ids_title.setStyleSheet("color: #FFFFFF; font-size: 15px;")
         ids_layout.addWidget(ids_title)
 
@@ -341,9 +341,9 @@ class IOSSettingsPage(QWidget):
         ids_layout.addWidget(self.saved_ids_list)
 
         ids_btns = QHBoxLayout()
-        clear_btn = self._make_mini_button(QCoreApplication.translate("IOSSettingsPage", "Clear"))
+        clear_btn = self._make_mini_button(QCoreApplication.translate("Nugget", "Clear"))
         clear_btn.clicked.connect(self._on_clear_saved_ids)
-        remove_btn = self._make_mini_button(QCoreApplication.translate("IOSSettingsPage", "Remove Selected"))
+        remove_btn = self._make_mini_button(QCoreApplication.translate("Nugget", "Remove Selected"))
         remove_btn.clicked.connect(self._on_remove_selected_id)
         ids_btns.addWidget(clear_btn)
         ids_btns.addWidget(remove_btn)
@@ -398,7 +398,7 @@ class IOSSettingsPage(QWidget):
         current = self.window.device_manager.data_singleton.current_device
         if current is None:
             QMessageBox.warning(
-                self, QCoreApplication.translate("IOSSettingsPage", "Get Database"),
+                self, QCoreApplication.translate("Nugget", "Get Database"),
                 QCoreApplication.translate("QCoreApplication", "Please connect a device."))
             return
         wizard = PosterBoardDBWizard(current.udid, self.pb_db_lbl, self._refresh_saved_ids)
@@ -407,7 +407,7 @@ class IOSSettingsPage(QWidget):
     def _on_pb_select_db(self):
         from PySide6.QtWidgets import QFileDialog as FD
         selected_file, _ = FD.getOpenFileName(
-            self, QCoreApplication.translate("IOSSettingsPage", "Select PBFPosterExtensionDataStoreSQLiteDatabase File"),
+            self, QCoreApplication.translate("Nugget", "Select PBFPosterExtensionDataStoreSQLiteDatabase File"),
             "", "*.sqlite3", options=FD.ReadOnly)
         if selected_file in (None, ""):
             tweaks[TweakID.PosterBoard].config_manager.database = None
@@ -417,7 +417,7 @@ class IOSSettingsPage(QWidget):
                     selected_file, self.window.device_manager.get_current_device_udid()):
                 QMessageBox.critical(
                     self, QCoreApplication.translate("QtCore.QCoreApplication", "Error!"),
-                    QCoreApplication.translate("IOSSettingsPage", "The database is not of the correct format!"))
+                    QCoreApplication.translate("Nugget", "The database is not of the correct format!"))
                 return
             self.pb_db_lbl.setText("sqlite: Selected")
 
@@ -433,8 +433,8 @@ class IOSSettingsPage(QWidget):
 
     def _on_clear_saved_ids(self):
         confirm = QMessageBox.question(
-            self, QCoreApplication.translate("IOSSettingsPage", "Clear Saved IDs"),
-            QCoreApplication.translate("IOSSettingsPage", "Clear all saved configuration IDs?"))
+            self, QCoreApplication.translate("Nugget", "Clear Saved IDs"),
+            QCoreApplication.translate("Nugget", "Clear all saved configuration IDs?"))
         if confirm != QMessageBox.StandardButton.Yes:
             return
         tweaks[TweakID.PosterBoard].config_manager.saved_items.clear()
@@ -450,7 +450,7 @@ class IOSSettingsPage(QWidget):
 
     def _make_presets_section(self):
         self.content_layout.addWidget(IOSSectionHeader(
-            QCoreApplication.translate("IOSSettingsPage", "Presets")
+            QCoreApplication.translate("Nugget", "Presets")
         ))
 
         card = QWidget()
@@ -460,9 +460,9 @@ class IOSSettingsPage(QWidget):
 
         name_row = QHBoxLayout()
         self.preset_name_txt = QLineEdit()
-        self.preset_name_txt.setPlaceholderText(QCoreApplication.translate("IOSSettingsPage", "Preset name"))
+        self.preset_name_txt.setPlaceholderText(QCoreApplication.translate("Nugget", "Preset name"))
         self.preset_desc_txt = QLineEdit()
-        self.preset_desc_txt.setPlaceholderText(QCoreApplication.translate("IOSSettingsPage", "Description (optional)"))
+        self.preset_desc_txt.setPlaceholderText(QCoreApplication.translate("Nugget", "Description (optional)"))
         for edit in (self.preset_name_txt, self.preset_desc_txt):
             edit.setStyleSheet("""
                 QLineEdit {
@@ -478,7 +478,7 @@ class IOSSettingsPage(QWidget):
         name_row.addWidget(self.preset_desc_txt, 3)
         presets_layout.addLayout(name_row)
 
-        save_btn = self._make_mini_button(QCoreApplication.translate("IOSSettingsPage", "Save Preset"))
+        save_btn = self._make_mini_button(QCoreApplication.translate("Nugget", "Save Preset"))
         save_btn.clicked.connect(self._on_preset_save)
         presets_layout.addWidget(save_btn)
 
@@ -500,11 +500,11 @@ class IOSSettingsPage(QWidget):
 
         btns_row = QHBoxLayout()
         for title, handler in [
-            (QCoreApplication.translate("IOSSettingsPage", "Load"), self._on_preset_load),
-            (QCoreApplication.translate("IOSSettingsPage", "Delete"), self._on_preset_delete),
-            (QCoreApplication.translate("IOSSettingsPage", "Refresh"), self.refresh_presets),
-            (QCoreApplication.translate("IOSSettingsPage", "Export"), self._on_preset_export),
-            (QCoreApplication.translate("IOSSettingsPage", "Import"), self._on_preset_import),
+            (QCoreApplication.translate("Nugget", "Load"), self._on_preset_load),
+            (QCoreApplication.translate("Nugget", "Delete"), self._on_preset_delete),
+            (QCoreApplication.translate("Nugget", "Refresh"), self.refresh_presets),
+            (QCoreApplication.translate("Nugget", "Export"), self._on_preset_export),
+            (QCoreApplication.translate("Nugget", "Import"), self._on_preset_import),
         ]:
             btn = self._make_mini_button(title)
             btn.clicked.connect(handler)
@@ -534,8 +534,8 @@ class IOSSettingsPage(QWidget):
         desc = self.preset_desc_txt.text().strip()
         if not name:
             QMessageBox.warning(
-                self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Enter a name for this preset."))
+                self, QCoreApplication.translate("Nugget", "Save Preset"),
+                QCoreApplication.translate("Nugget", "Enter a name for this preset."))
             return
         if self.preset_manager.save_preset(
                 name, desc, tags=[],
@@ -546,14 +546,14 @@ class IOSSettingsPage(QWidget):
             self.refresh_presets()
         else:
             QMessageBox.critical(
-                self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Failed to save the preset."))
+                self, QCoreApplication.translate("Nugget", "Save Preset"),
+                QCoreApplication.translate("Nugget", "Failed to save the preset."))
 
     def _on_preset_load(self):
         if self.preset_list.currentRow() < 0:
             QMessageBox.warning(
-                self, QCoreApplication.translate("IOSSettingsPage", "Load Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Select a preset to load first."))
+                self, QCoreApplication.translate("Nugget", "Load Preset"),
+                QCoreApplication.translate("Nugget", "Select a preset to load first."))
             return
         item_text = self.preset_list.currentItem().text()
         name = self.preset_list.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
@@ -562,87 +562,87 @@ class IOSSettingsPage(QWidget):
         model = meta.get("device_model", "Unknown") if meta else "Unknown"
         ios = meta.get("ios_version", "Unknown") if meta else "Unknown"
         confirm = QMessageBox.question(
-            self, QCoreApplication.translate("IOSSettingsPage", "Load Preset"),
+            self, QCoreApplication.translate("Nugget", "Load Preset"),
             QCoreApplication.translate(
-                "IOSSettingsPage",
+                "Nugget",
                 "Load preset \"{0}\"?\n\nDescription: {1}\nDevice: {2} • iOS {3}\n\nThis will replace your current configuration."
             ).format(name, desc, model, ios))
         if confirm != QMessageBox.StandardButton.Yes:
             return
         if not self.preset_manager.load_preset(name):
             QMessageBox.critical(
-                self, QCoreApplication.translate("IOSSettingsPage", "Load Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Failed to load the preset."))
+                self, QCoreApplication.translate("Nugget", "Load Preset"),
+                QCoreApplication.translate("Nugget", "Failed to load the preset."))
             return
         self.window.settings.setValue("last_loaded_preset", name)
         self.window._sync_settings()
         QMessageBox.information(
-            self, QCoreApplication.translate("IOSSettingsPage", "Load Preset"),
+            self, QCoreApplication.translate("Nugget", "Load Preset"),
             QCoreApplication.translate(
-                "IOSSettingsPage",
+                "Nugget",
                 "Preset \"{0}\" loaded.\n\nGoldenNugget will now restart to apply the changes.").format(name))
         self._restart_app()
 
     def _on_preset_delete(self):
         if self.preset_list.currentRow() < 0:
             QMessageBox.warning(
-                self, QCoreApplication.translate("IOSSettingsPage", "Delete Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Select a preset to delete first."))
+                self, QCoreApplication.translate("Nugget", "Delete Preset"),
+                QCoreApplication.translate("Nugget", "Select a preset to delete first."))
             return
         item_text = self.preset_list.currentItem().text()
         name = self.preset_list.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
         confirm = QMessageBox.question(
-            self, QCoreApplication.translate("IOSSettingsPage", "Delete Preset"),
-            QCoreApplication.translate("IOSSettingsPage", "Delete preset \"{0}\"?").format(name))
+            self, QCoreApplication.translate("Nugget", "Delete Preset"),
+            QCoreApplication.translate("Nugget", "Delete preset \"{0}\"?").format(name))
         if confirm != QMessageBox.StandardButton.Yes:
             return
         if self.preset_manager.delete_preset(name):
             self.refresh_presets()
         else:
             QMessageBox.critical(
-                self, QCoreApplication.translate("IOSSettingsPage", "Delete Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Failed to delete the preset."))
+                self, QCoreApplication.translate("Nugget", "Delete Preset"),
+                QCoreApplication.translate("Nugget", "Failed to delete the preset."))
 
     def _on_preset_export(self):
         if self.preset_list.currentRow() < 0:
             QMessageBox.warning(
-                self, QCoreApplication.translate("IOSSettingsPage", "Export Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Select a preset to export first."))
+                self, QCoreApplication.translate("Nugget", "Export Preset"),
+                QCoreApplication.translate("Nugget", "Select a preset to export first."))
             return
         item_text = self.preset_list.currentItem().text()
         name = self.preset_list.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
         file_path, _ = QFileDialog.getSaveFileName(
-            self, QCoreApplication.translate("IOSSettingsPage", "Export Preset"),
+            self, QCoreApplication.translate("Nugget", "Export Preset"),
             f"{name}.json",
-            QCoreApplication.translate("IOSSettingsPage", "JSON Files (*.json)"))
+            QCoreApplication.translate("Nugget", "JSON Files (*.json)"))
         if not file_path:
             return
         if self.preset_manager.export_preset(name, file_path):
             QMessageBox.information(
-                self, QCoreApplication.translate("IOSSettingsPage", "Export Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Preset exported to:\n{0}").format(file_path))
+                self, QCoreApplication.translate("Nugget", "Export Preset"),
+                QCoreApplication.translate("Nugget", "Preset exported to:\n{0}").format(file_path))
         else:
             QMessageBox.critical(
-                self, QCoreApplication.translate("IOSSettingsPage", "Export Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Failed to export preset."))
+                self, QCoreApplication.translate("Nugget", "Export Preset"),
+                QCoreApplication.translate("Nugget", "Failed to export preset."))
 
     def _on_preset_import(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, QCoreApplication.translate("IOSSettingsPage", "Import Preset"),
+            self, QCoreApplication.translate("Nugget", "Import Preset"),
             "",
-            QCoreApplication.translate("IOSSettingsPage", "JSON Files (*.json)"))
+            QCoreApplication.translate("Nugget", "JSON Files (*.json)"))
         if not file_path:
             return
         success, result = self.preset_manager.import_preset(file_path)
         if success:
             self.refresh_presets()
             QMessageBox.information(
-                self, QCoreApplication.translate("IOSSettingsPage", "Import Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Preset \"{0}\" imported successfully.").format(result))
+                self, QCoreApplication.translate("Nugget", "Import Preset"),
+                QCoreApplication.translate("Nugget", "Preset \"{0}\" imported successfully.").format(result))
         else:
             QMessageBox.critical(
-                self, QCoreApplication.translate("IOSSettingsPage", "Import Preset"),
-                QCoreApplication.translate("IOSSettingsPage", "Failed to import preset:\n{0}").format(result))
+                self, QCoreApplication.translate("Nugget", "Import Preset"),
+                QCoreApplication.translate("Nugget", "Failed to import preset:\n{0}").format(result))
 
     def _restart_app(self):
         import os

@@ -39,7 +39,7 @@ class IOSNavBar(QWidget):
 
         # Show back button if on_back callback is provided OR window is provided (to go back to iOS home)
         if on_back or window:
-            back_btn = QPushButton(QCoreApplication.translate("IOSNavBar", "←  Back"), self)
+            back_btn = QPushButton(QCoreApplication.translate("Nugget", "←  Back"), self)
             back_btn.setCursor(Qt.PointingHandCursor)
             back_btn.setStyleSheet("""
                 QPushButton {

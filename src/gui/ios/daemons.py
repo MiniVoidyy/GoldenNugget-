@@ -20,7 +20,7 @@ class IOSDaemonsPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        nav = IOSNavBar(QCoreApplication.translate("IOSDaemonsPage", "Daemons"), window=self.window)
+        nav = IOSNavBar(QCoreApplication.translate("Nugget", "Daemons"), window=self.window)
         layout.addWidget(nav)
 
         scroll = QScrollArea()
@@ -38,13 +38,13 @@ class IOSDaemonsPage(QWidget):
 
         # Master enable switch
         content_layout.addWidget(IOSSectionHeader(
-            QCoreApplication.translate("IOSDaemonsPage", "Daemons to Disable")
+            QCoreApplication.translate("Nugget", "Daemons to Disable")
         ))
         master_card = QWidget()
         master_row = QHBoxLayout(master_card)
         master_row.setContentsMargins(16, 10, 16, 10)
         master_row.setSpacing(12)
-        master_label = QLabel(QCoreApplication.translate("IOSDaemonsPage", "Enable Daemon Modifications"))
+        master_label = QLabel(QCoreApplication.translate("Nugget", "Enable Daemon Modifications"))
         master_label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
         master_row.addWidget(master_label, 1)
         self.master_switch = IOSSwitch(self.daemons_tweak.enabled)
@@ -74,8 +74,8 @@ class IOSDaemonsPage(QWidget):
             (QCoreApplication.translate("Nugget", "Voice Control Icon"), Daemon.VoiceControl),
             (QCoreApplication.translate("Nugget", "Disable NanoTimeKit (Apple Watch Face Sync)"), Daemon.NanoTimeKit),
             (QCoreApplication.translate("Nugget", "Disable System Diagnostics"), Daemon.Diagnostics),
-            (QCoreApplication.translate("IOSDaemonsPage", "Follow Up"), Daemon.FollowUp),
-            (QCoreApplication.translate("IOSDaemonsPage", "Location Services"), Daemon.Location),
+            (QCoreApplication.translate("Nugget", "Follow Up"), Daemon.FollowUp),
+            (QCoreApplication.translate("Nugget", "Location Services"), Daemon.Location),
         ]:
             self.daemon_cards.append(self._make_daemon_switch(content_layout, title, daemon))
 
