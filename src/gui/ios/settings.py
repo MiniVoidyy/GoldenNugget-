@@ -537,7 +537,10 @@ class IOSSettingsPage(QWidget):
                 self, QCoreApplication.translate("IOSSettingsPage", "Save Preset"),
                 QCoreApplication.translate("IOSSettingsPage", "Enter a name for this preset."))
             return
-        if self.preset_manager.save_preset(name, desc, tags=[]):
+        if self.preset_manager.save_preset(
+                name, desc, tags=[],
+                device_model=self.window.device_manager.get_current_device_model() or "",
+                ios_version=self.window.device_manager.get_current_device_version() or ""):
             self.preset_name_txt.clear()
             self.preset_desc_txt.clear()
             self.refresh_presets()

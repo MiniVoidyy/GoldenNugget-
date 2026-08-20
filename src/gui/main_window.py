@@ -485,7 +485,10 @@ class MainWindow(QtWidgets.QMainWindow):
         """Save current tweak state to AutoSave preset."""
         self._preset_autosave_pending = False
         try:
-            self.preset_manager.save_preset("AutoSave", "Automatic save of last tweak configuration", tags=["auto"])
+            self.preset_manager.save_preset(
+                "AutoSave", "Automatic save of last tweak configuration", tags=["auto"],
+                device_model=self.device_manager.get_current_device_model() or "",
+                ios_version=self.device_manager.get_current_device_version() or "")
         except Exception:
             pass  # Silent fail - autosave is best-effort
      

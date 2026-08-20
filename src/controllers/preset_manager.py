@@ -77,7 +77,8 @@ class PresetManager:
                 })
         return sorted(result, key=lambda x: x.get("updated_at", 0), reverse=True)
 
-    def save_preset(self, name: str, description: str = "", tags: list = None) -> bool:
+    def save_preset(self, name: str, description: str = "", tags: list = None,
+                    device_model: str = "", ios_version: str = "") -> bool:
         data = self._serialize()
         if data is None:
             return False
@@ -87,8 +88,8 @@ class PresetManager:
         meta = {
             "version": PRESET_VERSION,
             "description": description or "",
-            "device_model": self._get_current_device_model(),
-            "ios_version": self._get_current_ios_version(),
+            "device_model": device_model or "Unknown",
+            "ios_version": ios_version or "Unknown",
             "created_at": now,
             "updated_at": now,
             "tags": tags or [],
@@ -108,22 +109,6 @@ class PresetManager:
         except Exception as e:
             print(f"Failed to save preset: {e}")
             return False
-
-    def _get_current_device_model(self) -> str:
-        try:
-            from src.devicemanagement.device_manager import DeviceManager
-            dm = DeviceManager()
-            # This is a simplified approach - in reality we'd get from current device
-            return "Unknown"
-        except Exception:
-            return "Unknown"
-
-    def _get_current_ios_version(self) -> str:
-        try:
-            from src.devicemanagement.device_manager import DeviceManager
-            return "Unknown"
-        except Exception:
-            return "Unknown"
 
     def load_preset(self, name: str) -> bool:
         file_path = self.get_preset_path(name)
