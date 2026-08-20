@@ -252,6 +252,31 @@ class IOSTweaksPage(QWidget):
             card_layout.addWidget(row)
             content_layout.addWidget(card)
 
+        # Helper for grouped feature flag tweaks
+        def make_ff_group(tweak_ids: list, title: str):
+            available = [tid for tid in tweak_ids if tid in tweaks and is_compatible(tid)]
+            if not available:
+                return
+            card = IOSCard()
+            row_layout = QHBoxLayout(card)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(12)
+
+            label = QLabel(title)
+            label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
+            row_layout.addWidget(label, 1)
+
+            switch = IOSSwitch(all(tweaks[tid].enabled for tid in available))
+
+            def on_toggled(checked: bool, ids=available):
+                for tid in ids:
+                    tweaks[tid].set_enabled(checked)
+
+            switch.toggled.connect(on_toggled)
+            row_layout.addWidget(switch)
+
+            content_layout.addWidget(card)
+
         # Helper for number input tweaks
         def make_number_input(tweak_id: TweakID, title: str, min_val: int = 0, max_val: int = 999):
             if tweak_id not in tweaks:
@@ -288,6 +313,21 @@ class IOSTweaksPage(QWidget):
         make_switch(TweakID.DisableSpecularMotion, QCoreApplication.translate("Nugget", "Disable Specular Motion"))
         make_switch(TweakID.DisableOuterRefraction, QCoreApplication.translate("Nugget", "Disable Outer Refraction"))
         make_switch(TweakID.DisableSolariumHDR, QCoreApplication.translate("Nugget", "Disable Solarium HDR"))
+
+        # Feature Flags section
+        content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Feature Flags")))
+        make_switch(TweakID.ClockAnim, QCoreApplication.translate("Nugget", "Enable Lockscreen Clock Animation"))
+        make_switch(TweakID.Lockscreen, QCoreApplication.translate("Nugget", "Enable Duplicate Lockscreen Button and Lockscreen Quickswitch"))
+        make_switch(TweakID.KioskMode, QCoreApplication.translate("Nugget", "Enable Kiosk Mode"))
+        make_ff_group(
+            [TweakID.SolariumFFSwiftUI, TweakID.SolariumFFSpringBoard, TweakID.SolariumFFIconServices],
+            QCoreApplication.translate("Nugget", "Disable Solarium (Liquid Glass) (Feature Flag Method)"))
+        make_ff_group(
+            [TweakID.SolariumFFDocumentCamera, TweakID.SolariumFFPhotos, TweakID.SolariumFFAppleMediaServices],
+            QCoreApplication.translate("Nugget", "Disable Liquid Glass in Documents Camera"))
+        make_ff_group(
+            [TweakID.SolariumFFSharing, TweakID.SolariumFFMail],
+            QCoreApplication.translate("Nugget", "Disable Liquid Glass in Share Sheet"))
 
         # SpringBoard section
         content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSTweaksPage", "SpringBoard")))

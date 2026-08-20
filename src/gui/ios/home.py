@@ -228,6 +228,56 @@ class IOSHomePage(QWidget):
         cards_row.addWidget(self.statusbar_card, 1)
         layout.addLayout(cards_row)
 
+        # Second row: Springboard + Passcode cards
+        cards_row2 = QHBoxLayout()
+        cards_row2.setSpacing(12)
+
+        def make_nav_card(title, subtitle, page_index):
+            card = IOSCard()
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(0, 0, 0, 0)
+            card_layout.setSpacing(0)
+
+            header = QFrame()
+            header.setFixedHeight(56)
+            header.setStyleSheet("background-color: #1C1C1E; border-top-left-radius: 12px; border-top-right-radius: 12px;")
+            header_layout = QHBoxLayout(header)
+            header_layout.setContentsMargins(16, 8, 16, 8)
+            header_title = QLabel(title, header)
+            header_title.setStyleSheet("font-size: 17px; font-weight: 600; color: #FFFFFF;")
+            header_layout.addWidget(header_title, 1, Qt.AlignCenter)
+            card_layout.addWidget(header)
+
+            content = QWidget()
+            content_layout = QVBoxLayout(content)
+            content_layout.setContentsMargins(16, 16, 16, 16)
+            content_layout.setSpacing(8)
+            sub = QLabel(subtitle, content)
+            sub.setStyleSheet("font-size: 14px; color: #8E8E93;")
+            sub.setWordWrap(True)
+            content_layout.addWidget(sub)
+            card_layout.addWidget(content)
+
+            card.mousePressEvent = lambda e: self.switch_to_ios_page(page_index)
+            card.setCursor(Qt.PointingHandCursor)
+            return card
+
+        self.springboard_card = make_nav_card(
+            QCoreApplication.translate("IOSHomePage", "Springboard"),
+            QCoreApplication.translate("IOSHomePage", "Lock screen, UI & AirDrop tweaks"),
+            3,
+        )
+        cards_row2.addWidget(self.springboard_card, 1)
+
+        self.passcode_card = make_nav_card(
+            QCoreApplication.translate("IOSHomePage", "Passcode Themes"),
+            QCoreApplication.translate("IOSHomePage", "Custom passcode keypads"),
+            7,
+        )
+        cards_row2.addWidget(self.passcode_card, 1)
+
+        layout.addLayout(cards_row2)
+
         # Apply Tweaks button
         apply_btn = IOSPrimaryButton(QCoreApplication.translate("IOSHomePage", "Apply Tweaks"))
         apply_btn.clicked.connect(self.open_apply_classic)
@@ -292,14 +342,10 @@ class IOSHomePage(QWidget):
         self.window.apply_changes()
 
     def reset_tweaks(self):
-        """Reset all tweaks (calls classic reset via main window)."""
-        if hasattr(self.window, 'remove_tweaks'):
-            self.window.remove_tweaks()
-        else:
-            # Fallback: call device_manager directly
-            from src.gui.pages.pages_list import Page
-            pages = [Page.Posterboard, Page.Tweaks, Page.Springboard, Page.Daemons, Page.StatusBar]
-            self.window.apply_changes(reset_pages=pages)
+        """Reset tweaks using the classic reset dialog (select pages to reset)."""
+        from src.gui.dialogs.reset_dialog import ResetDialog
+        dialog = ResetDialog(device_manager=self.window.device_manager, apply_reset=self.window.apply_changes)
+        dialog.exec()
 
     def show_process_status(self, text: str, success: bool = None):
         """Show a status message for apply/reset operations.

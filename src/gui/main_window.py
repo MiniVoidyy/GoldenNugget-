@@ -30,6 +30,7 @@ from src.gui.ios.springboard import IOSSpringboardPage
 from src.gui.ios.daemons import IOSDaemonsPage
 from src.gui.ios.settings import IOSSettingsPage
 from src.gui.ios.statusbar import IOSStatusBarPage
+from src.gui.ios.passcode import IOSPasscodePage
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, device_manager: DeviceManager, translator: Translator):
@@ -90,7 +91,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.theme_manager = ThemeManager(self)
 
         # build the iOS-style pages stack
-        # 0 = home, 1 = tweaks, 2 = posterboard, 3 = springboard, 4 = daemons, 5 = settings, 6 = statusbar
+        # 0 = home, 1 = tweaks, 2 = posterboard, 3 = springboard, 4 = daemons, 5 = settings, 6 = statusbar, 7 = passcode
         self.ios_pages = QtWidgets.QStackedWidget(self)
         self.ios_pages.setStyleSheet("background-color: #1e1e1e;")
         self.ios_home = IOSHomePage(self)
@@ -100,6 +101,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ios_daemons = IOSDaemonsPage(self)
         self.ios_settings = IOSSettingsPage(self)
         self.ios_statusbar = IOSStatusBarPage(self)
+        self.ios_passcode = IOSPasscodePage(self)
         self.ios_pages.addWidget(self.ios_home)
         self.ios_pages.addWidget(self.ios_tweaks)
         self.ios_pages.addWidget(self.ios_posterboard)
@@ -107,6 +109,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ios_pages.addWidget(self.ios_daemons)
         self.ios_pages.addWidget(self.ios_settings)
         self.ios_pages.addWidget(self.ios_statusbar)
+        self.ios_pages.addWidget(self.ios_passcode)
 
         self.theme_manager.set_classic_widget(self.ui.centralwidget)
         self.theme_manager.set_ios_widget(self.ios_pages)
@@ -410,6 +413,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.updateInterfaceForNewDevice()
         self.ios_home.update_device_info()
         self.ios_home.update_status()
+        if hasattr(self, "ios_passcode"):
+            self.ios_passcode.refresh_language_code()
         if index > -1:
             self.warn_for_dev_beta()
 

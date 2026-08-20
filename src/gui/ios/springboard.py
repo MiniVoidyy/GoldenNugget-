@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QL
 
 from src.gui.ios.components import IOSNavBar, IOSSectionHeader, IOSCard, IOSSwitch, IOSSettingsRow
 from src.gui.ios.compat import is_tweak_compatible
-from src.gui.ios.tweaks import TextInputDialog
+from src.gui.ios.tweaks import TextInputDialog, NumberInputDialog
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.tweak_loader import load_springboard
 
@@ -13,6 +13,8 @@ class IOSSpringboardPage(QWidget):
         super().__init__(parent)
         self.window = window
         self.setObjectName("iosContainer")
+
+        load_springboard()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -83,6 +85,25 @@ class IOSSpringboardPage(QWidget):
             card_layout.addWidget(row)
             content_layout.addWidget(card)
 
+        # Helper to create number input row (skips if tweak not loaded or incompatible)
+        def make_number_input(tweak_id: TweakID, title: str, min_val: int = 0, max_val: int = 999):
+            if tweak_id not in tweaks:
+                return
+            if not is_tweak_compatible(tweak_id, device_ver, is_iphone):
+                return
+            tweak = tweaks[tweak_id]
+            card = IOSCard()
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(0, 0, 0, 0)
+            row = IOSSettingsRow(title)
+            current = 0
+            if hasattr(tweak, 'value') and tweak.value:
+                current = int(tweak.value)
+                row.setText(f"{title}  ({current})")
+            row.clicked.connect(lambda: self._show_number_input_dialog(tweak_id, title, current, row, min_val, max_val))
+            card_layout.addWidget(row)
+            content_layout.addWidget(card)
+
         # Lock Screen
         content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSpringboardPage", "Lock Screen")))
         make_text_input(TweakID.LockScreenFootnote, QCoreApplication.translate("Nugget", "Lock Screen Footnote Text"))
@@ -102,7 +123,7 @@ class IOSSpringboardPage(QWidget):
         # UI Tweaks
         content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSSpringboardPage", "UI Tweaks")))
         make_switch(TweakID.AirplaySupport, QCoreApplication.translate("Nugget", "Enable AirPlay support for Stage Manager"))
-        make_switch(TweakID.SBMinimumLockscreenIdleTime, QCoreApplication.translate("Nugget", "Auto‑Lock (Lock Screen)"))
+        make_number_input(TweakID.SBMinimumLockscreenIdleTime, QCoreApplication.translate("Nugget", "Auto‑Lock (Lock Screen)"), 0, 600)
         make_switch(TweakID.SBShowAuthenticationEngineeringUI, QCoreApplication.translate("Nugget", "Show Red/Green Authentication Line on Lock Screen"))
         make_switch(TweakID.UseFloatingTabBar, QCoreApplication.translate("Nugget", "Disable Floating Tab Bar"))
 
@@ -112,8 +133,12 @@ class IOSSpringboardPage(QWidget):
 
         content_layout.addStretch()
 
-        # Load springboard tweaks
-        load_springboard()
+    def _show_number_input_dialog(self, tweak_id: TweakID, title: str, current: int, row: IOSSettingsRow, min_val: int, max_val: int):
+        dialog = NumberInputDialog(title, current, min_val, max_val, self)
+        if dialog.exec() == QDialog.Accepted:
+            value = dialog.get_value()
+            tweaks[tweak_id].set_value(value, toggle_enabled=True)
+            row.setText(f"{title}  ({value})")
 
     def _show_text_input_dialog(self, tweak_id: TweakID, title: str, current: str, row: IOSSettingsRow):
         dialog = TextInputDialog(title, current, self)
