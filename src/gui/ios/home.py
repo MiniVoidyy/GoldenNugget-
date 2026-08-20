@@ -295,6 +295,12 @@ class IOSHomePage(QWidget):
         self.process_status_lbl.setStyleSheet("font-size: 14px; font-weight: 600; color: #30D158;")
         self.process_status_lbl.hide()
         layout.addWidget(self.process_status_lbl)
+        # Single auto-hide timer: restarted on every progress update so the
+        # label never hides mid-apply (stacked singleShot timers caused
+        # hide/show flicker on each progress tick).
+        self._hide_timer = QTimer(self)
+        self._hide_timer.setSingleShot(True)
+        self._hide_timer.timeout.connect(self.hide_process_status)
 
         layout.addStretch()
 
@@ -363,7 +369,7 @@ class IOSHomePage(QWidget):
             f"font-size: 14px; font-weight: 600; color: {color};")
         self.process_status_lbl.setText(text)
         self.process_status_lbl.show()
-        QTimer.singleShot(6000, self.hide_process_status)
+        self._hide_timer.start(6000)
 
     def hide_process_status(self):
         self.process_status_lbl.hide()
