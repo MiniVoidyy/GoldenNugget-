@@ -1,7 +1,7 @@
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel
 
-from src.gui.ios.components import IOSNavBar, IOSSectionHeader, IOSCard, IOSSwitch
+from src.gui.ios.components import IOSNavBar, IOSSectionHeader, IOSSwitch
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.tweak_loader import load_daemons
 from src.tweaks.daemons_tweak import Daemon
@@ -40,7 +40,7 @@ class IOSDaemonsPage(QWidget):
         content_layout.addWidget(IOSSectionHeader(
             QCoreApplication.translate("IOSDaemonsPage", "Daemons to Disable")
         ))
-        master_card = IOSCard()
+        master_card = QWidget()
         master_row = QHBoxLayout(master_card)
         master_row.setContentsMargins(16, 10, 16, 10)
         master_row.setSpacing(12)
@@ -85,7 +85,7 @@ class IOSDaemonsPage(QWidget):
         ))
         self.screen_time_tweak = tweaks.get(TweakID.ClearScreenTimeAgentPlist)
         if self.screen_time_tweak is not None:
-            card = IOSCard()
+            card = QWidget()
             row_layout = QHBoxLayout(card)
             row_layout.setContentsMargins(16, 10, 16, 10)
             row_layout.setSpacing(12)
@@ -100,8 +100,8 @@ class IOSDaemonsPage(QWidget):
         self._update_daemons_enabled()
         content_layout.addStretch()
 
-    def _make_daemon_switch(self, content_layout, title: str, daemon: Daemon) -> IOSCard:
-        card = IOSCard()
+    def _make_daemon_switch(self, content_layout, title: str, daemon: Daemon) -> QWidget:
+        card = QWidget()
         row_layout = QHBoxLayout(card)
         row_layout.setContentsMargins(16, 10, 16, 10)
         row_layout.setSpacing(12)

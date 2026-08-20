@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.gui.ios.components import (
-    IOSNavBar, IOSSectionHeader, IOSCard, IOSSwitch, IOSPrimaryButton
+    IOSNavBar, IOSSectionHeader, IOSSwitch, IOSPrimaryButton
 )
 from src.gui.ios.theme_manager import ThemeManager
 from src.gui.pages.main.settings import available_languages
@@ -152,7 +152,7 @@ class IOSSettingsPage(QWidget):
     # ---------- helpers ----------
 
     def _make_switch(self, title: str, checked: bool, on_toggled) -> IOSSwitch:
-        card = IOSCard()
+        card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
@@ -177,7 +177,7 @@ class IOSSettingsPage(QWidget):
         return handler
 
     def _make_text_row(self, title: str, current: str, on_submit):
-        card = IOSCard()
+        card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
@@ -236,7 +236,7 @@ class IOSSettingsPage(QWidget):
         self.window._sync_settings()
 
     def _make_language_row(self):
-        card = IOSCard()
+        card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
@@ -290,7 +290,7 @@ class IOSSettingsPage(QWidget):
         ))
 
         # apply method
-        card = IOSCard()
+        card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
@@ -316,7 +316,7 @@ class IOSSettingsPage(QWidget):
         )
 
         # saved ids list
-        ids_card = IOSCard()
+        ids_card = QWidget()
         ids_layout = QVBoxLayout(ids_card)
         ids_layout.setContentsMargins(16, 12, 16, 12)
         ids_layout.setSpacing(8)
@@ -353,7 +353,7 @@ class IOSSettingsPage(QWidget):
         self._refresh_saved_ids()
 
     def _make_label_row(self, title: str, value: str):
-        card = IOSCard()
+        card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
@@ -453,7 +453,7 @@ class IOSSettingsPage(QWidget):
             QCoreApplication.translate("IOSSettingsPage", "Presets")
         ))
 
-        card = IOSCard()
+        card = QWidget()
         presets_layout = QVBoxLayout(card)
         presets_layout.setContentsMargins(16, 12, 16, 12)
         presets_layout.setSpacing(8)
