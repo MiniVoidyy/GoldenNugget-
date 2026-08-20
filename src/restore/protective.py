@@ -45,6 +45,44 @@ from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 
 from src.exceptions.nugget_exception import NuggetException
 
+
+# Minimum free disk space required before any device backup is started.
+# Backups (protective, psysbackup, PosterBoard) are written to the system
+# temp directory and can easily reach several GB (photos, app data). Overridable
+# via the GOLDENNUGGET_MIN_FREE_GB environment variable.
+MIN_FREE_DISK_GB = 5.0
+
+
+def _min_free_disk_bytes() -> int:
+    try:
+        return int(float(os.environ.get("GOLDENNUGGET_MIN_FREE_GB", str(MIN_FREE_DISK_GB))) * (1024 ** 3))
+    except ValueError:
+        return int(MIN_FREE_DISK_GB * (1024 ** 3))
+
+
+def check_disk_space(path: str = None, min_free_bytes: int = None) -> None:
+    """Raise ``NuggetException`` if free disk space is below the backup threshold.
+
+    Device backups are written to disk (temp directory by default); a full
+    backup can be tens of GB. Fail early with a clear error instead of filling
+    the disk mid-backup, which would corrupt the backup and the apply flow.
+    """
+    import tempfile
+    if path is None:
+        path = tempfile.gettempdir()
+    if min_free_bytes is None:
+        min_free_bytes = _min_free_disk_bytes()
+    usage = shutil.disk_usage(path)
+    if usage.free < min_free_bytes:
+        free_gb = usage.free / (1024 ** 3)
+        required_gb = min_free_bytes / (1024 ** 3)
+        raise NuggetException(
+            f"Not enough free disk space: only {free_gb:.1f} GB available, "
+            f"at least {required_gb:.1f} GB is required for the backup. "
+            f"Free up space on your computer (backups are written to {path}) and try again."
+        )
+    return usage
+
 # Bump SSL handshake timeout — the default 10 seconds is too short for
 # mobilebackup2 service startup on busy or post-reboot devices (iOS 27+).
 # Importing this module applies it process-wide.
@@ -353,6 +391,8 @@ async def perform_protective_backup(
         )) or "connection" in msg or "incomplete" in msg or "terminated" in msg
 
     is_encrypted = False
+
+    check_disk_space(path=backup_root)
 
     shutil.rmtree(backup_root, ignore_errors=True)
     Path(backup_root).mkdir(parents=True, exist_ok=True)

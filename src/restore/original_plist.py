@@ -26,6 +26,7 @@ from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 
 from src.exceptions.nugget_exception import NuggetException
+from src.restore.protective import check_disk_space
 
 # Keys from lockdown ``all_values`` whose string values are device-specific
 # and should be replaced with placeholders when templating.
@@ -165,6 +166,7 @@ async def psysbackup(
             asyncio.TimeoutError,
         )) or "connection" in msg or "incomplete" in msg or "terminated" in msg
 
+    check_disk_space()
     update_label("Backing up device to capture original plists...")
     max_retries = 3
     for attempt in range(1, max_retries + 1):
