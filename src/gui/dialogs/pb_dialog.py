@@ -235,8 +235,3 @@ class PosterBoardDBWizard(QWizard):
             self.worker_thread.finished.connect(self.worker_thread.deleteLater)
             self.worker_thread.start()
         return super().initializePage(id)
-    
-    # def isComplete(self):
-    #     # need to emit completeChanged() every time a different value is returned
-    #     # this should be for the page not the QWizard itself
-    #     return not self.backup_started or self.backup_complete

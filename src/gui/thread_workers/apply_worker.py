@@ -30,10 +30,6 @@ class _SudoState:
             self._complete = False
             return pwd
 
-    def get_complete(self) -> bool:
-        with self._lock:
-            return self._complete
-
     def set_complete(self, complete: bool):
         with self._lock:
             self._complete = complete
@@ -48,10 +44,6 @@ _sudo_state = _SudoState()
 
 def get_sudo_pwd() -> Optional[str]:
     return _sudo_state.get_pwd()
-
-
-def get_sudo_complete() -> bool:
-    return _sudo_state.get_complete()
 
 
 def set_sudo_complete(is_complete: bool):

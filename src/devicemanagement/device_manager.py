@@ -758,7 +758,7 @@ class DeviceManager:
                 elif isinstance(tweak, StatusBarTweak):
                     # iOS 27: the status bar is Speakeasy, a SpringBoard
                     # feature flag — writing fails due to no write permissions.
-# The feature is disabled on iOS 27+.
+                    # The feature is disabled on iOS 27+.
                     flag_plist = tweak.apply_tweak(flag_plist, version=self.get_current_device_version())
 
             # Generate backup
