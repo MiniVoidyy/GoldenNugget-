@@ -1,49 +1,59 @@
-# note: This is 8.x branch (main, stable) only bug fixes accepts here. For development use 9.0 branch (unstable) but be ready for rapid changes
+# note: This is 8.x branch (main, stable) only bug fixes and some QOL features accepts here. For development use 9.0 branch (unstable) but be ready for rapid changes
 # note: want translate program to your language? Then go to [Our localization repo!](https://github.com/awesomenull-dev/gNugget-i18n)
-# contribute guide
-## 1. about AI usage
-# 1. Terms of AI use 
-AI is currently one of the best tools to help development\
-but YOU must test code on YOUR device before creating PR\
-Any untested or too unstable code will be REJECTED
-# 2. How to send evidence of test?
-You must add screen-shots or video of your code working correctly.\
-And as i said already if there is NO EVIDENCE of work, your PR will be auto-rejected.
+## 1. AI Usage & Testing Policy
+
+While AI is a great development tool, **you must thoroughly test all code on your own device** before creating a pull request. 
+
+* **Mandatory Testing:** Any untested or unstable code will be **automatically rejected**.
+* **Proof of Working Code:** You must include screenshots or a video demonstrating that your code works correctly. PRs submitted without visual or technical evidence will be auto-rejected.
+
+---
+
 ## 2. Bug Fixes
-About bug fixes.\
-This fixes shouldn't cause more bugs. Even trough nugget was ALWAYS really unstable in long perspective\
-I still want to have normal stability\
-That's all.
-## 3. New Features
-# 1. QOL (goldennugget app features)
-New features should NOT be useless.\
-GoldenNugget is already a HUGE project. And i don't want to turn goldennugget into "elephant" or superapp.
-# 2. Tweaks (New features for customization)
-As a "new tweaks" i accept:
-1. Old tweaks on new IOS versions
-2. New plist-based tweaks (like easyspeak workaround on iOS 27)
-3. New exploit-based tweaks (like bookrestore/sparserestore)
+
+When submitting bug fixes (`[FIX]`), please ensure that:
+* Your fix does **not** introduce new bugs.
+* While GoldenNugget has historically had some long-term stability challenges, maintaining a reasonable baseline of normal stability is a top priority.
+
+---
+
+## 3. New Features & Tweaks
+
+### Quality of Life (QOL) / App Features
+* Features should **not** be redundant or useless. 
+* GoldenNugget is already a large project; we want to avoid turning it into an overloaded "super-app" or bloatware ("elephant").
+
+### Customization Tweaks
+We welcome the following types of tweaks:
+1. Porting old tweaks to newer iOS versions.
+2. New plist-based tweaks (e.g., EasySpeak workarounds).
+3. New exploit-based tweaks (e.g., BookRestore / SparseRestore).
+
+---
+
 ## 4. Pull Request Naming Convention
 
-To keep the repository history clean and easy to read, please use the following tags at the beginning of your PR title:
+To keep the repository history clean and easy to read, please use the appropriate tag at the beginning of your PR title:
 
-* **[TWEAK]** - For new iOS tweaks or plist modifications.
-* **[FIX]** - For bug fixes and stability improvements.
-* **[QOL]** - For app features, UI changes, or overall GoldenNugget improvements.
-* **[DOCS]** - For updates to the README, documentation, or this guide.
+* **`[TWEAK]`** – For new iOS tweaks or plist modifications.
+* **`[FIX]`** – For bug fixes and stability improvements.
+* **`[QOL]`** – For app features, UI changes, or overall GoldenNugget improvements.
+* **`[DOCS]`** – For updates to the README, documentation, or this guide.
 
-**Good PR Titles:**
-* `[TWEAK] Add easyspeak (status bar) support for iOS 27`
-* `[FIX] Fix SEGV after restore`
-* `[QOL] Improve logging`
+### Examples
 
-**Bad PR Titles:**
-* `fixed bug`
-* `added new tweak please merge`
-* `update`
+| Good PR Titles | Bad PR Titles |
+| :--- | :--- |
+| `[TWEAK] Add easyspeak (status bar) support for iOS 27` | `fixed bug` |
+| `[FIX] Fix SEGV after restore` | `added new tweak please merge` |
+| `[QOL] Improve logging` | `update` |
 
-If your PR does not follow this format, you need to rename it before it gets reviewed.
-# End
-That's all, i hope this guideline was useful.\
-You can leave you opinion about it in discussion.\
-Written entirely by awesomenull. can be updated anytime, already created pull requests will not be affected in case of update.
+> ⚠️ **Note:** Any PR still will be reviewed but i recommend to follow this rules. 
+
+---
+
+## Final Notes
+
+* This guide may be updated at any time. 
+* **Existing pull requests will not be affected** if these guidelines are updated later.
+* Feel free to leave your thoughts or feedback about this guide in the repository discussions!
