@@ -43,4 +43,6 @@ class HomePage(Page):
         support_str: str = "<span style=\"color: #32d74b;\">" + QCoreApplication.tr("Supported!") + "</span></a>"
         if not self.window.device_manager.get_current_device_is_supported_by_fork():
             support_str = "<span style=\"color: #ff0000;\">" + QCoreApplication.tr("Not Supported.") + "</span></a>"
+        elif self.window.device_manager.get_current_device_partially_supported():
+            support_str = "<span style=\"color: #ffd60a;\">" + QCoreApplication.tr("Partially Supported") + "</span></a>"
         self.ui.phoneVersionLbl.setText(f"<a style=\"text-decoration:none; color: white;\" href=\"#\">iOS {version} ({build}) {support_str}")

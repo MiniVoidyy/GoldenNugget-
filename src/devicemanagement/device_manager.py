@@ -306,6 +306,15 @@ class DeviceManager:
             return False
         else:
             return self.data_singleton.current_device.is_supported_by_fork()
+
+    def get_current_device_partially_supported(self) -> bool:
+        """iOS 27 devices use the experimental three-phase protective restore."""
+        if self.data_singleton.current_device == None:
+            return False
+        try:
+            return Version(self.data_singleton.current_device.version) >= Version("27.0")
+        except Exception:
+            return False
         
     def reset_device_pairing(self):
         asyncio.run(self._reset_device_pairing())

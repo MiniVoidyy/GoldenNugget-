@@ -327,8 +327,12 @@ class IOSHomePage(QWidget):
     def update_status(self):
         try:
             if self.window.device_manager.get_current_device_udid():
-                status_text = QCoreApplication.translate("QCoreApplication", "Supported!")
-                color = "#30D158"
+                if self.window.device_manager.get_current_device_partially_supported():
+                    status_text = QCoreApplication.translate("IOSHomePage", "Partially Supported")
+                    color = "#FFD60A"
+                else:
+                    status_text = QCoreApplication.translate("QCoreApplication", "Supported!")
+                    color = "#30D158"
             else:
                 status_text = QCoreApplication.translate("IOSHomePage", "Not connected")
                 color = "#FFFFFF"
