@@ -43,6 +43,8 @@ import pymobiledevice3.service_connection as _sc
 from pymobiledevice3.lockdown import LockdownClient
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 
+from PySide6.QtCore import QCoreApplication
+
 from src.exceptions.nugget_exception import NuggetException
 
 
@@ -77,9 +79,11 @@ def check_disk_space(path: str = None, min_free_bytes: int = None) -> None:
         free_gb = usage.free / (1024 ** 3)
         required_gb = min_free_bytes / (1024 ** 3)
         raise NuggetException(
-            f"Not enough free disk space: only {free_gb:.1f} GB available, "
-            f"at least {required_gb:.1f} GB is required for the backup. "
-            f"Free up space on your computer (backups are written to {path}) and try again."
+            QCoreApplication.translate(
+                "Nugget",
+                "Not enough free disk space: only {0} GB available, at least {1} GB is required for the backup. "
+                "Free up space on your computer (backups are written to {2}) and try again.",
+            ).format(f"{free_gb:.1f}", f"{required_gb:.1f}", path)
         )
     return usage
 

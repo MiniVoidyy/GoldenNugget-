@@ -2218,13 +2218,13 @@ DO NOT unplug your device during restores.</source>
         </message>
         <message>
             <location line="+16" />
-            <location line="+56" />
+            <location line="+57" />
             <location line="+12" />
             <source>Save Preset</source>
             <translation>Сохранить пресет</translation>
         </message>
         <message>
-            <location line="-46" />
+            <location line="-47" />
             <source>Load</source>
             <translation>Загрузить</translation>
         </message>
@@ -2249,7 +2249,7 @@ DO NOT unplug your device during restores.</source>
             <translation>Импорт</translation>
         </message>
         <message>
-            <location line="+31" />
+            <location line="+32" />
             <source>Enter a name for this preset.</source>
             <translation>Введите название для этого пресета.</translation>
         </message>
@@ -2378,7 +2378,7 @@ GoldenNugget будет перезапущен, чтобы применить и
             <translation>* Примечание: пропуск настройки может вызвать проблемы с профилями конфигурации. Отключите эту функцию, если это необходимо.</translation>
         </message>
         <message>
-            <location filename="../../gui/ios/settings.py" line="-567" />
+            <location filename="../../gui/ios/settings.py" line="-568" />
             <location filename="../mainwindow.ui" line="+27" />
             <source>Reset Device Pairing</source>
             <translation>Сброс сопряжения устройств</translation>
@@ -2808,6 +2808,11 @@ Please do not make GitHub issues on Nugget about them, it is not fixable.</sourc
             <location filename="../../gui/ios/components.py" line="+42" />
             <source>←  Back</source>
             <translation>←  Назад</translation>
+        </message>
+        <message>
+            <location filename="../../restore/protective.py" line="+82" />
+            <source>Not enough free disk space: only {0} GB available, at least {1} GB is required for the backup. Free up space on your computer (backups are written to {2}) and try again.</source>
+            <translation>Недостаточно свободного места на диске: доступно только {0} ГБ, а для резервной копии требуется минимум {1} ГБ. Освободите место на компьютере (резервные копии записываются в {2}) и попробуйте снова.</translation>
         </message>
     </context>
     <context>
@@ -3263,14 +3268,14 @@ GoldenNugget поддерживает только iOS 26.2 и новее. Дл�
         </message>
         <message>
             <location line="+4" />
-            <location line="+270" />
+            <location line="+271" />
             <location line="+13" />
             <source>Save Preset</source>
             <translation>Сохранить пресет</translation>
         </message>
         <message>
-            <location line="-253" />
-            <location line="+260" />
+            <location line="-254" />
+            <location line="+261" />
             <location line="+12" />
             <location line="+7" />
             <location line="+9" />
@@ -3278,15 +3283,15 @@ GoldenNugget поддерживает только iOS 26.2 и новее. Дл�
             <translation>Загрузить пресет</translation>
         </message>
         <message>
-            <location line="-284" />
-            <location line="+292" />
+            <location line="-285" />
+            <location line="+293" />
             <location line="+7" />
             <location line="+9" />
             <source>Delete Preset</source>
             <translation>Удалить пресет</translation>
         </message>
         <message>
-            <location line="-304" />
+            <location line="-305" />
             <source>Refresh</source>
             <translation>Обновить</translation>
         </message>
@@ -3321,7 +3326,7 @@ GoldenNugget поддерживает только iOS 26.2 и новее. Дл�
             <translation>Интерфейс в стиле iOS (новый интерфейс)</translation>
         </message>
         <message>
-            <location line="+101" />
+            <location line="+102" />
             <source>Enter a name for this preset.</source>
             <translation>Введите название для этого пресета.</translation>
         </message>
