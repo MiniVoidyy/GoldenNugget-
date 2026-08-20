@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt, QSize, QCoreApplication
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout,
     QPushButton, QScrollArea, QToolButton, QStackedWidget,
-    QCheckBox
+    QCheckBox, QComboBox
 )
 from PySide6.QtGui import QPixmap, QIcon
 
@@ -348,6 +348,52 @@ class IOSPosterboardPage(QWidget):
         self.foreground_chk.toggled.connect(self.on_foreground_toggled)
         v_layout.addWidget(self.foreground_chk)
 
+        # Calculation mode
+        calc_row = QHBoxLayout()
+        calc_label = QLabel(QCoreApplication.translate("IOSPosterboardPage", "Calculation Mode"))
+        calc_label.setStyleSheet("font-size: 15px; color: #FFFFFF; min-width: 100px;")
+        self.calc_mode_drp = QComboBox()
+        self.calc_mode_drp.addItem(QCoreApplication.translate("IOSPosterboardPage", "Linear"))
+        self.calc_mode_drp.addItem(QCoreApplication.translate("IOSPosterboardPage", "Discrete"))
+        self.calc_mode_drp.setCurrentIndex(0 if tweaks[TweakID.PosterBoard].calculationMode == 'linear' else 1)
+        self.calc_mode_drp.activated.connect(self.on_calc_mode_selected)
+        self.calc_mode_drp.setStyleSheet("""
+            QComboBox {
+                background-color: #1C1C1E;
+                border: none;
+                border-radius: 10px;
+                color: #FFFFFF;
+                font-size: 14px;
+                padding: 8px 12px;
+            }
+            QComboBox::drop-down { border: none; width: 24px; }
+            QComboBox QAbstractItemView {
+                background-color: #2C2C2E;
+                border: 1px solid #3A3A3C;
+                border-radius: 10px;
+                color: #FFFFFF;
+                selection-background-color: #007AFF;
+            }
+        """)
+        calc_row.addWidget(calc_label)
+        calc_row.addWidget(self.calc_mode_drp, 1)
+        v_layout.addLayout(calc_row)
+
+        # Export video loop
+        export_btn = IOSPrimaryButton(QCoreApplication.translate("IOSPosterboardPage", "Export Video Loop (.tendies)"))
+        export_btn.clicked.connect(self.on_export_video_clicked)
+        v_layout.addWidget(export_btn)
+
+        # Discover wallpapers + help
+        ext_row = QHBoxLayout()
+        discover_btn = IOSPrimaryButton(QCoreApplication.translate("Nugget", "Discover Wallpapers"))
+        discover_btn.clicked.connect(self.on_discover_wallpapers)
+        help_btn = IOSPrimaryButton(QCoreApplication.translate("IOSPosterboardPage", "Help"))
+        help_btn.clicked.connect(self.on_help)
+        ext_row.addWidget(discover_btn)
+        ext_row.addWidget(help_btn)
+        v_layout.addLayout(ext_row)
+
         v_layout.addStretch()
 
         self._update_video_labels()
@@ -397,6 +443,46 @@ class IOSPosterboardPage(QWidget):
 
     def on_foreground_toggled(self, checked: bool):
         tweaks[TweakID.PosterBoard].use_foreground = checked
+
+    def on_calc_mode_selected(self, index: int):
+        tweaks[TweakID.PosterBoard].calculationMode = 'linear' if index == 0 else 'discrete'
+
+    def on_export_video_clicked(self):
+        import os
+        import uuid
+        import subprocess
+        from shutil import make_archive, rmtree
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        directory = QFileDialog.getExistingDirectory(
+            self.window, QCoreApplication.translate("IOSPosterboardPage", "Select Directory"), "",
+            QFileDialog.ShowDirsOnly)
+        if not directory:
+            return
+        try:
+            path = os.path.join(directory, f"Nugget-Export-{uuid.uuid4()}")
+            tweaks[TweakID.PosterBoard].create_video_loop_files(output_dir=path)
+            zip_path = path + ".tendies"
+            make_archive(path, 'zip', path)
+            os.rename(path + '.zip', zip_path)
+            rmtree(path)
+            print(f"Created at {zip_path}")
+            if os.name == 'nt':
+                subprocess.Popen(f'explorer "{os.path.normpath(zip_path)}"')
+            else:
+                subprocess.call(["open", '-R', zip_path])
+        except Exception as e:
+            QMessageBox.critical(
+                self.window, QCoreApplication.translate("QtCore.QCoreApplication", "Error!"),
+                type(e).__name__ + ": " + repr(e))
+
+    def on_discover_wallpapers(self):
+        import webbrowser
+        webbrowser.open_new_tab("https://cowabun.ga/wallpapers")
+
+    def on_help(self):
+        from src.gui.dialogs import PBHelpDialog
+        dialog = PBHelpDialog()
+        dialog.exec()
 
     def show_add_tendies_dialog(self):
         from PySide6.QtWidgets import QFileDialog
