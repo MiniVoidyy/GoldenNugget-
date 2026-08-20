@@ -8,7 +8,7 @@ from src.qt.mainwindow_ui import Ui_Nugget
 from PySide6.QtCore import QCoreApplication, QSize, Qt
 from PySide6.QtWidgets import (
     QFileDialog, QFrame, QHBoxLayout, QLabel,
-    QLineEdit, QListWidget, QMessageBox, QSizePolicy, QSpacerItem,
+    QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QSizePolicy, QSpacerItem,
     QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -363,7 +363,8 @@ class SettingsPage(Page):
                 item_text = f"{name}\n  {desc}  ({model} • iOS {ios}){tag_str}"
             else:
                 item_text = f"{name}  ({model} • iOS {ios}){tag_str}"
-            item = self.presetList.addItem(item_text)
+            item = QListWidgetItem(item_text)
+            self.presetList.addItem(item)
             item.setData(Qt.UserRole, name)
 
     def on_presetSaveBtn_clicked(self):
