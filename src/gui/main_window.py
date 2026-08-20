@@ -26,11 +26,9 @@ from src.gui.ios.theme_manager import ThemeManager
 from src.gui.ios.home import IOSHomePage
 from src.gui.ios.tweaks import IOSTweaksPage
 from src.gui.ios.posterboard import IOSPosterboardPage
-from src.gui.ios.springboard import IOSSpringboardPage
 from src.gui.ios.daemons import IOSDaemonsPage
 from src.gui.ios.settings import IOSSettingsPage
 from src.gui.ios.statusbar import IOSStatusBarPage
-from src.gui.ios.passcode import IOSPasscodePage
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, device_manager: DeviceManager, translator: Translator):
@@ -97,19 +95,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ios_home = IOSHomePage(self)
         self.ios_tweaks = IOSTweaksPage(self)
         self.ios_posterboard = IOSPosterboardPage(self)
-        self.ios_springboard = IOSSpringboardPage(self)
         self.ios_daemons = IOSDaemonsPage(self)
         self.ios_settings = IOSSettingsPage(self)
         self.ios_statusbar = IOSStatusBarPage(self)
-        self.ios_passcode = IOSPasscodePage(self)
         self.ios_pages.addWidget(self.ios_home)
         self.ios_pages.addWidget(self.ios_tweaks)
         self.ios_pages.addWidget(self.ios_posterboard)
-        self.ios_pages.addWidget(self.ios_springboard)
         self.ios_pages.addWidget(self.ios_daemons)
         self.ios_pages.addWidget(self.ios_settings)
         self.ios_pages.addWidget(self.ios_statusbar)
-        self.ios_pages.addWidget(self.ios_passcode)
 
         self.theme_manager.set_classic_widget(self.ui.centralwidget)
         self.theme_manager.set_ios_widget(self.ios_pages)
@@ -413,8 +407,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.updateInterfaceForNewDevice()
         self.ios_home.update_device_info()
         self.ios_home.update_status()
-        if hasattr(self, "ios_passcode"):
-            self.ios_passcode.refresh_language_code()
         if index > -1:
             self.warn_for_dev_beta()
 
