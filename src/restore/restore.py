@@ -393,8 +393,14 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
         # rejected there — see the pb_via_protective note in restore_files.
         for f in (pb_inject_files or []):
             rel = f.restore_path.lstrip("/")
+            data = f.contents
+            if data is None and f.contents_path:
+                with open(f.contents_path, "rb") as fh:
+                    data = fh.read()
+            if isinstance(data, str):
+                data = data.encode("utf-8")
             ok = inject_file_into_backup(
-                backup_root, udid, f.domain, rel, f.read_contents(),
+                backup_root, udid, f.domain, rel, data,
                 mode=_FileMode.S_IFREG | 0o644,
                 owner=f.owner, group=f.group)
             log_info(f"Injected {f.domain}/{rel} into protective backup: {ok}")
