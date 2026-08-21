@@ -550,20 +550,18 @@ class DeviceManager:
             # iOS 26.2+ (iOS 27 era) uses the heavy three-phase protective restore
             pb.tendies = original_tendies[:MAX_TENDIES_PER_RESTORE]
 
-            # Phase 0: one protective backup for the whole apply. It feeds both
-            # the PosterBoard database (so the config manager builds on the
-            # current on-device state) and the Phase 3 restore after the wipe.
-            # The master copy is cached in the temp dir and refreshed
+            # Phase 0a: cached protective backup feeding the Phase 3 restore.
+            # The master copy lives in the temp dir and is refreshed
             # incrementally, so repeat applies skip the multi-GB re-upload.
             # Encrypted backups bypass the cache entirely (the manifest cannot
             # be pruned locally and encryption is slow anyway).
             prepared_root = await self._prepare_protective_backup(update_label)
 
-            if prepared_root is None:
-                # fallback (encrypted / cache disabled): legacy separate
-                # PosterBoard backup. GOLDENNUGGET_SKIP_PB_BACKUP=1 skips it.
-                if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
-                    await self._backup_posterboard_database(update_label, force=True)
+            # Phase 0b: PosterBoard is fragile — its database is build-on-top
+            # state, so it is renewed from the live device on EVERY apply and
+            # never taken from the /tmp cache copy.
+            if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
+                await self._backup_posterboard_database(update_label, force=True)
 
             final_alert, files_to_restore = await self._apply_tweak_pass(
                 update_label,
@@ -578,11 +576,12 @@ class DeviceManager:
             show_alert(final_alert)
 
     async def _prepare_protective_backup(self, update_label=lambda x: None) -> Optional[str]:
-        """Run the single cached protective backup; return its root for Phase 3.
+        """Refresh the cached protective backup; return its root for Phase 3.
 
         Returns None when the cache path must be skipped (backup encryption
-        enabled, or GOLDENNUGGET_NO_BACKUP_CACHE=1). Also extracts the fresh
-        PosterBoard database from the backup into the config manager.
+        enabled, or GOLDENNUGGET_NO_BACKUP_CACHE=1). The PosterBoard database
+        is deliberately NOT taken from this cache — it is renewed separately
+        on every apply because it is build-on-top state.
         """
         udid = self.get_current_device_udid()
         if not udid:
@@ -591,11 +590,7 @@ class DeviceManager:
             log_info("Backup cache disabled via GOLDENNUGGET_NO_BACKUP_CACHE")
             return None
 
-        from src.restore.protective import (
-            ProtectiveBackupCache,
-            extract_posterboard_db,
-            is_backup_encrypted,
-        )
+        from src.restore.protective import ProtectiveBackupCache, is_backup_encrypted
 
         check_ld = await create_using_usbmux(serial=udid)
         try:
@@ -607,28 +602,12 @@ class DeviceManager:
             master_root = await cache.refresh(
                 check_ld,
                 progress_callback=self._backup_progress(update_label),
-                include_photos=True, include_posterboard=True)
+                include_photos=True)
         finally:
             try:
                 await check_ld.close()
             except Exception:
                 pass
-
-        # fresh PosterBoard database straight from the same backup
-        if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
-            import tempfile
-            with tempfile.TemporaryDirectory(prefix="nugget_pbdb_") as tmp_dir:
-                db_path = extract_posterboard_db(
-                    master_root, udid, os.path.join(tmp_dir, "posterboard.sqlite3"))
-                if db_path is not None:
-                    pb = tweaks[TweakID.PosterBoard]
-                    if not pb.config_manager.update_database_file(db_path, udid):
-                        raise NuggetException("The PosterBoard database is not of the correct format!")
-                    pb.config_manager.update_for_saved_database(udid)
-                    update_label(QCoreApplication.tr("PosterBoard database backed up successfully."))
-                else:
-                    log_warn("PosterBoard DB missing from protective backup — falling back to a separate backup")
-                    await self._backup_posterboard_database(update_label, force=True)
         return master_root
 
     async def _backup_posterboard_database(self, update_label=lambda x: None, force: bool = False):
