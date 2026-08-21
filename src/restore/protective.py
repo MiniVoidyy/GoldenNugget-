@@ -25,18 +25,16 @@ is not needed for tweak functionality.
 
 import asyncio
 import hashlib
+import json
 import os
 import plistlib
 import shutil
 import sqlite3
-import struct
+import tempfile
 import time
 import uuid as _uuid
-import warnings
-from collections.abc import Mapping
-from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Callable, Optional, cast
+from typing import Optional
 
 import pymobiledevice3.exceptions as _pm3_exc
 import pymobiledevice3.service_connection as _sc
@@ -167,11 +165,6 @@ def log_error(msg: str) -> None:
     _log_write(f"[ERROR] {msg}")
 
 # --- DeviceLink protocol constants (from pymobiledevice3.services.device_link) ---
-_SIZE_FORMAT = ">I"
-_CODE_FORMAT = ">B"
-_CODE_FILE_DATA = 0xC
-_CODE_ERROR_REMOTE = 0xB
-_CODE_SUCCESS = 0
 
 # Backup metadata files that must always be preserved (never filtered out)
 _BACKUP_METADATA_FILES = frozenset({
@@ -235,6 +228,16 @@ _SKIP_FILES = frozenset({
     ".GlobalPreferences.plist",  # Written separately as tweaks; skip to avoid overwrite
 })
 
+# PosterBoard sqlite database pulled from the same protective backup so the
+# apply flow needs a single device backup instead of two full ones.
+# Scope note: the database is kept mid-stream so it lands in the cache MASTER
+# (feeding the config manager), but clean_backup_for_restore still prunes it
+# from the restore copy — Phase 3 must never overwrite the tweaked database
+# that Phase 2 lays down.
+POSTERBOARD_DB_DOMAIN = "AppDomain-com.apple.PosterBoard"
+POSTERBOARD_DB_PATH = ("Library/Application Support/PRBPosterExtensionDataStore/61/"
+                       "PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3")
+
 
 def _is_protective_file(domain: str, relative_path: str, include_photos: bool = True) -> bool:
     """Check if a file belongs in the protective backup."""
@@ -252,86 +255,39 @@ def _is_protective_file(domain: str, relative_path: str, include_photos: bool = 
     return False
 
 
-class _SelectiveDeviceLink:
-    """DeviceLink wrapper that discards non-protective files mid-stream.
+def _norm_device_name(device_name: str) -> str:
+    return device_name.replace("\\", "/").lstrip("/")
 
-    During backup the device sends every file via DLMessageUploadFiles.
-    When ``preserve_file`` returns False for a file, its data is read off
-    the socket and thrown away — no placeholder is created (an empty file's
-    SHA1 never matches the Manifest.db digest, and clean_backup_for_restore
-    removes the dangling Manifest rows before the backup is restored).
 
-    All other DeviceLink operations delegate to the wrapped instance.
+def _domain_match(device_name: str, domain: str) -> bool:
+    name = _norm_device_name(device_name)
+    return name == domain or name.startswith(f"{domain}/")
+
+
+def _path_match(device_name: str, path: str) -> bool:
+    name = _norm_device_name(device_name)
+    return name == path or name.startswith(f"{path}/") or f"/{path}/" in name
+
+
+def is_protective_device_file(device_name: str, include_photos: bool = True,
+                              include_posterboard: bool = True) -> bool:
+    """Mid-stream backup filter: match an upload's device-side name against the keep-set.
+
+    Upload names carry the domain and path (e.g. ``HomeDomain/Library/...``),
+    mirroring pymobiledevice3's own BackupSelectionRule matching. Rejected
+    payloads are drained by the DeviceLink; their Manifest.db rows survive so
+    subsequent incremental backups do not re-upload them.
     """
-
-    def __init__(self, device_link, preserve_file: Callable[[str, str], bool]):
-        self._dl = device_link
-        self._preserve_file = preserve_file
-
-    def __getattr__(self, name):
-        return getattr(self._dl, name)
-
-    async def _recv_chunk_header(self) -> tuple:
-        (size,) = struct.unpack(
-            _SIZE_FORMAT, await self._dl.service.recvall(struct.calcsize(_SIZE_FORMAT)))
-        (code,) = struct.unpack(
-            _CODE_FORMAT, await self._dl.service.recvall(struct.calcsize(_CODE_FORMAT)))
-        return size - struct.calcsize(_CODE_FORMAT), code
-
-    async def upload_files(self, _message):
-        while True:
-            device_name = await self._dl._prefixed_recv()
-            if not device_name:
-                break
-            file_name = await self._dl._prefixed_recv()
-            size, code = await self._recv_chunk_header()
-
-            if self._preserve_file(file_name, device_name):
-                dest = self._dl.root_path / file_name
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                with open(dest, "wb") as fd:
-                    while size and code == _CODE_FILE_DATA:
-                        fd.write(await self._dl.service.recvall(size))
-                        size, code = await self._recv_chunk_header()
-            else:
-                # Discard incoming data — do NOT create an empty placeholder.
-                while size and code == _CODE_FILE_DATA:
-                    await self._dl.service.recvall(size)
-                    size, code = await self._recv_chunk_header()
-
-            if code == _CODE_ERROR_REMOTE:
-                error_message = (await self._dl.service.recvall(size)).decode()
-                warnings.warn(
-                    f"Failed to fully upload: {file_name}. "
-                    f"Device file name: {device_name}. Reason: {error_message}",
-                    stacklevel=2,
-                )
-                continue
-            assert code == _CODE_SUCCESS
-        await self._dl.status_response(0)
-
-    async def move_items(self, message):
-        items = cast(Mapping[str, str], message[1])
-        for src, dst in items.items():
-            source = self._dl.root_path / src
-            if not source.exists():
-                # File was discarded during upload — nothing to move.
-                continue
-            dest = self._dl.root_path / dst
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(source, dest)
-        await self._dl.status_response(0)
-
-    async def copy_item(self, message):
-        # DLMessageCopyItem carries (src, dst) as positional message fields.
-        # If the source was discarded during upload, skip instead of failing.
-        src, dst = message[1], message[2]
-        source = self._dl.root_path / src
-        if source.exists():
-            dest = self._dl.root_path / dst
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, dest)
-        await self._dl.status_response(0)
+    for domain in (("CameraRollDomain", "MediaDomain") if include_photos else ()) + \
+            ("SystemPreferencesDomain",):
+        if _domain_match(device_name, domain):
+            return True
+    for prefix in APPLE_ID_PATH_PREFIXES + SPRINGBOARD_PATH_PREFIXES + CONTROL_CENTER_PATH_PREFIXES:
+        if _path_match(device_name, f"HomeDomain/{prefix}") or _path_match(device_name, prefix):
+            return True
+    if include_posterboard and _path_match(device_name, f"{POSTERBOARD_DB_DOMAIN}/{POSTERBOARD_DB_PATH}"):
+        return True
+    return False
 
 
 class ProtectiveBackupService(Mobilebackup2Service):
@@ -339,17 +295,18 @@ class ProtectiveBackupService(Mobilebackup2Service):
 
     - ``init_mobile_backup_factory_info`` returns an empty ``Applications``
       dict, so the device skips all app containers (AppDomain-*) entirely —
-      they are never uploaded at all.
-    - When ``preserve_file`` is provided, the DeviceLink upload/move/copy
-      handlers are replaced with selective versions that discard
-      non-protective file data mid-stream.
+      they are never uploaded at all. With ``include_posterboard`` it lists
+      only the PosterBoard container so its sqlite database rides the same
+      backup.
+    - Mid-stream payload filtering is done via pymobiledevice3's native
+      ``filter_callback`` on ``backup()``.
     - ``connect`` retries transient failures with exponential backoff —
       iOS 27+ devices can take a while to spin up mobilebackup2.
     """
 
-    def __init__(self, lockdown, preserve_file: Optional[Callable[[str, str], bool]] = None):
+    def __init__(self, lockdown, include_posterboard: bool = False):
         super().__init__(lockdown)
-        self._preserve_file = preserve_file
+        self.include_posterboard = include_posterboard
 
     async def connect(self, max_retries: int = 5):
         last_error = None
@@ -371,7 +328,7 @@ class ProtectiveBackupService(Mobilebackup2Service):
 
     async def init_mobile_backup_factory_info(self, afc):
         root_node = self.lockdown.all_values
-        return {
+        info = {
             "iTunes Version": "10.0.1",
             "iTunes Files": {},
             "Unique Identifier": self.lockdown.udid.upper(),
@@ -387,28 +344,38 @@ class ProtectiveBackupService(Mobilebackup2Service):
             "Build Version": root_node["BuildVersion"],
             "Applications": {},  # skip all app containers — big speedup
         }
+        if self.include_posterboard:
+            await self._add_posterboard_container(info)
+        return info
 
-    @asynccontextmanager
-    async def device_link(self, backup_directory, **kwargs):
-        from pymobiledevice3.services.device_link import DeviceLink
-        dl = DeviceLink(self.service, Path(backup_directory))
-        await dl.version_exchange()
-        await self.version_exchange(dl)
-        if self._preserve_file is not None:
-            selective = _SelectiveDeviceLink(dl, preserve_file=self._preserve_file)
-            handlers = getattr(dl, "_dl_handlers", {})
-            # dl_loop dispatches via self._dl_handlers[command](message);
-            # swap in the selective handlers where they exist.
-            if "DLMessageUploadFiles" in handlers:
-                handlers["DLMessageUploadFiles"] = selective.upload_files
-            if "DLMessageMoveItems" in handlers:
-                handlers["DLMessageMoveItems"] = selective.move_items
-            if "DLMessageCopyItem" in handlers:
-                handlers["DLMessageCopyItem"] = selective.copy_item
+    async def _add_posterboard_container(self, info: dict):
+        """List only the PosterBoard container so its sqlite DB rides this backup.
+
+        The entry format backupd expects for a single container is not
+        documented; this mirrors the fields the stock factory info carries.
+        If the DB still ends up missing from the manifest, the apply flow
+        falls back to the legacy separate PosterBoard backup.
+        """
         try:
-            yield dl
-        finally:
-            await dl.disconnect()
+            from pymobiledevice3.services.installation_proxy import InstallationProxyService
+            async with InstallationProxyService(lockdown=self.lockdown) as ip:
+                apps = await ip.get_apps(application_type="Any", calculate_sizes=False)
+            app_info = apps.get(POSTERBOARD_DB_DOMAIN.removeprefix("AppDomain-"))
+            if app_info is None:
+                log_warn("PosterBoard app not found via installation proxy; skipping container inclusion")
+                return
+            container = app_info["Container"]
+            info["Installed Applications"] = [POSTERBOARD_DB_DOMAIN.removeprefix("AppDomain-")]
+            info["Applications"] = {
+                POSTERBOARD_DB_DOMAIN.removeprefix("AppDomain-"): {
+                    "Container": container,
+                    "CFBundleIdentifier": POSTERBOARD_DB_DOMAIN.removeprefix("AppDomain-"),
+                    "CFBundleVersion": app_info.get("CFBundleVersion", "1.0"),
+                }
+            }
+            log_info(f"PosterBoard container included in protective backup: {container}")
+        except Exception as e:
+            log_warn(f"PosterBoard container inclusion failed: {e}")
 
 
 async def perform_protective_backup(
@@ -416,13 +383,17 @@ async def perform_protective_backup(
     backup_root: str,
     progress_callback=None,
     include_photos: bool = True,
+    include_posterboard: bool = False,
+    incremental_ok: bool = False,
 ) -> bool:
     """Run a selective device backup into ``backup_root``.
 
-    Only protective data (photos, Apple ID, user settings) and the backup
-    metadata are written to disk; everything else is discarded mid-stream.
-    If the selective upload fails, automatically retries once as a full
-    (unfiltered) backup so the flow never dies on a filtering edge case.
+    Only protective data (photos, Apple ID, user settings, home screen,
+    Control Center — and optionally the PosterBoard database) is written to
+    disk; everything else is drained mid-stream via pymobiledevice3's native
+    backup filter. Rejected payloads keep their Manifest.db rows, so with
+    ``incremental_ok=True`` the next run only uploads what changed on the
+    device since this backup.
 
     Returns True if the device backup is encrypted.
     """
@@ -432,17 +403,25 @@ async def perform_protective_backup(
     from src.exceptions.device_errors import is_device_locked_error as _is_device_locked_error
     from src.exceptions.device_errors import is_connection_error as _is_connection_error
 
+    def _filter_callback(backup_file) -> bool:
+        return is_protective_device_file(
+            backup_file.device_name or "",
+            include_photos=include_photos,
+            include_posterboard=include_posterboard)
+
     is_encrypted = False
 
-    await check_disk_space_for_backup(lockdown_client, path=backup_root)
-
-    shutil.rmtree(backup_root, ignore_errors=True)
+    if not incremental_ok:
+        # A full (re)upload needs real disk headroom; an incremental refresh
+        # writes only the delta, so the floor check would be pure overhead.
+        await check_disk_space_for_backup(lockdown_client, path=backup_root)
+        shutil.rmtree(backup_root, ignore_errors=True)
     Path(backup_root).mkdir(parents=True, exist_ok=True)
 
     max_retries = 3
     for attempt in range(1, max_retries + 1):
         try:
-            async with ProtectiveBackupService(lockdown_client) as mb:
+            async with ProtectiveBackupService(lockdown_client, include_posterboard=include_posterboard) as mb:
                 # Check if encryption is already enabled (don't enable it ourselves)
                 try:
                     is_encrypted = await mb.get_will_encrypt()
@@ -457,8 +436,9 @@ async def perform_protective_backup(
                     progress_callback("Creating protective backup (unencrypted)...")
 
                 try:
-                    await mb.backup(full=True, backup_directory=backup_root,
-                                    progress_callback=progress_callback)
+                    await mb.backup(full=not incremental_ok, backup_directory=backup_root,
+                                    progress_callback=progress_callback,
+                                    filter_callback=_filter_callback)
                     break  # Success
                 except Exception as e:
                     if _is_device_locked_error(e):
@@ -479,6 +459,147 @@ async def perform_protective_backup(
             raise
 
     return is_encrypted
+
+
+async def is_backup_encrypted(lockdown_client: LockdownClient) -> bool:
+    """Check whether the device currently encrypts its backups."""
+    try:
+        async with Mobilebackup2Service(lockdown_client) as mb:
+            return await mb.get_will_encrypt()
+    except Exception as e:
+        log_warn(f"Could not read backup encryption state: {e}")
+        return False
+
+
+class ProtectiveBackupCache:
+    """Persistent per-device cache of the protective backup master copy.
+
+    The master keeps the FULL Manifest.db (rows for drained payloads stay put)
+    so mobilebackup2 can run true incremental refreshes against it: after the
+    first apply, each next apply only uploads what actually changed on the
+    device. Restores never touch the master — ``make_working_copy`` builds a
+    throwaway hardlink copy that gets pruned and tweak-injected instead.
+
+    Lives in the system temp dir, so a reboot naturally invalidates it.
+    """
+
+    def __init__(self, udid: str, product_version: str):
+        self.udid = udid
+        self.product_version = product_version
+        self.base = Path(tempfile.gettempdir()) / "goldennugget_protective_cache"
+        self.master_root = self.base / "master"  # directory handed to mobilebackup2
+        self.device_dir = self.master_root / udid  # where the device writes its files
+        self.info_path = self.base / f"{udid}.json"
+
+    def _read_info(self) -> dict:
+        try:
+            with open(self.info_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def has_valid_master(self) -> bool:
+        info = self._read_info()
+        if info.get("udid") != self.udid or info.get("product_version") != self.product_version:
+            return False
+        required = ("Manifest.db", "Manifest.plist", "Status.plist")
+        if not all((self.device_dir / name).is_file() for name in required):
+            return False
+        return _validate_sqlite_db(self.device_dir / "Manifest.db")
+
+    async def refresh(self, lockdown_client: LockdownClient, progress_callback=None,
+                      include_photos: bool = True, include_posterboard: bool = True) -> str:
+        """Bring the master up to the device's current state (full or incremental)."""
+        valid = self.has_valid_master()
+        mode = "incremental" if valid else "full"
+        log_info(f"Protective backup cache: {mode} refresh for {self.udid}")
+        await perform_protective_backup(
+            lockdown_client, str(self.master_root), progress_callback,
+            include_photos=include_photos, include_posterboard=include_posterboard,
+            incremental_ok=valid)
+        self.base.mkdir(parents=True, exist_ok=True)
+        with open(self.info_path, "w", encoding="utf-8") as f:
+            json.dump({"udid": self.udid, "product_version": self.product_version,
+                       "created": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
+        return str(self.master_root)
+
+    def make_working_copy(self) -> str:
+        """Build a throwaway hardlink copy of the master for prune + injection."""
+        return make_protective_working_copy(str(self.master_root), self.udid)
+
+    def purge(self):
+        shutil.rmtree(self.master_root, ignore_errors=True)
+        self.info_path.unlink(missing_ok=True)
+
+
+def make_protective_working_copy(backup_root: str, udid: str) -> str:
+    """Build a throwaway hardlink copy of a protective backup for prune + injection.
+
+    Hardlinks keep it near-instant and size-free; pruning unlinks orphans
+    without touching the source's own files (the cache master stays intact).
+    """
+    working_root = Path(tempfile.mkdtemp(prefix="nugget_protective_")) / "device_backup"
+    src_root = Path(backup_root) / udid
+    if not src_root.is_dir():
+        # Tolerate a root pointing directly at the device directory.
+        if (Path(backup_root) / "Manifest.db").is_file():
+            src_root = Path(backup_root)
+        else:
+            raise NuggetException("Protective backup is missing its payload.")
+
+    dst_root = working_root / udid
+    dst_root.mkdir(parents=True, exist_ok=True)
+    for dirpath, _dirnames, filenames in os.walk(src_root):
+        rel = Path(dirpath).relative_to(src_root)
+        (dst_root / rel).mkdir(parents=True, exist_ok=True)
+        for name in filenames:
+            src_file = Path(dirpath) / name
+            dst_file = dst_root / rel / name
+            if name in _BACKUP_METADATA_FILES:
+                # Manifest.db MUST be a real copy: pruning rewrites it, and a
+                # hardlink would corrupt the cache master's manifest too.
+                shutil.copy2(src_file, dst_file)
+            else:
+                try:
+                    os.link(src_file, dst_file)
+                except OSError:
+                    shutil.copy2(src_file, dst_file)
+    return str(working_root)
+
+
+def extract_posterboard_db(backup_root: str, udid: str, dest_path: str) -> Optional[str]:
+    """Pull the PosterBoard sqlite database out of a protective backup.
+
+    Returns the destination path, or None when the backup does not carry the
+    database (e.g. container inclusion was rejected by the device).
+    """
+    device_dir = Path(backup_root) / udid
+    if not device_dir.is_dir():
+        if (Path(backup_root) / "Manifest.db").is_file():
+            device_dir = Path(backup_root)
+        else:
+            return None
+    manifest_db = device_dir / "Manifest.db"
+    if not _validate_sqlite_db(manifest_db):
+        return None
+    conn = sqlite3.connect(str(manifest_db))
+    try:
+        row = conn.execute(
+            "SELECT fileID FROM Files WHERE domain = ? AND relativePath = ?",
+            (POSTERBOARD_DB_DOMAIN, POSTERBOARD_DB_PATH),
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return None
+    file_id = row[0]
+    payload = device_dir / file_id[:2] / file_id
+    if not payload.is_file():
+        return None
+    dest = Path(dest_path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(payload, dest)
+    return str(dest)
 
 
 def _iter_payload_files(device_dir: Path):

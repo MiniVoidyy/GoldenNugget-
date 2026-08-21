@@ -54,6 +54,7 @@ from src.tweaks.basic_plist_locations import FileLocation
 
 from src.restore.restore import restore_files, FileToRestore
 from src.restore.original_plist import psysbackup, materialize_plist, is_empty_plist, mobile_user_fallback_path
+from src.restore.protective import log_info, log_warn
 
 def get_files_list_str(files_list: list[FileToRestore] = None) -> str:
     files_str: str = ""
@@ -474,7 +475,7 @@ class DeviceManager:
                 "GoldenNugget only supports iOS 26.2 and newer. "
                 "Please use the original Nugget for iOS 26.1 and earlier."))
 
-    async def start_restore(self, files_to_restore: list[FileToRestore], update_label=lambda x: None, backup_password: str = ""):
+    async def start_restore(self, files_to_restore: list[FileToRestore], update_label=lambda x: None, backup_password: str = "", prepared_backup_root: str = None):
         # hard-block any restore on an unsupported (old) iOS version
         self._raise_if_unsupported()
         self.update_label = update_label
@@ -491,7 +492,8 @@ class DeviceManager:
                 files=files_to_restore, reboot=self.pref_manager.auto_reboot,
                 lockdown_client=ld,
                 progress_callback=self.progress_callback,
-                backup_password=backup_password
+                backup_password=backup_password,
+                prepared_backup_root=prepared_backup_root
             )
             tweaks[TweakID.PosterBoard].config_manager.save_staged_ids(self.get_current_device_udid())
             msg = QCoreApplication.tr("Your device will now restart.\n\nRemember to turn Find My back on!")
@@ -547,14 +549,26 @@ class DeviceManager:
 
             # iOS 26.2+ (iOS 27 era) uses the heavy three-phase protective restore
             pb.tendies = original_tendies[:MAX_TENDIES_PER_RESTORE]
-            # fetch a fresh copy of the PosterBoard database before the
-            # restore so the config manager builds on the current on-device
-            # state. GOLDENNUGGET_SKIP_PB_BACKUP=1 skips the backup.
-            if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
-                await self._backup_posterboard_database(update_label, force=True)
+
+            # Phase 0: one protective backup for the whole apply. It feeds both
+            # the PosterBoard database (so the config manager builds on the
+            # current on-device state) and the Phase 3 restore after the wipe.
+            # The master copy is cached in the temp dir and refreshed
+            # incrementally, so repeat applies skip the multi-GB re-upload.
+            # Encrypted backups bypass the cache entirely (the manifest cannot
+            # be pruned locally and encryption is slow anyway).
+            prepared_root = await self._prepare_protective_backup(update_label)
+
+            if prepared_root is None:
+                # fallback (encrypted / cache disabled): legacy separate
+                # PosterBoard backup. GOLDENNUGGET_SKIP_PB_BACKUP=1 skips it.
+                if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
+                    await self._backup_posterboard_database(update_label, force=True)
+
             final_alert, files_to_restore = await self._apply_tweak_pass(
                 update_label,
                 templates=tweaks[TweakID.Templates].templates,
+                prepared_backup_root=prepared_root,
             )
             update_label(QCoreApplication.tr("Success!"))
         except Exception as e:
@@ -562,6 +576,60 @@ class DeviceManager:
         finally:
             pb.tendies = original_tendies
             show_alert(final_alert)
+
+    async def _prepare_protective_backup(self, update_label=lambda x: None) -> Optional[str]:
+        """Run the single cached protective backup; return its root for Phase 3.
+
+        Returns None when the cache path must be skipped (backup encryption
+        enabled, or GOLDENNUGGET_NO_BACKUP_CACHE=1). Also extracts the fresh
+        PosterBoard database from the backup into the config manager.
+        """
+        udid = self.get_current_device_udid()
+        if not udid:
+            return None
+        if os.environ.get("GOLDENNUGGET_NO_BACKUP_CACHE"):
+            log_info("Backup cache disabled via GOLDENNUGGET_NO_BACKUP_CACHE")
+            return None
+
+        from src.restore.protective import (
+            ProtectiveBackupCache,
+            extract_posterboard_db,
+            is_backup_encrypted,
+        )
+
+        check_ld = await create_using_usbmux(serial=udid)
+        try:
+            if await is_backup_encrypted(check_ld):
+                log_info("Backup encryption enabled — bypassing the protective backup cache")
+                return None
+            cache = ProtectiveBackupCache(udid, product_version=self.get_current_device_version())
+            update_label(QCoreApplication.tr("Backing up device (cached)..."))
+            master_root = await cache.refresh(
+                check_ld,
+                progress_callback=self._backup_progress(update_label),
+                include_photos=True, include_posterboard=True)
+        finally:
+            try:
+                await check_ld.close()
+            except Exception:
+                pass
+
+        # fresh PosterBoard database straight from the same backup
+        if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
+            import tempfile
+            with tempfile.TemporaryDirectory(prefix="nugget_pbdb_") as tmp_dir:
+                db_path = extract_posterboard_db(
+                    master_root, udid, os.path.join(tmp_dir, "posterboard.sqlite3"))
+                if db_path is not None:
+                    pb = tweaks[TweakID.PosterBoard]
+                    if not pb.config_manager.update_database_file(db_path, udid):
+                        raise NuggetException("The PosterBoard database is not of the correct format!")
+                    pb.config_manager.update_for_saved_database(udid)
+                    update_label(QCoreApplication.tr("PosterBoard database backed up successfully."))
+                else:
+                    log_warn("PosterBoard DB missing from protective backup — falling back to a separate backup")
+                    await self._backup_posterboard_database(update_label, force=True)
+        return master_root
 
     async def _backup_posterboard_database(self, update_label=lambda x: None, force: bool = False):
         """Fetch the device's PosterBoard sqlite database before applying wallpapers.
@@ -688,7 +756,7 @@ class DeviceManager:
                 originals[path] = data
         return originals
 
-    async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None):
+    async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None, prepared_backup_root: str = None):
         """Generate all tweak files and restore them to the device in one pass.
 
         Returns (alert, files_to_restore) so the caller can surface the result
@@ -810,7 +878,6 @@ class DeviceManager:
                             )
                             if ok and password:
                                 backup_password = password
-                                from src.restore.protective import log_info
                                 log_info("Using existing backup encryption with provided password")
                                 update_label(QCoreApplication.tr("Password accepted. Proceeding with encrypted restore..."))
                             else:
@@ -828,7 +895,6 @@ class DeviceManager:
                 except Exception as e:
                     if isinstance(e, NuggetException):
                         raise
-                    from src.restore.protective import log_warn
                     log_warn(f"Failed to check backup encryption status: {e}")
                 finally:
                     try:
@@ -837,7 +903,9 @@ class DeviceManager:
                         pass
 
             # restore to the device
-            final_alert = await self.start_restore(files_to_restore, update_label, backup_password=backup_password)
+            final_alert = await self.start_restore(
+                files_to_restore, update_label, backup_password=backup_password,
+                prepared_backup_root=prepared_backup_root)
             return final_alert, files_to_restore
         finally:
             if len(tmp_dirs) > 0:

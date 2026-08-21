@@ -15,20 +15,35 @@ This document describes the background threads, async backup/restore operations,
 ### `_apply_changes()`
 Main entry point for applying tweaks. Order:
 1. `_raise_if_unsupported()` — hard-block iOS < 26.2
-2. `_get_lockdown_values()` — device lockdown values for templating
-3. `_backup_posterboard_database(force=True)` — fresh copy of the PosterBoard DB (skipped if `GOLDENNUGGET_SKIP_PB_BACKUP=1`)
-4. `_apply_tweak_pass()` — generate all tweak files, handle backup encryption, then `start_restore()`
+2. `_prepare_protective_backup()` — Phase 0: ONE cached protective backup that feeds both the PosterBoard database and the Phase 3 restore (see "Protective Backup Cache"). Returns None → legacy fallback: separate PosterBoard backup via `_backup_posterboard_database(force=True)` (skipped if `GOLDENNUGGET_SKIP_PB_BACKUP=1`)
+3. `_apply_tweak_pass()` — generate all tweak files, handle backup encryption, then `start_restore(prepared_backup_root=...)`
+
+### Protective Backup Cache (src/restore/protective.py)
+`ProtectiveBackupCache` keeps a per-device master copy of the protective
+backup in `<temp>/goldennugget_protective_cache/master/<udid>`:
+- The master's Manifest.db stays FULL (rows for mid-stream-drained payloads
+  remain), so `perform_protective_backup(incremental_ok=True)` runs a true
+  incremental refresh — repeat applies upload only what changed on the device.
+- Restores never touch the master: `make_protective_working_copy()` builds a
+  throwaway hardlink copy (metadata files are real copies — pruning rewrites
+  Manifest.db and a hardlink would corrupt the master).
+- Invalidated by UDID/iOS-version change; a PC reboot wipes it naturally.
+- PosterBoard DB is kept mid-stream into the master (`include_posterboard`)
+  and extracted via `extract_posterboard_db()`; it is deliberately pruned from
+  the restore copy so Phase 3 never clobbers the tweaked DB from Phase 2.
+- Bypassed entirely when backup encryption is enabled (manifest cannot be
+  pruned locally) or with `GOLDENNUGGET_NO_BACKUP_CACHE=1`.
 
 ### `_apply_tweak_pass()`
 - Generates every tweak's files in a single pass and restores them together
 - iOS 27+: prompts for backup password if encryption is enabled (`use_encrypted_backup` pref)
 - Writes `FileLocation.globalPreferencesHomeDomain` copy merged with the device's current `.GlobalPreferences.plist` so user region/language/appearance survive the iOS 27 wipe
-- Calls `start_restore()` internally
+- Calls `start_restore(prepared_backup_root=...)` internally
 
 ### `start_restore()`
 - Entry point for all restores (apply and reset)
 - Opens a lockdown connection and delegates to `restore_files()`
-- Passes `backup_password` for encrypted backups
+- Passes `backup_password` for encrypted backups and `prepared_backup_root` down to the three-phase restore
 
 ### `_reset_tweaks()`
 - Reset flow: `_raise_if_unsupported()` → `_capture_original_plists()` (via `psysbackup()`) → build reset files → `start_restore()`
@@ -42,7 +57,8 @@ Main entry point for applying tweaks. Order:
 
 ### `_restore_ios27()` — Three-Phase Restore
 **Phase 1 (0-40%)**: Protective Backup
-- `perform_protective_backup()` — selective backup of photos, Apple ID, settings
+- With `prepared_backup_root` (cache hit): builds a hardlink working copy of the cached master — no device backup runs here
+- Otherwise: `perform_protective_backup()` — selective backup of photos, Apple ID, settings
 - `clean_backup_for_restore()` — prunes manifest to protective files only
 - Injects HomeDomain/SystemPreferencesDomain tweak files into the pruned backup
 
@@ -142,15 +158,16 @@ User clicks "Apply Tweaks"
     |
 _apply_changes()
     |_ _raise_if_unsupported()
-    |_ _get_lockdown_values()
-    |_ _backup_posterboard_database(force=True)   [skip: GOLDENNUGGET_SKIP_PB_BACKUP=1]
-    |_ _apply_tweak_pass()
+    |_ _prepare_protective_backup()          [Phase 0: cached master + PB DB extract]
+    |     |_ encrypted / GOLDENNUGGET_NO_BACKUP_CACHE=1 -> None -> legacy _backup_posterboard_database()
+    |_ _apply_tweak_pass(prepared_backup_root)
          |_ generate tweak files
          |_ backup encryption handling (iOS 27+ password prompt)
-         |_ start_restore()
+         |_ start_restore(prepared_backup_root)
               |_ restore_files()
                    |_ _restore_ios27()
-                        Phase 1: perform_protective_backup() + clean_backup_for_restore() + inject tweaks
+                        Phase 1: hardlink working copy of cache master (or perform_protective_backup())
+                                 + clean_backup_for_restore() + inject tweaks
                         Phase 2: perform_restore() (sparse) -> reboot
                         Phase 3: _wait_for_device() -> _restore_protective_backup(password)
 ```
