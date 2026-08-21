@@ -88,8 +88,8 @@ class PasscodeThemeTweak(Tweak):
                         img.close()
                     files.append(FileToRestore(
                         contents=img_data,
-                        restore_path=f"/var/mobile/Library/Caches/TelephonyUI-10/{self.get_name_for_file(path)}",
-                        domain=None
+                        restore_path=f"Library/Caches/TelephonyUI-10/{self.get_name_for_file(path)}",
+                        domain="HomeDomain"
                     ))
                     del img_data
         return files
