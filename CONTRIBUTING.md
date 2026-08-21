@@ -22,6 +22,7 @@ When submitting bug fixes (`[FIX]`), please ensure that:
 ### Quality of Life (QOL) / App Features
 * Features should **not** be redundant or useless. 
 * GoldenNugget is already a large project; we want to avoid turning it into an overloaded "super-app" or bloatware ("elephant").
+* Backports (e.g Cache function from 9.0 to 8.x) is NOT ALLOWED.
 
 ### Customization Tweaks
 We welcome the following types of tweaks:
