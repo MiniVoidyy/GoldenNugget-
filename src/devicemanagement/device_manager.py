@@ -550,18 +550,27 @@ class DeviceManager:
             # iOS 26.2+ (iOS 27 era) uses the heavy three-phase protective restore
             pb.tendies = original_tendies[:MAX_TENDIES_PER_RESTORE]
 
-            # Phase 0a: cached protective backup feeding the Phase 3 restore.
-            # The master copy lives in the temp dir and is refreshed
-            # incrementally, so repeat applies skip the multi-GB re-upload.
-            # Encrypted backups bypass the cache entirely (the manifest cannot
-            # be pruned locally and encryption is slow anyway).
-            prepared_root = await self._prepare_protective_backup(update_label)
+            # Phase 0: ONE cached protective backup. The master copy lives in
+            # the temp dir and is refreshed incrementally, so repeat applies
+            # upload only what changed on the device.
+            # When wallpapers are being applied, the PosterBoard container rides
+            # the same backup and its database is extracted right after the
+            # refresh — so the DB always mirrors the live on-device state
+            # without a second full backup. Encrypted backups bypass the cache
+            # entirely (the manifest cannot be pruned locally).
+            needs_posterboard = not (
+                len(pb.tendies) == 0 and pb.videoFile is None
+                and len(tweaks[TweakID.Templates].templates) == 0)
+            prepared_root, pb_from_cache = await self._prepare_protective_backup(
+                update_label, needs_posterboard=needs_posterboard)
 
-            # Phase 0b: PosterBoard is fragile — its database is build-on-top
-            # state, so it is renewed from the live device on EVERY apply and
-            # never taken from the /tmp cache copy.
-            if not os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
-                await self._backup_posterboard_database(update_label, force=True)
+            # fallback: PosterBoard DB missing from the cache backup (e.g. the
+            # device rejected container inclusion) -> legacy separate backup
+            if needs_posterboard and not pb_from_cache:
+                if os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
+                    log_warn("GOLDENNUGGET_SKIP_PB_BACKUP=1 set; skipping PosterBoard DB fetch")
+                else:
+                    await self._backup_posterboard_database(update_label, force=True)
 
             final_alert, files_to_restore = await self._apply_tweak_pass(
                 update_label,
@@ -575,40 +584,63 @@ class DeviceManager:
             pb.tendies = original_tendies
             show_alert(final_alert)
 
-    async def _prepare_protective_backup(self, update_label=lambda x: None) -> Optional[str]:
-        """Refresh the cached protective backup; return its root for Phase 3.
+    async def _prepare_protective_backup(self, update_label=lambda x: None,
+                                         needs_posterboard: bool = False) -> tuple:
+        """Refresh the cached protective backup; return (root, posterboard_db_ok).
 
-        Returns None when the cache path must be skipped (backup encryption
-        enabled, or GOLDENNUGGET_NO_BACKUP_CACHE=1). The PosterBoard database
-        is deliberately NOT taken from this cache — it is renewed separately
-        on every apply because it is build-on-top state.
+        The master is incrementally refreshed FIRST, so with
+        ``needs_posterboard`` the extracted PosterBoard database mirrors the
+        live on-device state — never a stale copy. Returns (None, False) when
+        the cache path is skipped (backup encryption enabled, no device, or
+        GOLDENNUGGET_NO_BACKUP_CACHE=1).
         """
         udid = self.get_current_device_udid()
         if not udid:
-            return None
+            return None, False
         if os.environ.get("GOLDENNUGGET_NO_BACKUP_CACHE"):
             log_info("Backup cache disabled via GOLDENNUGGET_NO_BACKUP_CACHE")
-            return None
+            return None, False
 
-        from src.restore.protective import ProtectiveBackupCache, is_backup_encrypted
+        from src.restore.protective import (
+            ProtectiveBackupCache,
+            extract_posterboard_db,
+            is_backup_encrypted,
+        )
 
         check_ld = await create_using_usbmux(serial=udid)
         try:
             if await is_backup_encrypted(check_ld):
                 log_info("Backup encryption enabled — bypassing the protective backup cache")
-                return None
+                return None, False
             cache = ProtectiveBackupCache(udid, product_version=self.get_current_device_version())
             update_label(QCoreApplication.tr("Backing up device (cached)..."))
             master_root = await cache.refresh(
                 check_ld,
                 progress_callback=self._backup_progress(update_label),
-                include_photos=True)
+                include_photos=True, include_posterboard=needs_posterboard)
         finally:
             try:
                 await check_ld.close()
             except Exception:
                 pass
-        return master_root
+
+        if not needs_posterboard or os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
+            return master_root, True  # PB DB not needed this run
+
+        # extract the fresh database right after the refresh
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix="nugget_pbdb_") as tmp_dir:
+            db_path = extract_posterboard_db(
+                master_root, udid, os.path.join(tmp_dir, "posterboard.sqlite3"))
+            if db_path is None:
+                log_warn("PosterBoard DB missing from protective backup — falling back to a separate backup")
+                return master_root, False
+            pb = tweaks[TweakID.PosterBoard]
+            if not pb.config_manager.update_database_file(db_path, udid):
+                raise NuggetException("The PosterBoard database is not of the correct format!")
+            pb.config_manager.update_for_saved_database(udid)
+            update_label(QCoreApplication.tr("PosterBoard database backed up successfully."))
+        return master_root, True
 
     async def _backup_posterboard_database(self, update_label=lambda x: None, force: bool = False):
         """Fetch the device's PosterBoard sqlite database before applying wallpapers.
