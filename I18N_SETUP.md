@@ -17,13 +17,10 @@ GoldenNugget repo: sync-translations.yml
        ├── Merge into .ts files
        ├── Compile .qm files (pyside6-lrelease)
        ├── Regenerate resources_rc.py (pyside6-rcc)
-       └── Create PR with changes
+       └── Commit and push changes to main
 ```
 
 ## Required Secrets
-
-In **GoldenNugget** repo:
-- `GH_PAT` - Personal Access Token with `repo` scope (for creating PRs)
 
 In **gNugget-i18n** repo:
 - `GH_PAT` - Personal Access Token with `repo` scope (to dispatch to GoldenNugget)
@@ -55,7 +52,7 @@ pyside6-rcc resources.qrc -o resources_rc.py
    - Copy to src/qt/translations/
    - Compile .qm
    - Update resources_rc.py
-   - Create PR
+   - Commit and push to main
 
 ## Local Development
 
@@ -63,7 +60,7 @@ For testing translations locally:
 
 ```bash
 # Set up test environment
-export GOLDENNUGGET_LOG_FILE=/tmp/goldennugget.log
+export GOLDENNUGGET_LOG_FILE=/tmp/goldennugget_log.txt
 python main_app.py --test-mode --debug
 ```
 
@@ -94,8 +91,8 @@ The sync runs in this order:
    - Merges translations using `scripts/sync_translations.py`
    - Compiles `.ts` → `.qm` with `pyside6-lrelease`
    - Regenerates `resources_rc.py` with `pyside6-rcc`
-   - Creates PR with changes
-3. Maintainer reviews and merges PR
+   - Commits and pushes changes directly to `main`
+3. Changes land on `main` immediately (no PR step)
 
 ## Testing Translations
 
