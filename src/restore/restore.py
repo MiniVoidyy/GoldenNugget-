@@ -9,6 +9,7 @@ import time
 from . import backup, perform_restore
 from .mbdb import _FileMode
 from .protective import (
+    PreparedBackup,
     clean_backup_for_restore,
     inject_file_into_backup,
     log_error,
@@ -303,7 +304,7 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
 async def _restore_ios27(back: backup.Backup, reboot: bool,
                           lockdown_client: LockdownClient, progress_callback,
                           backup_password: str = "",
-                          prepared_backup_root: str = None):
+                          prepared_backup_root: PreparedBackup = None):
     """iOS 27+ three-phase restore: backup → tweak → reboot → restore.
 
     Phase 1 (0-40%):  Selective backup of photos, Apple ID, and user
@@ -323,10 +324,11 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
     udid = lockdown_client.udid
     started = time.monotonic()
     using_cache = prepared_backup_root is not None
+    manifest_password = prepared_backup_root.manifest_password if using_cache else ""
     protective_dir = None
     if using_cache:
         backup_root = await asyncio.to_thread(
-            make_protective_working_copy, prepared_backup_root, udid)
+            make_protective_working_copy, prepared_backup_root.root, udid)
         protective_dir = os.path.dirname(backup_root)
     else:
         protective_dir = tempfile.mkdtemp(prefix="nugget_protective_")
@@ -352,7 +354,8 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
 
         # Prune Manifest.db + orphan payloads in a worker thread
         removed_rows, removed_files = await asyncio.to_thread(
-            clean_backup_for_restore, backup_root, udid
+            clean_backup_for_restore, backup_root, udid,
+            manifest_password=manifest_password
         )
         log_info(f"Phase 1: Pruned backup: -{removed_rows} manifest rows, -{removed_files} payload files "
                  f"({time.monotonic() - started:.1f}s into the run)")
@@ -414,7 +417,7 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                 pass
     except Exception as e:
         if backup_complete:
-            kept = backup_root if not using_cache else prepared_backup_root
+            kept = backup_root if not using_cache else prepared_backup_root.root
             log_error(f"Restore failed; protective backup kept at: {kept}")
             try:
                 e.add_note(f"Protective backup kept at: {kept}")
@@ -438,7 +441,7 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
 
 
 # files is a list of FileToRestore objects
-async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdown_client: LockdownClient = None, progress_callback = lambda x: None, backup_password: str = "", prepared_backup_root: str = None):
+async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdown_client: LockdownClient = None, progress_callback = lambda x: None, backup_password: str = "", prepared_backup_root: PreparedBackup = None):
     # create the files to be backed up
     files_list = [
     ]

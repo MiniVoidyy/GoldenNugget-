@@ -33,6 +33,7 @@ import sqlite3
 import tempfile
 import time
 import uuid as _uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -44,6 +45,13 @@ from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 from PySide6.QtCore import QCoreApplication
 
 from src.exceptions.nugget_exception import NuggetException
+
+
+@dataclass
+class PreparedBackup:
+    """A protective backup prepared ahead of the three-phase restore."""
+    root: str
+    manifest_password: str = ""  # required to prune/inject encrypted manifests
 
 
 # Minimum free disk space required before any device backup is started.
@@ -483,9 +491,10 @@ class ProtectiveBackupCache:
     Lives in the system temp dir, so a reboot naturally invalidates it.
     """
 
-    def __init__(self, udid: str, product_version: str):
+    def __init__(self, udid: str, product_version: str, encrypted: bool = False):
         self.udid = udid
         self.product_version = product_version
+        self.encrypted = encrypted  # device encryption state this cache was built for
         self.base = Path(tempfile.gettempdir()) / "goldennugget_protective_cache"
         self.master_root = self.base / "master"  # directory handed to mobilebackup2
         self.device_dir = self.master_root / udid  # where the device writes its files
@@ -501,6 +510,9 @@ class ProtectiveBackupCache:
     def has_valid_master(self) -> bool:
         info = self._read_info()
         if info.get("udid") != self.udid or info.get("product_version") != self.product_version:
+            return False
+        # a master built for the opposite encryption state is unusable
+        if bool(info.get("encrypted", False)) != self.encrypted:
             return False
         required = ("Manifest.db", "Manifest.plist", "Status.plist")
         if not all((self.device_dir / name).is_file() for name in required):
@@ -518,13 +530,14 @@ class ProtectiveBackupCache:
         valid = self.has_valid_master()
         mode = "incremental" if valid else "full"
         log_info(f"Protective backup cache: {mode} refresh for {self.udid}")
-        await perform_protective_backup(
+        is_encrypted = await perform_protective_backup(
             lockdown_client, str(self.master_root), progress_callback,
             include_photos=include_photos, include_posterboard=include_posterboard,
             incremental_ok=valid)
         self.base.mkdir(parents=True, exist_ok=True)
         with open(self.info_path, "w", encoding="utf-8") as f:
             json.dump({"udid": self.udid, "product_version": self.product_version,
+                       "encrypted": is_encrypted,
                        "created": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
         return str(self.master_root)
 
@@ -641,8 +654,19 @@ def _validate_sqlite_db(db_path: Path) -> bool:
         return False
 
 
+def _keep_protective_entry(domain: str, relative_path: str, include_photos: bool = True) -> bool:
+    """Keep-set predicate shared by the plain and encrypted prune paths."""
+    if domain and relative_path and (_is_protective_file(domain, relative_path, include_photos)
+                                     or domain == "SystemPreferencesDomain"):
+        return True
+    # the domain root directory row — without it the restore agent may skip
+    # the whole domain
+    return domain == "SystemPreferencesDomain" and relative_path == ""
+
+
 def clean_backup_for_restore(backup_dir: "str | Path", udid: str,
-                              include_photos: bool = True) -> tuple:
+                             include_photos: bool = True,
+                             manifest_password: str = "") -> tuple:
     """Prune a backup directory down to its protective payload.
 
     1. Deletes every non-protective row from Manifest.db in a single DELETE
@@ -650,6 +674,11 @@ def clean_backup_for_restore(backup_dir: "str | Path", udid: str,
     2. Deletes payload files not referenced by the keep-set, scanning hash
        subdirectories too (iOS may store payloads as "<aa>/<fileID>").
     3. Removes directories left empty by the pruning.
+
+    Encrypted backups are supported when ``manifest_password`` is given:
+    pymobiledevice3 decrypts the manifest, prunes it and re-encrypts it in
+    place (the caller works on a working copy, so the cache master keeps its
+    own encrypted manifest untouched).
 
     Returns (removed_manifest_rows, removed_payload_files).
     """
@@ -665,11 +694,27 @@ def clean_backup_for_restore(backup_dir: "str | Path", udid: str,
     if not manifest_db.exists():
         return 0, 0
 
-    # If backup is encrypted, we can't read the manifest locally to prune it.
-    # The device can restore encrypted backups directly, so skip local pruning.
     if _is_encrypted_backup(device_dir):
-        log_info("Backup is encrypted — skipping local manifest pruning (device will handle it)")
-        return 0, 0
+        if not manifest_password:
+            log_info("Backup is encrypted and no password was given — skipping local manifest pruning")
+            return 0, 0
+        def _keep(bf) -> bool:
+            if bf.domain is None or bf.relative_path is None:
+                return False
+            return _keep_protective_entry(bf.domain, bf.relative_path, include_photos)
+        allowed_ids = Mobilebackup2Service.prune_backup_manifest(
+            device_dir, _keep, password=manifest_password)
+        removed_files = 0
+        for payload in _iter_payload_files(device_dir):
+            if payload.name not in allowed_ids:
+                payload.unlink(missing_ok=True)
+                removed_files += 1
+        for dirpath, _dirnames, _filenames in os.walk(device_dir, topdown=False):
+            d = Path(dirpath)
+            if d != device_dir and not any(d.iterdir()):
+                d.rmdir()
+        log_info(f"Encrypted manifest pruned with password (-{removed_files} orphan payloads)")
+        return 0, removed_files
 
     if not _validate_sqlite_db(manifest_db):
         log_error(f"Manifest.db at {manifest_db} is not a valid SQLite database. Skipping cleanup.")
@@ -682,12 +727,7 @@ def clean_backup_for_restore(backup_dir: "str | Path", udid: str,
         cur = conn.cursor()
         cur.execute("SELECT fileID, domain, relativePath FROM Files")
         for file_id, domain, rel_path in cur:
-            if domain and rel_path and (_is_protective_file(domain, rel_path, include_photos)
-                                        or domain == "SystemPreferencesDomain"):
-                keep_ids.add(file_id)
-            elif domain == "SystemPreferencesDomain" and rel_path == "":
-                # the domain root directory row — without it the restore
-                # agent may skip the whole domain
+            if _keep_protective_entry(domain, rel_path, include_photos):
                 keep_ids.add(file_id)
 
         cur.execute("CREATE TEMP TABLE nugget_keep (fileID TEXT PRIMARY KEY)")
@@ -955,6 +995,13 @@ def inject_file_into_backup(backup_dir: "str | Path", udid: str, domain: str,
     The file ID follows the standard ``SHA1("<domain>-<relativePath>")``
     convention and the payload is placed in the ``<aa>/<fileID>`` layout the
     restore agent expects. Returns True when the file was added.
+
+    Encrypted backups are supported when ``manifest_password`` is given: the
+    manifest is decrypted to a temp copy, edited there and re-encrypted back.
+    NOTE: the injected payload itself stays plaintext while the rest of an
+    encrypted backup's payloads are device-encrypted — whether the restore
+    agent accepts that mix is unverified, so callers may reasonably skip
+    injection for encrypted backups.
     """
     device_dir = Path(backup_dir) / udid
     if not device_dir.is_dir():
@@ -968,19 +1015,34 @@ def inject_file_into_backup(backup_dir: "str | Path", udid: str, domain: str,
     if not manifest_db.exists():
         return False
 
-    # If backup is encrypted, we can't inject files locally.
-    # The tweaks will need to be applied after restore via AFC or other means.
-    if _is_encrypted_backup(device_dir):
-        log_warn(f"Backup is encrypted — skipping local file injection for {domain}/{relative_path}")
+    encrypted = _is_encrypted_backup(device_dir)
+    if encrypted and not manifest_password:
+        log_warn(f"Backup is encrypted and no password was given — skipping local file injection for {domain}/{relative_path}")
         return False
 
-    if not _validate_sqlite_db(manifest_db):
+    if not encrypted and not _validate_sqlite_db(manifest_db):
         log_error(f"Manifest.db at {manifest_db} is not a valid SQLite database. Cannot inject file.")
         return False
 
     file_id = hashlib.sha1(f"{domain}-{relative_path}".encode("utf-8")).hexdigest()
 
-    conn = sqlite3.connect(str(manifest_db))
+    # Work on a decrypted temp manifest when encrypted; re-encrypt afterwards.
+    edit_db = manifest_db
+    tmp_decrypted = None
+    manifest_key = None
+    if encrypted:
+        tmp_decrypted = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
+        tmp_decrypted.close()
+        edit_db = Path(tmp_decrypted.name)
+        try:
+            manifest_key = Mobilebackup2Service._decrypt_backup_manifest_db(
+                device_dir, manifest_password, edit_db)
+        except Exception as e:
+            log_warn(f"Could not decrypt manifest for injection: {e}")
+            os.unlink(edit_db)
+            return False
+
+    conn = sqlite3.connect(str(edit_db))
     try:
         # The restore agent skips a file whose parent directory rows are
         # missing, so ensure the whole directory chain first.
@@ -1016,6 +1078,16 @@ def inject_file_into_backup(backup_dir: "str | Path", udid: str, domain: str,
             (file_id, domain, relative_path, flags, sqlite3.Binary(blob)),
         )
         conn.commit()
-        return True
+        ok = True
     finally:
         conn.close()
+
+    if encrypted:
+        try:
+            Mobilebackup2Service._encrypt_backup_manifest_db(edit_db, manifest_db, manifest_key)
+        except Exception as e:
+            log_error(f"Could not re-encrypt manifest after injection: {e}")
+            ok = False
+        finally:
+            os.unlink(edit_db)
+    return ok
