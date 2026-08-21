@@ -586,13 +586,15 @@ class DeviceManager:
 
     async def _prepare_protective_backup(self, update_label=lambda x: None,
                                          needs_posterboard: bool = False) -> tuple:
-        """Refresh the cached protective backup; return (root, posterboard_db_ok).
+        """Refresh the cached protective backup; return (PreparedBackup, posterboard_db_ok).
 
         The master is incrementally refreshed FIRST, so with
         ``needs_posterboard`` the extracted PosterBoard database mirrors the
-        live on-device state — never a stale copy. Returns (None, False) when
-        the cache path is skipped (backup encryption enabled, no device, or
-        GOLDENNUGGET_NO_BACKUP_CACHE=1).
+        live on-device state — never a stale copy. Encrypted backups are
+        supported when the user provides the backup password (the manifest is
+        decrypted only locally, on the pruned working copy); without a
+        password the cache is bypassed entirely. Returns (None, False) when
+        the cache path is skipped.
         """
         udid = self.get_current_device_udid()
         if not udid:
@@ -602,6 +604,7 @@ class DeviceManager:
             return None, False
 
         from src.restore.protective import (
+            PreparedBackup,
             ProtectiveBackupCache,
             extract_posterboard_db,
             is_backup_encrypted,
@@ -609,10 +612,24 @@ class DeviceManager:
 
         check_ld = await create_using_usbmux(serial=udid)
         try:
-            if await is_backup_encrypted(check_ld):
-                log_info("Backup encryption enabled — bypassing the protective backup cache")
-                return None, False
-            cache = ProtectiveBackupCache(udid, product_version=self.get_current_device_version())
+            encrypted = await is_backup_encrypted(check_ld)
+            manifest_password = ""
+            if encrypted:
+                from PySide6.QtWidgets import QInputDialog
+                from PySide6.QtWidgets import QLineEdit
+                update_label(QCoreApplication.tr("Backup encryption is enabled. Enter your backup password to use the fast cached backup:"))
+                password, ok = QInputDialog.getText(
+                    None,
+                    QCoreApplication.tr("Backup Encryption Password"),
+                    QCoreApplication.tr("Enter your iTunes/Finder backup password (used locally to prepare the cached backup):"),
+                    QLineEdit.Password)
+                if not ok or not password:
+                    log_info("No backup password provided — bypassing the protective backup cache")
+                    return None, False
+                manifest_password = password
+                self._backup_password = password  # reuse it for the Phase 3 restore prompt
+            cache = ProtectiveBackupCache(udid, product_version=self.get_current_device_version(),
+                                          encrypted=encrypted)
             update_label(QCoreApplication.tr("Backing up device (cached)..."))
             master_root = await cache.refresh(
                 check_ld,
@@ -625,7 +642,13 @@ class DeviceManager:
                 pass
 
         if not needs_posterboard or os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
-            return master_root, True  # PB DB not needed this run
+            return PreparedBackup(root=master_root, manifest_password=manifest_password), True
+
+        if encrypted:
+            # payloads are device-encrypted on disk; a decrypted single-file
+            # extract is not available, so use the legacy separate backup
+            log_warn("Encrypted cache cannot yield a readable PosterBoard DB — falling back to a separate backup")
+            return PreparedBackup(root=master_root, manifest_password=manifest_password), False
 
         # extract the fresh database right after the refresh
         import tempfile
@@ -634,13 +657,13 @@ class DeviceManager:
                 master_root, udid, os.path.join(tmp_dir, "posterboard.sqlite3"))
             if db_path is None:
                 log_warn("PosterBoard DB missing from protective backup — falling back to a separate backup")
-                return master_root, False
+                return PreparedBackup(root=master_root, manifest_password=manifest_password), False
             pb = tweaks[TweakID.PosterBoard]
             if not pb.config_manager.update_database_file(db_path, udid):
                 raise NuggetException("The PosterBoard database is not of the correct format!")
             pb.config_manager.update_for_saved_database(udid)
             update_label(QCoreApplication.tr("PosterBoard database backed up successfully."))
-        return master_root, True
+        return PreparedBackup(root=master_root, manifest_password=manifest_password), True
 
     async def _backup_posterboard_database(self, update_label=lambda x: None, force: bool = False):
         """Fetch the device's PosterBoard sqlite database before applying wallpapers.
@@ -767,7 +790,7 @@ class DeviceManager:
                 originals[path] = data
         return originals
 
-    async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None, prepared_backup_root: str = None):
+    async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None, prepared_backup_root=None):
         """Generate all tweak files and restore them to the device in one pass.
 
         Returns (alert, files_to_restore) so the caller can surface the result
@@ -878,21 +901,27 @@ class DeviceManager:
                     if is_encrypted:
                         from PySide6.QtWidgets import QInputDialog
                         if self.pref_manager.use_encrypted_backup:
-                            # User wants to keep encryption - ask for password to use it
-                            update_label(QCoreApplication.tr("Backup encryption is enabled. We'll use it for the restore."))
-                            update_label(QCoreApplication.tr("Please enter your iTunes/Finder backup password:"))
-                            password, ok = QInputDialog.getText(
-                                None,
-                                QCoreApplication.tr("Backup Encryption Password"),
-                                QCoreApplication.tr("Enter your iTunes/Finder backup password (required for encrypted restore):"),
-                                QLineEdit.Password
-                            )
-                            if ok and password:
-                                backup_password = password
+                            # reuse the password entered for the cached backup, if any
+                            backup_password = self._get_backup_password()
+                            if backup_password:
                                 log_info("Using existing backup encryption with provided password")
                                 update_label(QCoreApplication.tr("Password accepted. Proceeding with encrypted restore..."))
                             else:
-                                raise NuggetException(QCoreApplication.tr("Backup password is required for encrypted restore. Please provide the password or disable encryption in iTunes/Finder."))
+                                # User wants to keep encryption - ask for password to use it
+                                update_label(QCoreApplication.tr("Backup encryption is enabled. We'll use it for the restore."))
+                                update_label(QCoreApplication.tr("Please enter your iTunes/Finder backup password:"))
+                                password, ok = QInputDialog.getText(
+                                    None,
+                                    QCoreApplication.tr("Backup Encryption Password"),
+                                    QCoreApplication.tr("Enter your iTunes/Finder backup password (required for encrypted restore):"),
+                                    QLineEdit.Password
+                                )
+                                if ok and password:
+                                    backup_password = password
+                                    log_info("Using existing backup encryption with provided password")
+                                    update_label(QCoreApplication.tr("Password accepted. Proceeding with encrypted restore..."))
+                                else:
+                                    raise NuggetException(QCoreApplication.tr("Backup password is required for encrypted restore. Please provide the password or disable encryption in iTunes/Finder."))
                         else:
                             # User doesn't want encryption - show friendly error
                             raise NuggetException(QCoreApplication.tr(

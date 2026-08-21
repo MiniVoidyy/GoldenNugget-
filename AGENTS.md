@@ -33,8 +33,16 @@ backup in `<temp>/goldennugget_protective_cache/master/<udid>`:
   (`include_posterboard`) and extracted after the refresh
   (`extract_posterboard_db`); pruned from the restore copy so Phase 3 never
   clobbers the tweaked DB from Phase 2.
-- Bypassed entirely when backup encryption is enabled (manifest cannot be
-  pruned locally) or with `GOLDENNUGGET_NO_BACKUP_CACHE=1`.
+- Encrypted backups: supported when the user provides the backup password
+  (prompted in `_prepare_protective_backup`; reused later for the Phase 3
+  restore). The manifest is decrypted only locally on the pruned working
+  copy (`clean_backup_for_restore` / `inject_file_into_backup` take a
+  `manifest_password`). Without a password — or when the encryption state
+  flips vs. what the master was built with — the cache is bypassed.
+  Caveat: injected tweak payloads stay plaintext inside an otherwise
+  device-encrypted backup; restore-agent behaviour for that mix is
+  unverified, so injection may be skipped for encrypted backups.
+  Kill switch: `GOLDENNUGGET_NO_BACKUP_CACHE=1`.
 
 ### `_apply_tweak_pass()`
 - Generates every tweak's files in a single pass and restores them together
