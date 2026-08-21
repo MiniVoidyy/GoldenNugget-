@@ -84,10 +84,11 @@ async def backup_posterboard_database(udid: str, update_label=lambda x: None, up
         raise NuggetException("Backup manifest (Manifest.db) is not a valid SQLite database. The backup may have failed or been interrupted.")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
+    # resolve by file name: the store dir's structure version varies by iOS
     cursor.execute(
-        "SELECT fileID FROM Files WHERE domain = ? AND relativePath = ?",
+        "SELECT fileID FROM Files WHERE domain = ? AND relativePath LIKE ? ORDER BY relativePath DESC",
         ("AppDomain-com.apple.PosterBoard",
-            "Library/Application Support/PRBPosterExtensionDataStore/61/PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3"))
+         "%PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3"))
     fileID = cursor.fetchone()
     conn.close()
     if fileID is None or len(fileID) == 0:

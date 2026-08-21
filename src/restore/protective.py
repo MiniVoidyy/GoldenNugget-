@@ -243,9 +243,10 @@ _SKIP_FILES = frozenset({
 # so Phase 3 never clobbers the tweaked database Phase 2 lays down. Because
 # the master is incrementally refreshed BEFORE extraction, the extracted DB
 # always mirrors the live on-device state.
+# The store directory carries a structure version (61, 62, ...) that varies
+# between iOS releases, so matching is done by FILE NAME, not full path.
 POSTERBOARD_DB_DOMAIN = "AppDomain-com.apple.PosterBoard"
-POSTERBOARD_DB_PATH = ("Library/Application Support/PRBPosterExtensionDataStore/61/"
-                       "PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3")
+POSTERBOARD_DB_NAME = "PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3"
 
 
 def _is_protective_file(domain: str, relative_path: str, include_photos: bool = True) -> bool:
@@ -294,10 +295,10 @@ def is_protective_device_file(device_name: str, include_photos: bool = True,
     for prefix in APPLE_ID_PATH_PREFIXES + SPRINGBOARD_PATH_PREFIXES + CONTROL_CENTER_PATH_PREFIXES:
         if _path_match(device_name, f"HomeDomain/{prefix}") or _path_match(device_name, prefix):
             return True
-    if include_posterboard and (
-            _path_match(device_name, f"{POSTERBOARD_DB_DOMAIN}/{POSTERBOARD_DB_PATH}")
-            or _path_match(device_name, POSTERBOARD_DB_PATH)):
-        return True
+    if include_posterboard:
+        name = _norm_device_name(device_name)
+        if "PRBPosterExtensionDataStore" in name and POSTERBOARD_DB_NAME in name:
+            return True
     return False
 
 
@@ -645,22 +646,26 @@ def extract_posterboard_db(backup_root: str, udid: str, dest_path: str) -> Optio
     conn = sqlite3.connect(str(manifest_db))
     try:
         pb_rows = conn.execute(
-            "SELECT relativePath FROM Files WHERE domain = ? ORDER BY relativePath",
+            "SELECT fileID, relativePath FROM Files WHERE domain = ? ORDER BY relativePath",
             (POSTERBOARD_DB_DOMAIN,),
         ).fetchall()
-        if not pb_rows:
-            log_warn("Master manifest has NO PosterBoard rows — the device did not back up the container")
-        else:
-            log_info(f"Master manifest has {len(pb_rows)} PosterBoard rows, e.g. {[r[0] for r in pb_rows[:3]]}")
-        row = conn.execute(
-            "SELECT fileID FROM Files WHERE domain = ? AND relativePath = ?",
-            (POSTERBOARD_DB_DOMAIN, POSTERBOARD_DB_PATH),
-        ).fetchone()
     finally:
         conn.close()
-    if row is None:
+
+    if not pb_rows:
+        log_warn("Master manifest has NO PosterBoard rows — the device did not back up the container")
         return None
-    file_id = row[0]
+    log_info(f"Master manifest has {len(pb_rows)} PosterBoard rows, e.g. {[r[1] for r in pb_rows[:3]]}")
+
+    # resolve by FILE NAME: the store dir carries a structure version that
+    # varies between iOS releases; prefer the highest-versioned match
+    candidates = sorted((r for r in pb_rows if r[1].endswith(POSTERBOARD_DB_NAME)),
+                        key=lambda r: r[1], reverse=True)
+    if not candidates:
+        log_warn(f"No {POSTERBOARD_DB_NAME} among the PosterBoard rows")
+        return None
+    file_id, rel_path = candidates[0]
+    log_info(f"PosterBoard DB resolved at: {rel_path}")
     payload = device_dir / file_id[:2] / file_id
     if not payload.is_file():
         return None
