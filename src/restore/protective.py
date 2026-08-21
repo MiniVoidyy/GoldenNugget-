@@ -228,16 +228,6 @@ _SKIP_FILES = frozenset({
     ".GlobalPreferences.plist",  # Written separately as tweaks; skip to avoid overwrite
 })
 
-# PosterBoard sqlite database pulled from the same protective backup so the
-# apply flow needs a single device backup instead of two full ones.
-# Scope note: the database is kept mid-stream so it lands in the cache MASTER
-# (feeding the config manager), but clean_backup_for_restore still prunes it
-# from the restore copy — Phase 3 must never overwrite the tweaked database
-# that Phase 2 lays down.
-POSTERBOARD_DB_DOMAIN = "AppDomain-com.apple.PosterBoard"
-POSTERBOARD_DB_PATH = ("Library/Application Support/PRBPosterExtensionDataStore/61/"
-                       "PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3")
-
 
 def _is_protective_file(domain: str, relative_path: str, include_photos: bool = True) -> bool:
     """Check if a file belongs in the protective backup."""
@@ -269,8 +259,7 @@ def _path_match(device_name: str, path: str) -> bool:
     return name == path or name.startswith(f"{path}/") or f"/{path}/" in name
 
 
-def is_protective_device_file(device_name: str, include_photos: bool = True,
-                              include_posterboard: bool = True) -> bool:
+def is_protective_device_file(device_name: str, include_photos: bool = True) -> bool:
     """Mid-stream backup filter: match an upload's device-side name against the keep-set.
 
     Upload names carry the domain and path (e.g. ``HomeDomain/Library/...``),
@@ -285,8 +274,6 @@ def is_protective_device_file(device_name: str, include_photos: bool = True,
     for prefix in APPLE_ID_PATH_PREFIXES + SPRINGBOARD_PATH_PREFIXES + CONTROL_CENTER_PATH_PREFIXES:
         if _path_match(device_name, f"HomeDomain/{prefix}") or _path_match(device_name, prefix):
             return True
-    if include_posterboard and _path_match(device_name, f"{POSTERBOARD_DB_DOMAIN}/{POSTERBOARD_DB_PATH}"):
-        return True
     return False
 
 
@@ -295,18 +282,15 @@ class ProtectiveBackupService(Mobilebackup2Service):
 
     - ``init_mobile_backup_factory_info`` returns an empty ``Applications``
       dict, so the device skips all app containers (AppDomain-*) entirely —
-      they are never uploaded at all. With ``include_posterboard`` it lists
-      only the PosterBoard container so its sqlite database rides the same
-      backup.
+      they are never uploaded at all.
     - Mid-stream payload filtering is done via pymobiledevice3's native
       ``filter_callback`` on ``backup()``.
     - ``connect`` retries transient failures with exponential backoff —
       iOS 27+ devices can take a while to spin up mobilebackup2.
     """
 
-    def __init__(self, lockdown, include_posterboard: bool = False):
+    def __init__(self, lockdown):
         super().__init__(lockdown)
-        self.include_posterboard = include_posterboard
 
     async def connect(self, max_retries: int = 5):
         last_error = None
@@ -328,7 +312,7 @@ class ProtectiveBackupService(Mobilebackup2Service):
 
     async def init_mobile_backup_factory_info(self, afc):
         root_node = self.lockdown.all_values
-        info = {
+        return {
             "iTunes Version": "10.0.1",
             "iTunes Files": {},
             "Unique Identifier": self.lockdown.udid.upper(),
@@ -344,38 +328,6 @@ class ProtectiveBackupService(Mobilebackup2Service):
             "Build Version": root_node["BuildVersion"],
             "Applications": {},  # skip all app containers — big speedup
         }
-        if self.include_posterboard:
-            await self._add_posterboard_container(info)
-        return info
-
-    async def _add_posterboard_container(self, info: dict):
-        """List only the PosterBoard container so its sqlite DB rides this backup.
-
-        The entry format backupd expects for a single container is not
-        documented; this mirrors the fields the stock factory info carries.
-        If the DB still ends up missing from the manifest, the apply flow
-        falls back to the legacy separate PosterBoard backup.
-        """
-        try:
-            from pymobiledevice3.services.installation_proxy import InstallationProxyService
-            async with InstallationProxyService(lockdown=self.lockdown) as ip:
-                apps = await ip.get_apps(application_type="Any", calculate_sizes=False)
-            app_info = apps.get(POSTERBOARD_DB_DOMAIN.removeprefix("AppDomain-"))
-            if app_info is None:
-                log_warn("PosterBoard app not found via installation proxy; skipping container inclusion")
-                return
-            container = app_info["Container"]
-            info["Installed Applications"] = [POSTERBOARD_DB_DOMAIN.removeprefix("AppDomain-")]
-            info["Applications"] = {
-                POSTERBOARD_DB_DOMAIN.removeprefix("AppDomain-"): {
-                    "Container": container,
-                    "CFBundleIdentifier": POSTERBOARD_DB_DOMAIN.removeprefix("AppDomain-"),
-                    "CFBundleVersion": app_info.get("CFBundleVersion", "1.0"),
-                }
-            }
-            log_info(f"PosterBoard container included in protective backup: {container}")
-        except Exception as e:
-            log_warn(f"PosterBoard container inclusion failed: {e}")
 
 
 async def perform_protective_backup(
@@ -383,17 +335,15 @@ async def perform_protective_backup(
     backup_root: str,
     progress_callback=None,
     include_photos: bool = True,
-    include_posterboard: bool = False,
     incremental_ok: bool = False,
 ) -> bool:
     """Run a selective device backup into ``backup_root``.
 
     Only protective data (photos, Apple ID, user settings, home screen,
-    Control Center — and optionally the PosterBoard database) is written to
-    disk; everything else is drained mid-stream via pymobiledevice3's native
-    backup filter. Rejected payloads keep their Manifest.db rows, so with
-    ``incremental_ok=True`` the next run only uploads what changed on the
-    device since this backup.
+    Control Center) is written to disk; everything else is drained mid-stream
+    via pymobiledevice3's native backup filter. Rejected payloads keep their
+    Manifest.db rows, so with ``incremental_ok=True`` the next run only
+    uploads what changed on the device since this backup.
 
     Returns True if the device backup is encrypted.
     """
@@ -406,8 +356,7 @@ async def perform_protective_backup(
     def _filter_callback(backup_file) -> bool:
         return is_protective_device_file(
             backup_file.device_name or "",
-            include_photos=include_photos,
-            include_posterboard=include_posterboard)
+            include_photos=include_photos)
 
     is_encrypted = False
 
@@ -421,7 +370,7 @@ async def perform_protective_backup(
     max_retries = 3
     for attempt in range(1, max_retries + 1):
         try:
-            async with ProtectiveBackupService(lockdown_client, include_posterboard=include_posterboard) as mb:
+            async with ProtectiveBackupService(lockdown_client) as mb:
                 # Check if encryption is already enabled (don't enable it ourselves)
                 try:
                     is_encrypted = await mb.get_will_encrypt()
@@ -508,14 +457,14 @@ class ProtectiveBackupCache:
         return _validate_sqlite_db(self.device_dir / "Manifest.db")
 
     async def refresh(self, lockdown_client: LockdownClient, progress_callback=None,
-                      include_photos: bool = True, include_posterboard: bool = True) -> str:
+                      include_photos: bool = True) -> str:
         """Bring the master up to the device's current state (full or incremental)."""
         valid = self.has_valid_master()
         mode = "incremental" if valid else "full"
         log_info(f"Protective backup cache: {mode} refresh for {self.udid}")
         await perform_protective_backup(
             lockdown_client, str(self.master_root), progress_callback,
-            include_photos=include_photos, include_posterboard=include_posterboard,
+            include_photos=include_photos,
             incremental_ok=valid)
         self.base.mkdir(parents=True, exist_ok=True)
         with open(self.info_path, "w", encoding="utf-8") as f:
@@ -565,41 +514,6 @@ def make_protective_working_copy(backup_root: str, udid: str) -> str:
                 except OSError:
                     shutil.copy2(src_file, dst_file)
     return str(working_root)
-
-
-def extract_posterboard_db(backup_root: str, udid: str, dest_path: str) -> Optional[str]:
-    """Pull the PosterBoard sqlite database out of a protective backup.
-
-    Returns the destination path, or None when the backup does not carry the
-    database (e.g. container inclusion was rejected by the device).
-    """
-    device_dir = Path(backup_root) / udid
-    if not device_dir.is_dir():
-        if (Path(backup_root) / "Manifest.db").is_file():
-            device_dir = Path(backup_root)
-        else:
-            return None
-    manifest_db = device_dir / "Manifest.db"
-    if not _validate_sqlite_db(manifest_db):
-        return None
-    conn = sqlite3.connect(str(manifest_db))
-    try:
-        row = conn.execute(
-            "SELECT fileID FROM Files WHERE domain = ? AND relativePath = ?",
-            (POSTERBOARD_DB_DOMAIN, POSTERBOARD_DB_PATH),
-        ).fetchone()
-    finally:
-        conn.close()
-    if row is None:
-        return None
-    file_id = row[0]
-    payload = device_dir / file_id[:2] / file_id
-    if not payload.is_file():
-        return None
-    dest = Path(dest_path)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(payload, dest)
-    return str(dest)
 
 
 def _iter_payload_files(device_dir: Path):

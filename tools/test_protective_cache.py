@@ -13,11 +13,8 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.restore.protective import (
-    POSTERBOARD_DB_DOMAIN,
-    POSTERBOARD_DB_PATH,
     ProtectiveBackupCache,
     clean_backup_for_restore,
-    extract_posterboard_db,
     make_protective_working_copy,
 )
 
@@ -67,7 +64,9 @@ def main():
     make_manifest(cache.device_dir, [
         ("HomeDomain", "Library/SpringBoard/IconState.plist", b"<plist>"),
         ("CameraRollDomain", "DCIM/100APPLE/IMG.JPG", photo_payload),
-        (POSTERBOARD_DB_DOMAIN, POSTERBOARD_DB_PATH, pb_payload),
+        ("AppDomain-com.apple.PosterBoard",
+         "Library/Application Support/PRBPosterExtensionDataStore/61/PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3",
+         pb_payload),
         ("HomeDomain", "Library/SMS/sms.db", None),  # drained mid-stream: row without payload
     ])
     for name, content in (("Status.plist", b"s"), ("Manifest.plist", b"m"), ("Info.plist", b"i")):
@@ -101,22 +100,16 @@ def main():
     check("sms.db pruned from working copy", "Library/SMS/sms.db" not in rels)
     check("icon state kept", "Library/SpringBoard/IconState.plist" in rels)
     # the raw PB DB must NOT be restored in Phase 3 (it would clobber the
-    # tweaked DB from Phase 2) — it only lives in the master for extraction
-    check("posterboard db pruned from working copy", POSTERBOARD_DB_PATH not in rels)
+    # tweaked DB from Phase 2) — it is renewed separately on every apply
+    check("posterboard db pruned from working copy",
+          "Library/Application Support/PRBPosterExtensionDataStore/61/PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3"
+          not in rels)
 
-    # master untouched by pruning of the copy
+    # --- master untouched by pruning of the copy; PB row survives there ---
     conn = sqlite3.connect(str(cache.device_dir / "Manifest.db"))
     master_rels = {r[0] for r in conn.execute("SELECT relativePath FROM Files")}
     conn.close()
     check("master manifest still has sms.db row", "Library/SMS/sms.db" in master_rels)
-
-    # --- PB extraction (from the MASTER, which keeps the row) ---
-    dest = tmp / "pb.sqlite3"
-    got = extract_posterboard_db(str(cache.master_root), UDID, str(dest))
-    check("extract_posterboard_db returns path", got == str(dest))
-    check("extracted payload matches", dest.read_bytes() == pb_payload)
-    check("extract missing db -> None", extract_posterboard_db(wc, UDID + "x", str(tmp / "x")) is None
-          or True)  # wrong-root tolerance path
 
     print(f"\nALL {PASS} CHECKS PASSED")
 

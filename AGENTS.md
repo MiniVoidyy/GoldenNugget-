@@ -15,8 +15,9 @@ This document describes the background threads, async backup/restore operations,
 ### `_apply_changes()`
 Main entry point for applying tweaks. Order:
 1. `_raise_if_unsupported()` — hard-block iOS < 26.2
-2. `_prepare_protective_backup()` — Phase 0: ONE cached protective backup that feeds both the PosterBoard database and the Phase 3 restore (see "Protective Backup Cache"). Returns None → legacy fallback: separate PosterBoard backup via `_backup_posterboard_database(force=True)` (skipped if `GOLDENNUGGET_SKIP_PB_BACKUP=1`)
-3. `_apply_tweak_pass()` — generate all tweak files, handle backup encryption, then `start_restore(prepared_backup_root=...)`
+2. `_prepare_protective_backup()` — Phase 0a: cached protective backup for the Phase 3 restore (see "Protective Backup Cache"). Returns None → no cache (encrypted / `GOLDENNUGGET_NO_BACKUP_CACHE=1`)
+3. `_backup_posterboard_database(force=True)` — Phase 0b: PosterBoard DB is renewed from the live device on EVERY apply (skipped if `GOLDENNUGGET_SKIP_PB_BACKUP=1`). Never taken from the /tmp cache — it is build-on-top state and stale copies break PosterBoard
+4. `_apply_tweak_pass()` — generate all tweak files, handle backup encryption, then `start_restore(prepared_backup_root=...)`
 
 ### Protective Backup Cache (src/restore/protective.py)
 `ProtectiveBackupCache` keeps a per-device master copy of the protective
@@ -28,9 +29,6 @@ backup in `<temp>/goldennugget_protective_cache/master/<udid>`:
   throwaway hardlink copy (metadata files are real copies — pruning rewrites
   Manifest.db and a hardlink would corrupt the master).
 - Invalidated by UDID/iOS-version change; a PC reboot wipes it naturally.
-- PosterBoard DB is kept mid-stream into the master (`include_posterboard`)
-  and extracted via `extract_posterboard_db()`; it is deliberately pruned from
-  the restore copy so Phase 3 never clobbers the tweaked DB from Phase 2.
 - Bypassed entirely when backup encryption is enabled (manifest cannot be
   pruned locally) or with `GOLDENNUGGET_NO_BACKUP_CACHE=1`.
 
@@ -158,8 +156,9 @@ User clicks "Apply Tweaks"
     |
 _apply_changes()
     |_ _raise_if_unsupported()
-    |_ _prepare_protective_backup()          [Phase 0: cached master + PB DB extract]
-    |     |_ encrypted / GOLDENNUGGET_NO_BACKUP_CACHE=1 -> None -> legacy _backup_posterboard_database()
+    |_ _prepare_protective_backup()          [Phase 0a: cached master refresh]
+    |     |_ encrypted / GOLDENNUGGET_NO_BACKUP_CACHE=1 -> None (no cache)
+    |_ _backup_posterboard_database(force=True)  [Phase 0b: fresh PB DB every apply]
     |_ _apply_tweak_pass(prepared_backup_root)
          |_ generate tweak files
          |_ backup encryption handling (iOS 27+ password prompt)
