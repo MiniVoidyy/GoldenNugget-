@@ -570,15 +570,17 @@ def make_protective_working_copy(backup_root: str, udid: str) -> str:
 
     dst_root = working_root / udid
     dst_root.mkdir(parents=True, exist_ok=True)
+    # metadata (incl. sqlite sidecars) must be real copies: pruning rewrites
+    # Manifest.db, and a hardlink would corrupt the cache master through the
+    # shared inode/-wal.
+    always_copy = set(_BACKUP_METADATA_FILES) | {"Manifest.db-wal", "Manifest.db-shm"}
     for dirpath, _dirnames, filenames in os.walk(src_root):
         rel = Path(dirpath).relative_to(src_root)
         (dst_root / rel).mkdir(parents=True, exist_ok=True)
         for name in filenames:
             src_file = Path(dirpath) / name
             dst_file = dst_root / rel / name
-            if name in _BACKUP_METADATA_FILES:
-                # Manifest.db MUST be a real copy: pruning rewrites it, and a
-                # hardlink would corrupt the cache master's manifest too.
+            if name in always_copy:
                 shutil.copy2(src_file, dst_file)
             else:
                 try:
@@ -586,6 +588,33 @@ def make_protective_working_copy(backup_root: str, udid: str) -> str:
                 except OSError:
                     shutil.copy2(src_file, dst_file)
     return str(working_root)
+
+
+def verify_backup_payloads(backup_dir: "str | Path", udid: str) -> list:
+    """Return relativePaths of regular-file manifest rows whose payload is missing.
+
+    Such rows make the Phase 3 restore fail with MBErrorDomain/205 (the device
+    requests the payload and the host cannot provide it).
+    """
+    device_dir = Path(backup_dir) / udid
+    if not device_dir.is_dir():
+        if (Path(backup_dir) / "Manifest.db").is_file():
+            device_dir = Path(backup_dir)
+        else:
+            return []
+    manifest_db = device_dir / "Manifest.db"
+    if not _validate_sqlite_db(manifest_db):
+        return []
+    missing = []
+    conn = sqlite3.connect(str(manifest_db))
+    try:
+        for file_id, rel_path in conn.execute(
+                "SELECT fileID, relativePath FROM Files WHERE flags = 1"):
+            if not (device_dir / file_id[:2] / file_id).is_file():
+                missing.append(rel_path)
+    finally:
+        conn.close()
+    return missing
 
 
 def extract_posterboard_db(backup_root: str, udid: str, dest_path: str) -> Optional[str]:
@@ -725,13 +754,24 @@ def clean_backup_for_restore(backup_dir: "str | Path", udid: str,
 
     keep_ids = set()
     removed_rows = 0
+    missing_payloads = []
     conn = sqlite3.connect(str(manifest_db))
     try:
         cur = conn.cursor()
         cur.execute("SELECT fileID, domain, relativePath FROM Files")
         for file_id, domain, rel_path in cur:
             if _keep_protective_entry(domain, rel_path, include_photos):
-                keep_ids.add(file_id)
+                if (device_dir / file_id[:2] / file_id).is_file():
+                    keep_ids.add(file_id)
+                else:
+                    # a row without a payload makes the restore fail with
+                    # MBErrorDomain/205 — drop it and let the device's own
+                    # data stand
+                    missing_payloads.append(rel_path)
+
+        if missing_payloads:
+            log_warn(f"Prune: dropping {len(missing_payloads)} manifest rows with missing payloads "
+                     f"(e.g. {missing_payloads[:5]})")
 
         cur.execute("CREATE TEMP TABLE nugget_keep (fileID TEXT PRIMARY KEY)")
         cur.executemany("INSERT INTO nugget_keep (fileID) VALUES (?)",
