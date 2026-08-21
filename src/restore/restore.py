@@ -525,20 +525,25 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
                                 "Could not query installed apps from the device "
                                 f"(needed to register {bundle_id} for the restore). "
                                 f"Last error: {last_err}")
-                    try:
-                        app_info = apps[bundle_id]
-                        active_bundle_ids.append(bundle_id)
-                        apps_list.append(backup.AppBundle(
-                            identifier=bundle_id,
-                            path=app_info["Container"],
-                            version=app_info.get("CFBundleVersion", "1.0"),
-                            container_content_class="Data/Application"
-                        ))
-                        log_info(f"Registered AppDomain bundle for restore: {bundle_id}")
-                    except KeyError:
-                        log_warn(f"AppDomain bundle '{bundle_id}' not found in installation proxy; "
-                                 "the device may reject this restore")
-                        active_bundle_ids.append(bundle_id)
+                try:
+                    app_info = apps[bundle_id]
+                except KeyError:
+                    log_warn(f"AppDomain bundle '{bundle_id}' not found in installation proxy; "
+                             "the device may reject this restore")
+                    active_bundle_ids.append(bundle_id)
+                else:
+                    active_bundle_ids.append(bundle_id)
+                    # NOTE: `Path` must be the APP BUNDLE path (/Applications/X.app),
+                    # exactly like in real iTunes backups — pointing it at the data
+                    # container makes the restore agent abort at 0%.
+                    apps_list.append(backup.AppBundle(
+                        identifier=bundle_id,
+                        path=app_info.get("Path") or app_info["Container"],
+                        version=str(app_info.get("CFBundleVersion", "1.0")),
+                        container_content_class="Data/Application"
+                    ))
+                    log_info(f"Registered AppDomain bundle for restore: {bundle_id} "
+                             f"({apps_list[-1].path})")
 
     # create the backup
     back = backup.Backup(files=files_list, apps=apps_list)
