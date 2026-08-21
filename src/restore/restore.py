@@ -455,7 +455,7 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
                             version=app_info.get("CFBundleVersion", "1.0"),
                             container_content_class="Data/Application"
                         ))
-                    except (KeyError, Exception) as e:
+                    except Exception as e:
                         print(
                             f"WARNING: AppDomain bundle '{bundle_id}'"
                             f" not found in installation proxy"

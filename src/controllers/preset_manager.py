@@ -12,7 +12,6 @@ from src.tweaks.tweaks import tweaks
 from src.tweaks.tweak_classes import (
     BasicPlistTweak, AdvancedPlistTweak,
 )
-from src.tweaks.posterboard.posterboard_tweak import PosterboardTweak
 from src.tweaks.posterboard.template_options.templates_tweak import TemplatesTweak
 from src.tweaks.status_bar.status_bar_tweak import StatusBarTweak
 from src.tweaks.passcode_theme_tweak import PasscodeThemeTweak
@@ -216,21 +215,8 @@ class PresetManager:
 
     def _serialize_tweak(self, tweak) -> dict:
         data = {"type": type(tweak).__name__, "enabled": tweak.enabled}
-        if isinstance(tweak, AdvancedPlistTweak):
+        if isinstance(tweak, (AdvancedPlistTweak, BasicPlistTweak)):
             data["value"] = tweak.value
-        elif isinstance(tweak, BasicPlistTweak):
-            data["value"] = tweak.value
-        elif isinstance(tweak, PosterboardTweak):
-            data["tendies"] = [t.path for t in tweak.tendies]
-            data["videoThumbnail"] = tweak.videoThumbnail
-            data["videoFile"] = tweak.videoFile
-            data["loop_video"] = tweak.loop_video
-            data["reverse_video"] = tweak.reverse_video
-            data["use_foreground"] = tweak.use_foreground
-            data["calculationMode"] = tweak.calculationMode
-            data["resetModes"] = tweak.resetModes
-            data["bundle_id"] = tweak.bundle_id
-            data["saved_items"] = [{"uuid": i.uuid, "extension": i.extension, "set_selected": i.set_selected} for i in tweak.config_manager.saved_items]
         elif isinstance(tweak, TemplatesTweak):
             data["templates"] = [t.path for t in tweak.templates]
         elif isinstance(tweak, StatusBarTweak):
@@ -288,8 +274,6 @@ class PresetManager:
         if isinstance(tweak, (BasicPlistTweak, AdvancedPlistTweak)):
             if "value" in data:
                 tweak.value = data["value"]
-        elif isinstance(tweak, PosterboardTweak):
-            self._apply_posterboard(tweak, data)
         elif isinstance(tweak, TemplatesTweak):
             self._apply_templates(tweak, data)
         elif isinstance(tweak, StatusBarTweak):
@@ -304,42 +288,6 @@ class PresetManager:
                 tweak.big_keys = data["big_keys"]
             if "current_size" in data:
                 tweak.current_size = data["current_size"]
-
-    def _apply_posterboard(self, tweak: PosterboardTweak, data: dict):
-        # replace the tendies
-        if "tendies" in data:
-            tweak.tendies = []
-            for path in data["tendies"]:
-                if os.path.isfile(path):
-                    try:
-                        tweak.add_tendie(path)
-                    except Exception as e:
-                        print(f"Failed to add tendie: {e}")
-        if "videoThumbnail" in data:
-            tweak.videoThumbnail = data["videoThumbnail"]
-        if "videoFile" in data:
-            tweak.videoFile = data["videoFile"]
-        if "loop_video" in data:
-            tweak.loop_video = data["loop_video"]
-        if "reverse_video" in data:
-            tweak.reverse_video = data["reverse_video"]
-        if "use_foreground" in data:
-            tweak.use_foreground = data["use_foreground"]
-        if "calculationMode" in data:
-            tweak.calculationMode = data["calculationMode"]
-        if "resetModes" in data:
-            tweak.resetModes = data["resetModes"]
-        if "bundle_id" in data:
-            tweak.bundle_id = data["bundle_id"]
-        if "saved_items" in data:
-            try:
-                from src.tweaks.posterboard.pb_config_item import PBConfigItem
-                tweak.config_manager.saved_items = [
-                    PBConfigItem(i["uuid"], i.get("extension", ""), set_selected=i.get("set_selected", False))
-                    for i in data["saved_items"]
-                ]
-            except Exception as e:
-                print(f"Failed to restore saved ids: {e}")
 
     def _apply_templates(self, tweak: TemplatesTweak, data: dict):
         if "templates" in data:

@@ -137,8 +137,6 @@ class IOSStatusBarPage(QWidget):
         self.content_layout.setContentsMargins(16, 16, 16, 32)
         self.content_layout.setSpacing(8)
 
-        self.status_manager = tweaks[TweakID.StatusBar]
-
         # Master enable switch
         self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Status Bar Overrides")))
         self.enabled_switch = self._make_switch(

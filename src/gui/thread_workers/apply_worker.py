@@ -21,18 +21,12 @@ class _SudoState:
     def __init__(self):
         self._lock = threading.Lock()
         self._pwd: Optional[str] = None
-        self._complete = False
 
     def get_pwd(self) -> Optional[str]:
         with self._lock:
             pwd = self._pwd
             self._pwd = None
-            self._complete = False
             return pwd
-
-    def set_complete(self, complete: bool):
-        with self._lock:
-            self._complete = complete
 
     def set_pwd(self, pwd: Optional[str]):
         with self._lock:
@@ -44,10 +38,6 @@ _sudo_state = _SudoState()
 
 def get_sudo_pwd() -> Optional[str]:
     return _sudo_state.get_pwd()
-
-
-def set_sudo_complete(is_complete: bool):
-    _sudo_state.set_complete(is_complete)
 
 
 def set_sudo_pwd(pwd: Optional[str]):

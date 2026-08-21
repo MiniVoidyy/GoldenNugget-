@@ -29,9 +29,6 @@ TWEAK_MIN_VERSION = {
     TweakID.Templates: "17.4",
 }
 
-# Maximum iOS version supported by a tweak (feature removed after this).
-TWEAK_MAX_VERSION = {}
-
 # Tweak is only useful on iPads.
 IPAD_ONLY_TWEAKS = {
     TweakID.UseFloatingTabBar,
@@ -55,9 +52,6 @@ def is_tweak_compatible(tweak_id: TweakID, device_version: str, is_iphone: bool)
         if ver is not None:
             min_ver = TWEAK_MIN_VERSION.get(tweak_id)
             if min_ver and ver < Version(min_ver):
-                return False
-            max_ver = TWEAK_MAX_VERSION.get(tweak_id)
-            if max_ver and ver > Version(max_ver):
                 return False
     if tweak_id in IPAD_ONLY_TWEAKS and is_iphone:
         return False

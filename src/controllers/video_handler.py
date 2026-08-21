@@ -1,5 +1,5 @@
 import os
-from tempfile import mkdtemp, NamedTemporaryFile
+from tempfile import mkdtemp
 from shutil import rmtree
 
 cv2_successful = False
@@ -38,27 +38,6 @@ def convert_to_mov(input_file: str, output_file: str = None):
     if os.name == 'nt' and os.path.exists(ffmpeg_bin):
         os.environ['PATH'] += os.pathsep + ffmpeg_bin
     ffmpeg.run(out)
-
-def get_thumbnail_from_mov(input_file: str, output_file: str = None):
-    # if there is no output file specified, create a temp file and then return contents
-    if output_file == None:
-        tmpdir = mkdtemp()
-        tmp = os.path.join(tmpdir, "thumb.png")
-        get_thumbnail_from_mov(input_file, tmp)
-        with open(tmp, "rb") as tmpfile:
-            contents = tmpfile.read()
-        rmtree(tmpdir)
-        return contents
-
-    inp = ffmpeg.input(input_file, ss=0)
-    out = ffmpeg.output(inp, output_file, vframes=1)
-    ffmpeg.run(out)
-
-def get_thumbnail_from_contents(contents: bytes, output_file: str = None):
-    with NamedTemporaryFile("rb+", suffix=".mov") as inp_file:
-        inp_file.write(contents)
-        contents = get_thumbnail_from_mov(inp_file.name, output_file)
-    return contents
 
 def create_caml(video_path: str, output_file: str, auto_reverses: bool, calculationMode: str, update_label=lambda x: None):
     cam = cv2.VideoCapture(video_path)

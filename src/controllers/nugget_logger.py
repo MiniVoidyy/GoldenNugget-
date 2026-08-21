@@ -39,7 +39,3 @@ def init_logging() -> str:
         root_logger.setLevel(logging.INFO)
         root_logger.addHandler(handler)
     return _active_log_path
-
-
-def log(level: int, message: str):
-    logging.getLogger("GoldenNugget").log(level, message)

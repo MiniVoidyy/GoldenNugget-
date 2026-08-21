@@ -14,7 +14,7 @@ from src.devicemanagement.device_manager import DeviceManager
 
 from src.gui.dialogs import UpdateAppDialog, AboutProgramDialog
 from src.gui.dialogs.reset_dialog import ResetDialog
-from src.gui.thread_workers.apply_worker import ApplyThread, ApplyAlertMessage, RefreshDevicesThread, set_sudo_pwd, set_sudo_complete, get_sudo_pwd
+from src.gui.thread_workers.apply_worker import ApplyThread, ApplyAlertMessage, RefreshDevicesThread, set_sudo_pwd, get_sudo_pwd
 from src.gui.pages.pages_list import Page
 
 from src.tweaks.tweaks import tweaks, TweakID
@@ -601,7 +601,6 @@ class MainWindow(QtWidgets.QMainWindow):
             pwd, ok = QtWidgets.QInputDialog.getText(None, "Enter Sudo Password", "Enter Your Computer's Password:", QtWidgets.QLineEdit.Password, "")
             if ok and pwd:
                 set_sudo_pwd(pwd)
-            set_sudo_complete(True)
             return
         if log_to_console:
             print(alert.txt)
