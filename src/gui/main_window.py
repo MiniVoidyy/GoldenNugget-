@@ -1,5 +1,4 @@
 from PySide6 import QtCore, QtWidgets
-import os
 from typing import Optional
 
 from src.qt.mainwindow_ui import Ui_Nugget
@@ -26,7 +25,6 @@ from src.gui.ios.theme_manager import ThemeManager
 from src.gui.ios.home import IOSHomePage
 from src.gui.ios.tweaks import IOSTweaksPage
 from src.gui.ios.posterboard import IOSPosterboardPage
-from src.gui.ios.springboard import IOSSpringboardPage
 from src.gui.ios.daemons import IOSDaemonsPage
 from src.gui.ios.settings import IOSSettingsPage
 from src.gui.ios.statusbar import IOSStatusBarPage
@@ -59,7 +57,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.euEnablerPageBtn.hide()
         self.ui.enableiPadOSChk.hide()
         self.ui.ipadOSAlphaWarningLbl.hide()
-        self.ui.featureFlagsPageBtn.hide()
         self.ui.statusBarPageBtn.hide()
         self.ui.springboardOptionsPageBtn.hide()
         self.ui.internalOptionsPageBtn.hide()
@@ -75,7 +72,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pages = {
             Page.Home: Pages.Home(window=self, ui=self.ui),
             Page.Posterboard: Pages.Posterboard(window=self, ui=self.ui),
-            Page.FeatureFlags: Pages.FeatureFlags(ui=self.ui),
             Page.StatusBar: Pages.StatusBar(ui=self.ui),
             Page.Springboard: Pages.Springboard(ui=self.ui),
             Page.InternalOptions: Pages.Internal(ui=self.ui),
@@ -90,20 +86,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.theme_manager = ThemeManager(self)
 
         # build the iOS-style pages stack
-        # 0 = home, 1 = tweaks, 2 = posterboard, 3 = springboard, 4 = daemons, 5 = settings, 6 = statusbar
+        # 0 = home, 1 = tweaks, 2 = posterboard, 3 = springboard, 4 = daemons, 5 = settings, 6 = statusbar, 7 = passcode
         self.ios_pages = QtWidgets.QStackedWidget(self)
         self.ios_pages.setStyleSheet("background-color: #1e1e1e;")
         self.ios_home = IOSHomePage(self)
         self.ios_tweaks = IOSTweaksPage(self)
         self.ios_posterboard = IOSPosterboardPage(self)
-        self.ios_springboard = IOSSpringboardPage(self)
         self.ios_daemons = IOSDaemonsPage(self)
         self.ios_settings = IOSSettingsPage(self)
         self.ios_statusbar = IOSStatusBarPage(self)
         self.ios_pages.addWidget(self.ios_home)
         self.ios_pages.addWidget(self.ios_tweaks)
         self.ios_pages.addWidget(self.ios_posterboard)
-        self.ios_pages.addWidget(self.ios_springboard)
         self.ios_pages.addWidget(self.ios_daemons)
         self.ios_pages.addWidget(self.ios_settings)
         self.ios_pages.addWidget(self.ios_statusbar)
@@ -111,6 +105,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.theme_manager.set_classic_widget(self.ui.centralwidget)
         self.theme_manager.set_ios_widget(self.ios_pages)
         self.setCentralWidget(self.theme_manager.stack)
+
+        # Back navigation: ESC key and mouse back button go to the home page
+        QtWidgets.QApplication.instance().installEventFilter(self)
 
         # Check for an update
         if is_update_available(App_Version, App_Build):
@@ -155,7 +152,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         ## SIDE BAR ACTIONS
         self.ui.homePageBtn.clicked.connect(self.on_homePageBtn_clicked)
-        self.ui.featureFlagsPageBtn.clicked.connect(self.on_featureFlagsPageBtn_clicked)
         self.ui.statusBarPageBtn.clicked.connect(self.on_statusBarPageBtn_clicked)
         self.ui.springboardOptionsPageBtn.clicked.connect(self.on_springboardOptionsPageBtn_clicked)
         self.ui.internalOptionsPageBtn.clicked.connect(self.on_internalOptionsPageBtn_clicked)
@@ -169,8 +165,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         ## APPLY PAGE ACTIONS
         self.ui.applyTweaksBtn.clicked.connect(self.on_applyTweaksBtn_clicked)
-        self.ui.revertLastApplyBtn.clicked.connect(self.on_revertLastApplyBtn_clicked)
-        self.ui.restartUACBtn.clicked.connect(self.on_restartUACBtn_clicked)
         self.ui.removeTweaksBtn.clicked.connect(self.on_removeTweaksBtn_clicked)
 
 
@@ -242,7 +236,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.sidebarDiv1.hide()
 
             self.ui.gestaltPageBtn.hide()
-            self.ui.featureFlagsPageBtn.hide()
             self.ui.statusBarPageBtn.hide()
             self.ui.springboardOptionsPageBtn.hide()
             self.ui.internalOptionsPageBtn.hide()
@@ -265,12 +258,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.devicePicker.setEnabled(True)
             # populate the ComboBox with device names
             for device in self.device_manager.devices:
-                tag = ""
-                if self.device_manager.pref_manager.apply_over_wifi:
-                    if device.connected_via_usb:
-                        tag = " (@ USB)"
-                    else:
-                        tag = " (@ WiFi)"
+                tag = " (@ USB)" if device.connected_via_usb else " (@ WiFi)"
                 self.ui.devicePicker.addItem(f"{device.name}{tag}")
             
             # show all pages
@@ -287,7 +275,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.sidebarDiv2.show()
             self.ui.applyPageBtn.show()
 
-            self.ui.featureFlagsPageContent.setDisabled(False)
             self.ui.springboardOptionsPageContent.setDisabled(False)
             self.ui.internalOptionsPageContent.setDisabled(False)
             self.ui.advancedOptionsPageContent.setDisabled(False)
@@ -308,7 +295,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.device_manager.set_current_device(index=index)
             # hide options that are for newer versions
             MinTweakVersions = {
-                "no_patch": [self.ui.chooseGestaltBtn, self.ui.gestaltPageBtn, self.ui.gestaltLocationLbl, self.ui.gestaltLocationTitleLbl, self.ui.showAllSpoofableChk, self.ui.featureFlagsPageBtn],
+                "no_patch": [self.ui.chooseGestaltBtn, self.ui.gestaltPageBtn, self.ui.gestaltLocationLbl, self.ui.gestaltLocationTitleLbl],
                 "exploit": [("1.0", self.ui.regularDomainsLbl)],
                 "17.4": [self.ui.supportsDIChk],
                 "18.0": [self.ui.aodChk, self.ui.aodVibrancyChk, self.ui.iphone16SettingsChk],
@@ -422,24 +409,20 @@ class MainWindow(QtWidgets.QMainWindow):
     def loadSettings(self):
         try:
             # load the settings
-            apply_over_wifi = self.settings.value("apply_over_wifi", False, type=bool)
             auto_reboot = self.settings.value("auto_reboot", True, type=bool)
             ignore_frame_limit = self.settings.value("ignore_pb_frame_limit", False, type=bool)
             disable_tendies_limit = self.settings.value("disable_tendies_limit", False, type=bool)
             auto_refresh_posterboard = self.settings.value("auto_refresh_posterboard", True, type=bool)
-            restore_truststore = self.settings.value("restore_truststore", False, type=bool)
 
             skip_setup = self.settings.value("skip_setup", True, type=bool)
             supervised = self.settings.value("supervised", False, type=bool)
             organization_name = self.settings.value("organization_name", "", type=str)
             use_encrypted_backup = self.settings.value("use_encrypted_backup", False, type=bool)
 
-            self.ui.allowWifiApplyingChk.setChecked(apply_over_wifi)
             self.ui.autoRebootChk.setChecked(auto_reboot)
             self.ui.ignorePBFrameLimitChk.setChecked(ignore_frame_limit)
             self.ui.disableTendiesLimitChk.setChecked(disable_tendies_limit)
             self.ui.forcePBRefreshChk.setChecked(auto_refresh_posterboard)
-            self.ui.trustStoreChk.setChecked(restore_truststore)
             # Experimental encrypted backup option
             if hasattr(self.ui, 'encryptedBackupChk'):
                 self.ui.encryptedBackupChk.setChecked(use_encrypted_backup)
@@ -454,12 +437,10 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 self.ui.skipSetupOnLbl.hide()
 
-            self.device_manager.pref_manager.apply_over_wifi = apply_over_wifi
             self.device_manager.pref_manager.auto_reboot = auto_reboot
             video_handler.set_ignore_frame_limit(ignore_frame_limit)
             self.device_manager.pref_manager.disable_tendies_limit = disable_tendies_limit
             self.device_manager.pref_manager.auto_refresh_posterboard = auto_refresh_posterboard
-            self.device_manager.pref_manager.restore_truststore = restore_truststore
             self.device_manager.pref_manager.use_encrypted_backup = use_encrypted_backup
             self.device_manager.pref_manager.skip_setup = skip_setup
             self.device_manager.pref_manager.supervised = supervised
@@ -468,7 +449,15 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
     
     def _load_last_preset(self):
-        """Load the last used preset on startup."""
+        """Load the latest autosaved preset on startup.
+
+        Prefers the AutoSave preset (written on every tweak change) so the UI
+        restores the most recent configuration. Falls back to the last
+        manually-loaded preset when no autosave exists.
+        """
+        if "AutoSave" in self.preset_manager.list_presets():
+            self.preset_manager.load_preset("AutoSave")
+            return
         last_preset = self.settings.value("last_loaded_preset", "", type=str)
         if last_preset:
             self.preset_manager.load_preset(last_preset)
@@ -489,7 +478,10 @@ class MainWindow(QtWidgets.QMainWindow):
         """Save current tweak state to AutoSave preset."""
         self._preset_autosave_pending = False
         try:
-            self.preset_manager.save_preset("AutoSave", "Automatic save of last tweak configuration", tags=["auto"])
+            self.preset_manager.save_preset(
+                "AutoSave", "Automatic save of last tweak configuration", tags=["auto"],
+                device_model=self.device_manager.get_current_device_model() or "",
+                ios_version=self.device_manager.get_current_device_version() or "")
         except Exception:
             pass  # Silent fail - autosave is best-effort
      
@@ -498,12 +490,38 @@ class MainWindow(QtWidgets.QMainWindow):
     def is_ios_theme(self) -> bool:
         return self.theme_manager.current_theme == ThemeManager.IOS
 
+    def eventFilter(self, obj, event):
+        """Handle ESC and the mouse back button as navigation-back.
+
+        Installed app-wide so it works regardless of which widget has focus.
+        Modal dialogs (QInputDialog, QMessageBox, file pickers, ...) are left
+        untouched so ESC keeps closing them.
+        """
+        if QtWidgets.QApplication.activeModalWidget() is not None:
+            return super().eventFilter(obj, event)
+        etype = event.type()
+        if etype == QtCore.QEvent.Type.KeyPress and event.key() == QtCore.Qt.Key.Key_Escape:
+            return self._go_back()
+        if etype == QtCore.QEvent.Type.MouseButtonPress and event.button() in (
+                QtCore.Qt.MouseButton.BackButton, QtCore.Qt.MouseButton.ExtraButton1):
+            return self._go_back()
+        return super().eventFilter(obj, event)
+
+    def _go_back(self) -> bool:
+        """Navigate back to the iOS home page. Returns True if the event was consumed.
+
+        Only applies to the new iOS UI; the classic UI keeps its own sidebar
+        navigation and does not react to ESC / mouse back button.
+        """
+        if not self.is_ios_theme():
+            return False
+        if self.ios_pages.currentIndex() != 0:
+            self.ios_pages.setCurrentIndex(0)
+            return True
+        return False
+
     def on_homePageBtn_clicked(self):
         self.ui.pages.setCurrentIndex(Page.Home.value)
-    
-    def on_featureFlagsPageBtn_clicked(self):
-        self.pages[Page.FeatureFlags].load()
-        self.ui.pages.setCurrentIndex(Page.FeatureFlags.value)
     
     def on_statusBarPageBtn_clicked(self):
         self.pages[Page.StatusBar].load()
@@ -534,10 +552,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pages[Page.Templates].load()
         self.ui.pages.setCurrentIndex(Page.Templates.value)
 
-    def on_passcodePageBtn_clicked(self):
-        self.pages[Page.Passcode].load()
-        self.ui.pages.setCurrentIndex(Page.Passcode.value)
-
     def on_tweaksPageBtn_clicked(self):
         self.ui.pages.setCurrentIndex(Page.Tweaks.value)
 
@@ -548,13 +562,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pages[Page.Settings].load()
         self.ui.pages.setCurrentIndex(Page.Settings.value)
 
-    def update_side_btn_color(self, btn: QtWidgets.QToolButton, toggled: bool):
-        if toggled:
-            btn.setStyleSheet("QToolButton {\ncolor: #00FF00;\n}")
-        else:
-            btn.setStyleSheet("")
-
-
     ## APPLY PAGE
 
     def show_about_dialog(self):
@@ -563,52 +570,26 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def update_label(self, txt: str):
         self.ui.statusLbl.setText(txt)
-    def update_bar(self, percent):
-        self.ui.restoreProgressBar.setValue(int(percent))
+        # Mirror progress into the iOS home indicator when in iOS theme
+        try:
+            if self.is_ios_theme() and txt:
+                self.ios_home.show_process_status(txt)
+        except Exception:
+            pass
     def on_removeTweaksBtn_clicked(self):
         dialog = ResetDialog(device_manager=self.device_manager, apply_reset=self.apply_changes)
         dialog.exec()
-    def on_restartUACBtn_clicked(self):
-        if os.name != 'nt':
-            return
-        import pyuac
-        import sys
-        pyuac.runAsAdmin()
-        os.execl(sys.executable, sys.executable, *sys.argv)
 
     @QtCore.Slot()
     def on_applyTweaksBtn_clicked(self):
         self.apply_changes()
-
-    @QtCore.Slot()
-    def on_revertLastApplyBtn_clicked(self):
-        if not self.apply_in_progress:
-            self.apply_in_progress = True
-            self.toggle_thread_btns(disabled=True)
-            self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, revert_last_apply_only=True)
-            self.worker_thread.progress.connect(self.ui.statusLbl.setText)
-            self.worker_thread.alert.connect(self.alert_message)
-            self.worker_thread.finished_with_result.connect(self.finish_apply_thread)
-            self.worker_thread.finished.connect(self.worker_thread.deleteLater)
-            self.worker_thread.start()
-
-    def capture_originals(self):
-        if not self.apply_in_progress:
-            self.apply_in_progress = True
-            self.toggle_thread_btns(disabled=True)
-            self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, capture_only=True)
-            self.worker_thread.progress.connect(self.ui.statusLbl.setText)
-            self.worker_thread.alert.connect(self.alert_message)
-            self.worker_thread.finished_with_result.connect(self.finish_apply_thread)
-            self.worker_thread.finished.connect(self.worker_thread.deleteLater)
-            self.worker_thread.start()
 
     def apply_changes(self, reset_pages: list=None):
         if not self.apply_in_progress:
             self.apply_in_progress = True
             self.toggle_thread_btns(disabled=True)
             self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, reset_pages=reset_pages)
-            self.worker_thread.progress.connect(self.ui.statusLbl.setText)
+            self.worker_thread.progress.connect(self.update_label)
             self.worker_thread.alert.connect(self.alert_message)
             self.worker_thread.finished_with_result.connect(self.finish_apply_thread)
             self.worker_thread.finished.connect(self.worker_thread.deleteLater)
@@ -636,9 +617,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.apply_in_progress = False
         self.toggle_thread_btns(disabled=False)
         self.update_pb_saved_ids_list()
+        worker = getattr(self, 'worker_thread', None)
+        is_reset = worker is not None and worker.reset_pages is not None
+        # Show completion indicator on the iOS home page
+        try:
+            if self.is_ios_theme():
+                if success:
+                    self.ios_home.show_process_status(
+                        QCoreApplication.tr("Reset complete!") if is_reset else QCoreApplication.tr("Apply complete!"),
+                        success=True)
+                else:
+                    self.ios_home.show_process_status(
+                        QCoreApplication.tr("Operation failed"), success=False)
+        except Exception:
+            pass
         if success:
-            worker = getattr(self, 'worker_thread', None)
-            if worker is not None and worker.reset_pages is None and not worker.capture_only and not worker.revert_last_apply_only:
+            if worker is not None and not is_reset:
                 self.prompt_star_on_github()
         else:
             # Show error notification if not already shown via alert
@@ -674,6 +668,5 @@ class MainWindow(QtWidgets.QMainWindow):
         if disabled or not self.apply_in_progress:
             self.ui.applyTweaksBtn.setDisabled(disabled)
             self.ui.removeTweaksBtn.setDisabled(disabled)
-            self.ui.revertLastApplyBtn.setDisabled(disabled)
         if disabled or not self.refresh_in_progress:
             self.ui.refreshBtn.setDisabled(disabled)

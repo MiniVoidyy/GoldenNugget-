@@ -1,11 +1,11 @@
 from PySide6.QtCore import Qt, QCoreApplication
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel, QFrame,
+    QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel,
     QDialog, QDialogButtonBox, QLineEdit, QSpinBox
 )
 
 from src.gui.ios.components import (
-    IOSNavBar, IOSSectionHeader, IOSCard, IOSSwitch, IOSSettingsRow
+    IOSNavBar, IOSSectionHeader, IOSSwitch, IOSSettingsRow
 )
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.status_bar.status_setter import StatusBarItem
@@ -21,7 +21,7 @@ class _TextDialog(QDialog):
             QDialog { background-color: #1e1e1e; }
             QLabel { color: #FFFFFF; font-size: 15px; }
             QLineEdit {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -65,7 +65,7 @@ class _NumDialog(QDialog):
             QDialog { background-color: #1e1e1e; }
             QLabel { color: #FFFFFF; font-size: 15px; }
             QSpinBox {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -94,7 +94,7 @@ class _NumDialog(QDialog):
         self.spin.setButtonSymbols(QSpinBox.NoButtons)
         self.spin.setStyleSheet("""
             QSpinBox {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -140,15 +140,15 @@ class IOSStatusBarPage(QWidget):
         self.status_manager = tweaks[TweakID.StatusBar]
 
         # Master enable switch
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSStatusBarPage", "Status Bar Overrides")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Status Bar Overrides")))
         self.enabled_switch = self._make_switch(
-            QCoreApplication.translate("IOSStatusBarPage", "Enable Status Bar Modifications"),
+            QCoreApplication.translate("Nugget", "Enable Status Bar Modifications"),
             self.status_manager.enabled,
             self._on_enabled_toggled,
         )
 
         # Text rows
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSStatusBarPage", "Text")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Text")))
         self.time_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Change Status Bar Time Text*"),
             self.status_manager.is_time_overridden(),
@@ -186,20 +186,20 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.set_primary_service_badge, self.status_manager.unset_primary_service_badge,
         )
         self.secondary_carrier_row = self._make_text_row(
-            QCoreApplication.translate("IOSStatusBarPage", "Secondary Carrier Name"),
+            QCoreApplication.translate("Nugget", "Secondary Carrier Name"),
             self.status_manager.is_secondary_carrier_overridden(),
             self.status_manager.get_secondary_carrier_override(),
             self.status_manager.set_secondary_carrier_override, self.status_manager.unset_secondary_carrier_override,
         )
         self.secondary_badge_row = self._make_text_row(
-            QCoreApplication.translate("IOSStatusBarPage", "Secondary Service Badge"),
+            QCoreApplication.translate("Nugget", "Secondary Service Badge"),
             self.status_manager.is_secondary_service_badge_overridden(),
             self.status_manager.get_secondary_service_badge_override(),
             self.status_manager.set_secondary_service_badge, self.status_manager.unset_secondary_service_badge,
         )
 
         # Number rows
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSStatusBarPage", "Levels")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Levels")))
         self.gsm_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Change Signal Strength"),
             self.status_manager.is_gsm_signal_strength_bars_overridden(),
@@ -208,7 +208,7 @@ class IOSStatusBarPage(QWidget):
             0, 5,
         )
         self.secondary_gsm_row = self._make_number_row(
-            QCoreApplication.translate("IOSStatusBarPage", "Secondary Cellular Signal Bars"),
+            QCoreApplication.translate("Nugget", "Secondary Cellular Signal Bars"),
             self.status_manager.is_secondary_gsm_signal_strength_bars_overridden(),
             self.status_manager.get_secondary_gsm_signal_strength_bars_override(),
             self.status_manager.set_secondary_gsm_signal_strength_bars, self.status_manager.unset_secondary_gsm_signal_strength_bars,
@@ -236,7 +236,7 @@ class IOSStatusBarPage(QWidget):
             0, 30,
         )
         self.secondary_network_type_row = self._make_number_row(
-            QCoreApplication.translate("IOSStatusBarPage", "Secondary Data Network Type"),
+            QCoreApplication.translate("Nugget", "Secondary Data Network Type"),
             self.status_manager.is_secondary_data_network_type_overridden(),
             self.status_manager.get_secondary_data_network_type_override(),
             self.status_manager.set_secondary_data_network_type, self.status_manager.unset_secondary_data_network_type,
@@ -244,7 +244,7 @@ class IOSStatusBarPage(QWidget):
         )
 
         # Raw signal strength
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSStatusBarPage", "Raw Signal Strength")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Raw Signal Strength")))
         self._make_switch(
             QCoreApplication.translate("Nugget", "Show Numeric Cellular Strength"),
             self.status_manager.is_raw_gsm_signal_shown(),
@@ -257,11 +257,11 @@ class IOSStatusBarPage(QWidget):
         )
 
         # Item show/hide toggles
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSStatusBarPage", "Items")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Items")))
         for name, item in [
             (QCoreApplication.translate("Nugget", "Focus Mode Icon"), StatusBarItem.QuietModeStatusBarItem),
             (QCoreApplication.translate("Nugget", "Airplane Mode"), StatusBarItem.AirplaneModeStatusBarItem),
-            (QCoreApplication.translate("IOSStatusBarPage", "Cellular Service"), StatusBarItem.CellularServiceStatusBarItem),
+            (QCoreApplication.translate("Nugget", "Cellular Service"), StatusBarItem.CellularServiceStatusBarItem),
             (QCoreApplication.translate("Nugget", "Wi-Fi Icon"), StatusBarItem.CellularDataNetworkStatusBarItem),
             (QCoreApplication.translate("Nugget", "Battery Icon"), StatusBarItem.MainBatteryStatusBarItem),
             (QCoreApplication.translate("Nugget", "Bluetooth Icon"), StatusBarItem.BluetoothStatusBarItem),
@@ -283,7 +283,7 @@ class IOSStatusBarPage(QWidget):
             )
 
         # Silly mode
-        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSStatusBarPage", "Extras")))
+        self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Extras")))
         self._make_switch(
             QCoreApplication.translate("Nugget", "Silly Mode"),
             self.status_manager.is_silly_mode_enabled(),
@@ -304,7 +304,7 @@ class IOSStatusBarPage(QWidget):
         return handler
 
     def _make_switch(self, title: str, checked: bool, on_toggled):
-        card = IOSCard()
+        card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
@@ -318,7 +318,7 @@ class IOSStatusBarPage(QWidget):
         return switch
 
     def _make_text_row(self, title: str, overridden: bool, current: str, setter, unsetter):
-        card = IOSCard()
+        card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
@@ -368,7 +368,7 @@ class IOSStatusBarPage(QWidget):
             label.setText(title)
 
     def _make_number_row(self, title: str, overridden: bool, current: int, setter, unsetter, min_val: int, max_val: int):
-        card = IOSCard()
+        card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)

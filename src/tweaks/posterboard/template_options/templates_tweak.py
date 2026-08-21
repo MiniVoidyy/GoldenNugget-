@@ -9,7 +9,6 @@ from ...tweak_classes import Tweak
 from ..template_file import TemplateFile
 
 from src.restore.restore import FileToRestore
-from src.exceptions.posterboard_exceptions import PBTemplateException
 
 class TemplatesTweak(Tweak):
     def __init__(self):
@@ -23,9 +22,6 @@ class TemplatesTweak(Tweak):
                 return True
         return False
     
-    def is_empty(self) -> bool:
-        return len(self.templates) == 0
-
     def is_empty(self) -> bool:
         return len(self.templates) == 0
 

@@ -2,7 +2,7 @@
 ![Artboard][NuggetLogo]
 
 # GoldenNugget
-Continuation of Nugget legacy\
+Continuation of Nugget legacy,
 Unlock your device's full potential, with iOS 27 support!
 
 Customize your device with animated wallpapers, disable pesky daemons, and more!
@@ -11,6 +11,9 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
 
 > [!WARNING]
 > Please back up your data before using this Project! GoldenNugget may cause unforeseen problems, so it is better to be safe than sorry. We are not responsible for any damage done to your device.
+
+> [!NOTE]
+> Make sure that you have enough free space on disk before applying tweaks.
 
 > [!WARNING]
 > This fork implements a three-phase backup→tweak→restore workflow to prevent data loss on iOS 27. Apple has patched the partial restore method that Nugget uses, so applying tweaks directly now triggers a security response that wipes AppleID, Keychain, Photos and settings. This fork preserves your data by backing it up first, then restoring it after the tweak is applied. **THIS WORKAROUND IS UNSTABLE NOW, I AM NOT RESPONSIBLE FOR ANY DATA LOSS/BOOTLOOP CAUSED BY GOLDENNUGGET.**
@@ -27,7 +30,7 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - See documentation on the structure of batter files in [documentation.md](documentation.md)
 - psysbackup: backup system plist
   - Required to make "reset tweaks" function work without damaging system.
-- Status Bar (patched on iOS 27)
+- Status Bar (disabled on iOS 27+, no write permissions for the Speakeasy feature flag)
   - Change carrier name
   - Change secondary carrier name
   - Enable/Disable the primary or secondary carriers
@@ -49,10 +52,10 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - Show Supervision Text on Lock Screen
   - Show Dynamic Island in Screenshots
   - Enable AirPlay support for Stage Manager
-  - Show Red/Green Authentication Line on Lock Screen (See [this issue](https://github.com/leminlimez/Nugget/issues/656) for what it looks like)miscellaneous
+  - Show Red/Green Authentication Line on Lock Screen (See [this issue](https://github.com/leminlimez/Nugget/issues/656) for what it looks like)
   - Disable Floating Tab Bar on iPads
 - Internal Options
-  - Enabling Key Flick (iPad-style keyboard) on iPhones (iOS 26.0-)
+  - ~~Enabling Key Flick (iPad-style keyboard) on iPhones~~ (removed — unsupported on iOS 26.2+)
   - Build Version in Status Bar
   - Force Right to Left
   - Show Hidden Icons on Home Screen
@@ -68,6 +71,7 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - Show Notifications for System Pastes
 - Disable Liquid Glass (iOS 26.0+):
   - Ignore Liquid Glass App Build Check (iOS 26.0+)
+  - Force Solarium Fallback (iOS 26.0+, doesn't work on iOS 27 anymore)
 - Disable Daemons:
   - OTAd
   - UsageTrackingAgent
@@ -87,6 +91,20 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - Spotlight
   - Voice Control
 </details>
+
+## Contributors 
+
+<div align="center">
+
+**Thanks everyone who contributes to project!** 🎉
+
+<a href="https://github.com/awesomenull-dev/GoldenNugget/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=awesomenull-dev/GoldenNugget" alt="Contributors" />
+</a>
+
+Want to see your name here? Open [Pull Request](https://github.com/awesomenull-dev/GoldenNugget/pulls)!
+
+</div>
 
 ## Star History
 
@@ -117,7 +135,7 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
 
   - [pymobiledevice3][pymobiledevice3GitHub]
   - [PySide6][PySide6Doc]
-  - Python 3.9 or newer
+  - Python 3.10 or newer
 </details>
 
 ## Running the Python Program
@@ -155,7 +173,7 @@ pyside6-rcc src/qt/resources.qrc -o src/qt/resources_rc.py
 
 To create and compile languages, you can use the following commands:
 ```py
-pyside6-lupdate src/gui/main_window.py src/gui/pages/page.py src/gui/pages/reset_dialog.py src/gui/pages/main/*.py src/gui/pages/tools/*.py src/gui/dialogs.py src/qt/mainwindow.ui src/devicemanagement/device_manager.py src/exceptions/*.py src/tweaks/*.py src/tweaks/posterboard/*.py src/tweaks/posterboard/template_options/*.py src/controllers/*.py -ts src/qt/translations/Nugget_{language code}.ts # generate/update the language file
+pyside6-lupdate src/gui/main_window.py src/gui/pages/page.py src/gui/pages/pages_list.py src/gui/pages/main/*.py src/gui/pages/tools/*.py src/gui/dialogs/*.py src/gui/ios/*.py src/qt/mainwindow.ui src/devicemanagement/device_manager.py src/exceptions/*.py src/tweaks/*.py src/tweaks/posterboard/*.py src/tweaks/posterboard/template_options/*.py src/tweaks/status_bar/*.py src/controllers/*.py -ts src/qt/translations/Nugget_{language code}.ts # generate/update the language file
 pyside6-lrelease src/qt/translations/Nugget_{language code}.ts -qm src/qt/translations/Nugget_{language code}.qm # compile to binary
 ```
 

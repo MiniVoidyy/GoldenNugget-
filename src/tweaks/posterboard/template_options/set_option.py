@@ -10,7 +10,6 @@ from PySide6 import QtWidgets, QtCore
 
 from src.controllers.xml_handler import set_xml_value, set_xml_values
 from src.controllers.plist_handler import write_plist_value
-from src.exceptions.posterboard_exceptions import PBTemplateException
 
 class SetterType(Enum):
     textbox = "textbox"

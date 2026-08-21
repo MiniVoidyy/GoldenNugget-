@@ -1,7 +1,7 @@
-from PySide6.QtCore import Qt, QCoreApplication, Slot
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtCore import Qt, QCoreApplication, Slot, QTimer
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QMenu, QComboBox, QFrame
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox, QFrame
 )
 
 from src.gui.ios.components import IOSCard, IOSPrimaryButton
@@ -33,12 +33,12 @@ class IOSHomePage(QWidget):
         header.addWidget(logo)
 
         title_layout = QVBoxLayout()
-        title = QLabel(QCoreApplication.translate("IOSHomePage", "GoldenNugget"), self)
+        title = QLabel(QCoreApplication.translate("Nugget", "GoldenNugget"), self)
         title.setStyleSheet("font-size: 32px; font-weight: 700; color: #FFFFFF;")
         title_layout.addWidget(title)
 
         # Dynamic subtitle from device
-        self.subtitle = QLabel(QCoreApplication.translate("IOSHomePage", "iPhone (iOS —)"), self)
+        self.subtitle = QLabel(QCoreApplication.translate("Nugget", "iPhone (iOS —)"), self)
         self.subtitle.setStyleSheet("font-size: 15px; color: #8E8E93;")
         title_layout.addWidget(self.subtitle)
         header.addLayout(title_layout, 1)
@@ -121,7 +121,7 @@ class IOSHomePage(QWidget):
         pb_header.setStyleSheet("background-color: #1C1C1E; border-top-left-radius: 12px; border-top-right-radius: 12px;")
         pb_header_layout = QHBoxLayout(pb_header)
         pb_header_layout.setContentsMargins(16, 8, 16, 8)
-        pb_title = QLabel(QCoreApplication.translate("IOSHomePage", "PosterBoard"), pb_header)
+        pb_title = QLabel(QCoreApplication.translate("Nugget", "PosterBoard"), pb_header)
         pb_title.setStyleSheet("font-size: 17px; font-weight: 600; color: #FFFFFF;")
         pb_header_layout.addWidget(pb_title, 1, Qt.AlignCenter)
         pb_layout.addWidget(pb_header)
@@ -130,7 +130,7 @@ class IOSHomePage(QWidget):
         pb_content_layout = QVBoxLayout(pb_content)
         pb_content_layout.setContentsMargins(16, 16, 16, 16)
         pb_content_layout.setSpacing(8)
-        pb_sub = QLabel(QCoreApplication.translate("IOSHomePage", "Animated wallpapers & templates"), pb_content)
+        pb_sub = QLabel(QCoreApplication.translate("Nugget", "Animated wallpapers & templates"), pb_content)
         pb_sub.setStyleSheet("font-size: 14px; color: #8E8E93;")
         pb_content_layout.addWidget(pb_sub)
         pb_layout.addWidget(pb_content)
@@ -150,7 +150,7 @@ class IOSHomePage(QWidget):
         tc_header.setStyleSheet("background-color: #1C1C1E; border-top-left-radius: 12px; border-top-right-radius: 12px;")
         tc_header_layout = QHBoxLayout(tc_header)
         tc_header_layout.setContentsMargins(16, 8, 16, 8)
-        tc_title = QLabel(QCoreApplication.translate("IOSHomePage", "Tweaks"), tc_header)
+        tc_title = QLabel(QCoreApplication.translate("Nugget", "Tweaks"), tc_header)
         tc_title.setStyleSheet("font-size: 17px; font-weight: 600; color: #FFFFFF;")
         tc_header_layout.addWidget(tc_title, 1, Qt.AlignCenter)
         tc_layout.addWidget(tc_header)
@@ -159,7 +159,7 @@ class IOSHomePage(QWidget):
         tc_content_layout = QVBoxLayout(tc_content)
         tc_content_layout.setContentsMargins(16, 16, 16, 16)
         tc_content_layout.setSpacing(8)
-        tc_sub = QLabel(QCoreApplication.translate("IOSHomePage", "Customize system settings"), tc_content)
+        tc_sub = QLabel(QCoreApplication.translate("Nugget", "Customize system settings"), tc_content)
         tc_sub.setStyleSheet("font-size: 14px; color: #8E8E93;")
         tc_content_layout.addWidget(tc_sub)
         tc_layout.addWidget(tc_content)
@@ -179,7 +179,7 @@ class IOSHomePage(QWidget):
         dm_header.setStyleSheet("background-color: #1C1C1E; border-top-left-radius: 12px; border-top-right-radius: 12px;")
         dm_header_layout = QHBoxLayout(dm_header)
         dm_header_layout.setContentsMargins(16, 8, 16, 8)
-        dm_title = QLabel(QCoreApplication.translate("IOSHomePage", "Daemons"), dm_header)
+        dm_title = QLabel(QCoreApplication.translate("Nugget", "Daemons"), dm_header)
         dm_title.setStyleSheet("font-size: 17px; font-weight: 600; color: #FFFFFF;")
         dm_header_layout.addWidget(dm_title, 1, Qt.AlignCenter)
         dm_layout.addWidget(dm_header)
@@ -188,12 +188,12 @@ class IOSHomePage(QWidget):
         dm_content_layout = QVBoxLayout(dm_content)
         dm_content_layout.setContentsMargins(16, 16, 16, 16)
         dm_content_layout.setSpacing(8)
-        dm_sub = QLabel(QCoreApplication.translate("IOSHomePage", "Disable system daemons"), dm_content)
+        dm_sub = QLabel(QCoreApplication.translate("Nugget", "Disable system daemons"), dm_content)
         dm_sub.setStyleSheet("font-size: 14px; color: #8E8E93;")
         dm_content_layout.addWidget(dm_sub)
         dm_layout.addWidget(dm_content)
 
-        self.daemons_card.mousePressEvent = lambda e: self.switch_to_ios_page(4)
+        self.daemons_card.mousePressEvent = lambda e: self.switch_to_ios_page(3)
         self.daemons_card.setCursor(Qt.PointingHandCursor)
         cards_row.addWidget(self.daemons_card, 1)
 
@@ -217,31 +217,40 @@ class IOSHomePage(QWidget):
         sb_content_layout = QVBoxLayout(sb_content)
         sb_content_layout.setContentsMargins(16, 16, 16, 16)
         sb_content_layout.setSpacing(8)
-        sb_sub = QLabel(QCoreApplication.translate("IOSHomePage", "Customize the status bar"), sb_content)
+        sb_sub = QLabel(QCoreApplication.translate("Nugget", "Customize the status bar"), sb_content)
         sb_sub.setStyleSheet("font-size: 14px; color: #8E8E93;")
         sb_sub.setWordWrap(True)
         sb_content_layout.addWidget(sb_sub)
         sb_layout.addWidget(sb_content)
 
-        self.statusbar_card.mousePressEvent = lambda e: self.switch_to_ios_page(6)
+        self.statusbar_card.mousePressEvent = lambda e: self.switch_to_ios_page(5)
         self.statusbar_card.setCursor(Qt.PointingHandCursor)
         cards_row.addWidget(self.statusbar_card, 1)
         layout.addLayout(cards_row)
 
         # Apply Tweaks button
-        apply_btn = IOSPrimaryButton(QCoreApplication.translate("IOSHomePage", "Apply Tweaks"))
+        apply_btn = IOSPrimaryButton(QCoreApplication.translate("Nugget", "Apply Tweaks"))
         apply_btn.clicked.connect(self.open_apply_classic)
         layout.addWidget(apply_btn)
 
         # Reset Tweaks button
-        reset_btn = IOSPrimaryButton(QCoreApplication.translate("IOSHomePage", "Reset Tweaks"))
+        reset_btn = IOSPrimaryButton(QCoreApplication.translate("Nugget", "Reset Tweaks"))
         reset_btn.clicked.connect(self.reset_tweaks)
         layout.addWidget(reset_btn)
 
-        # Revert Last Apply button
-        revert_btn = IOSPrimaryButton(QCoreApplication.translate("IOSHomePage", "Revert Last Apply"))
-        revert_btn.clicked.connect(self.revert_last_apply)
-        layout.addWidget(revert_btn)
+        # Process status indicator (apply/reset progress + completion)
+        self.process_status_lbl = QLabel("", self)
+        self.process_status_lbl.setWordWrap(True)
+        self.process_status_lbl.setAlignment(Qt.AlignCenter)
+        self.process_status_lbl.setStyleSheet("font-size: 14px; font-weight: 600; color: #30D158;")
+        self.process_status_lbl.hide()
+        layout.addWidget(self.process_status_lbl)
+        # Single auto-hide timer: restarted on every progress update so the
+        # label never hides mid-apply (stacked singleShot timers caused
+        # hide/show flicker on each progress tick).
+        self._hide_timer = QTimer(self)
+        self._hide_timer.setSingleShot(True)
+        self._hide_timer.timeout.connect(self.hide_process_status)
 
         layout.addStretch()
 
@@ -256,9 +265,7 @@ class IOSHomePage(QWidget):
             devices = self.window.device_manager.devices
             if devices:
                 for device in devices:
-                    tag = ""
-                    if self.window.device_manager.pref_manager.apply_over_wifi:
-                        tag = " (@ USB)" if device.connected_via_usb else " (@ WiFi)"
+                    tag = " (@ USB)" if device.connected_via_usb else " (@ WiFi)"
                     self.device_combo.addItem(f"{device.name}{tag}")
             else:
                 self.device_combo.addItem(QCoreApplication.translate("QCoreApplication", "No Device"))
@@ -281,7 +288,7 @@ class IOSHomePage(QWidget):
     @Slot()
     def open_settings(self):
         # Open iOS settings page within the iOS stack
-        self.window.ios_pages.setCurrentIndex(5)  # IOSSettingsPage
+        self.window.ios_pages.setCurrentIndex(4)  # IOSSettingsPage
 
     def switch_to_ios_page(self, index: int):
         self.window.ios_pages.setCurrentIndex(index)
@@ -291,29 +298,46 @@ class IOSHomePage(QWidget):
         self.window.apply_changes()
 
     def reset_tweaks(self):
-        """Reset all tweaks (calls classic reset via main window)."""
-        if hasattr(self.window, 'remove_tweaks'):
-            self.window.remove_tweaks()
-        else:
-            # Fallback: call device_manager directly
-            from src.gui.pages.pages_list import Page
-            pages = [Page.Posterboard, Page.Tweaks, Page.Springboard, Page.Daemons, Page.StatusBar]
-            self.window.apply_changes(reset_pages=pages)
+        """Reset tweaks using the classic reset dialog (select pages to reset)."""
+        from src.gui.dialogs.reset_dialog import ResetDialog
+        dialog = ResetDialog(device_manager=self.window.device_manager, apply_reset=self.window.apply_changes)
+        dialog.exec()
 
-    def revert_last_apply(self):
-        """Revert last apply."""
-        self.window.revert_last_apply()
+    def show_process_status(self, text: str, success: bool = None):
+        """Show a status message for apply/reset operations.
+
+        ``success``: True -> green, False -> red, None -> neutral progress.
+        The message auto-hides after a few seconds.
+        """
+        if success is True:
+            color = "#30D158"
+        elif success is False:
+            color = "#FF453A"
+        else:
+            color = "#007AFF"
+        self.process_status_lbl.setStyleSheet(
+            f"font-size: 14px; font-weight: 600; color: {color};")
+        self.process_status_lbl.setText(text)
+        self.process_status_lbl.show()
+        self._hide_timer.start(6000)
+
+    def hide_process_status(self):
+        self.process_status_lbl.hide()
 
     def update_status(self):
         try:
             if self.window.device_manager.get_current_device_udid():
-                status_text = QCoreApplication.translate("QCoreApplication", "Supported!")
-                color = "#30D158"
+                if self.window.device_manager.get_current_device_partially_supported():
+                    status_text = QCoreApplication.translate("Nugget", "Partially Supported")
+                    color = "#FFD60A"
+                else:
+                    status_text = QCoreApplication.translate("QCoreApplication", "Supported!")
+                    color = "#30D158"
             else:
-                status_text = QCoreApplication.translate("IOSHomePage", "Not connected")
+                status_text = QCoreApplication.translate("Nugget", "Not connected")
                 color = "#FFFFFF"
         except AttributeError:
-            status_text = QCoreApplication.translate("IOSHomePage", "Not connected")
+            status_text = QCoreApplication.translate("Nugget", "Not connected")
             color = "#FFFFFF"
         self.status_lbl.setText(f"<span style='color:{color};'>{status_text}</span>")
 
@@ -321,9 +345,9 @@ class IOSHomePage(QWidget):
         try:
             ver = self.window.device_manager.get_current_device_version() or "—"
             build = self.window.device_manager.get_current_device_build() or "—"
-            self.subtitle.setText(QCoreApplication.translate("IOSHomePage", "iPhone (iOS {0} {1})").format(ver, build))
+            self.subtitle.setText(QCoreApplication.translate("Nugget", "iPhone (iOS {0} {1})").format(ver, build))
         except AttributeError:
-            self.subtitle.setText(QCoreApplication.translate("IOSHomePage", "iPhone (iOS —)"))
+            self.subtitle.setText(QCoreApplication.translate("Nugget", "iPhone (iOS —)"))
 
     def refresh_device_combo(self):
         self.populate_device_picker()

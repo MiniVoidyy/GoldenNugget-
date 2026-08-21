@@ -1,7 +1,7 @@
-from PySide6.QtCore import Qt, QCoreApplication
+from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QDialog, QDialogButtonBox,
-    QLineEdit, QSpinBox, QFormLayout, QLabel, QHBoxLayout, QFrame
+    QLineEdit, QSpinBox, QLabel, QHBoxLayout
 )
 
 from src.gui.ios.components import (
@@ -11,7 +11,7 @@ from src.gui.ios.components import (
 from src.gui.ios.compat import is_tweak_compatible
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.tweak_loader import (
-    load_featureflags, load_internal, load_liquidglass, load_springboard
+    load_internal, load_liquidglass, load_springboard
 )
 
 
@@ -28,7 +28,7 @@ class TextInputDialog(QDialog):
             }
             QLabel { color: #FFFFFF; font-size: 15px; }
             QLineEdit {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -89,7 +89,7 @@ class NumberInputDialog(QDialog):
             QDialog { background-color: #1e1e1e; }
             QLabel { color: #FFFFFF; font-size: 15px; }
             QSpinBox {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -120,7 +120,7 @@ class NumberInputDialog(QDialog):
         self.spin.setButtonSymbols(QSpinBox.NoButtons)
         self.spin.setStyleSheet("""
             QSpinBox {
-                background-color: #3b3b3b;
+                background-color: #1C1C1E;
                 border: none;
                 border-radius: 10px;
                 color: #FFFFFF;
@@ -162,7 +162,7 @@ class IOSTweaksPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        nav = IOSNavBar(QCoreApplication.translate("IOSTweaksPage", "tweaks"), window=self.window)
+        nav = IOSNavBar(QCoreApplication.translate("Nugget", "tweaks"), window=self.window)
         layout.addWidget(nav)
 
         scroll = QScrollArea(self)
@@ -176,19 +176,7 @@ class IOSTweaksPage(QWidget):
         content_layout.setContentsMargins(16, 16, 16, 32)
         content_layout.setSpacing(8)
 
-        # Page header matching card background
-        page_header = QFrame()
-        page_header.setFixedHeight(56)
-        page_header.setStyleSheet("background-color: #1C1C1E;")
-        page_header_layout = QHBoxLayout(page_header)
-        page_header_layout.setContentsMargins(16, 8, 16, 8)
-        page_title = QLabel(QCoreApplication.translate("IOSTweaksPage", "Tweaks"), page_header)
-        page_title.setStyleSheet("font-size: 17px; font-weight: 600; color: #FFFFFF;")
-        page_header_layout.addWidget(page_title, 1, Qt.AlignCenter)
-        content_layout.addWidget(page_header)
-
         # Load tweaks (idempotent) so the sections below actually populate
-        load_featureflags()
         load_internal()
         load_liquidglass()
         load_springboard()
@@ -274,15 +262,15 @@ class IOSTweaksPage(QWidget):
         # Liquid Glass section
         content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Liquid Glass")))
         make_switch(TweakID.ForceSolariumFallback, QCoreApplication.translate("Nugget", "Force Solarium Fallback"))
-        make_switch(TweakID.IgnoreSolariumLinkedOnCheck, QCoreApplication.translate("IOSTweaksPage", "Ignore Solarium Linked-On Check"))
-        make_switch(TweakID.ForceSolariumIntelligence, QCoreApplication.translate("IOSTweaksPage", "Force Solarium Intelligence"))
-        make_switch(TweakID.ForceEnhancedSpeculars, QCoreApplication.translate("IOSTweaksPage", "Force Enhanced Speculars"))
-        make_switch(TweakID.UISolariumFallback, QCoreApplication.translate("IOSTweaksPage", "UI Solarium Fallback"))
-        make_switch(TweakID.IgnoreSolariumHardwareCheck, QCoreApplication.translate("IOSTweaksPage", "Ignore Solarium Hardware Check"))
-        make_switch(TweakID.IgnoreSolariumOptOut, QCoreApplication.translate("IOSTweaksPage", "Ignore Solarium Opt-Out"))
-        make_switch(TweakID.DisallowGlassButtons, QCoreApplication.translate("IOSTweaksPage", "Disallow Glass Buttons"))
-        make_switch(TweakID.DisallowGlassLockScreen, QCoreApplication.translate("IOSTweaksPage", "Disallow Glass Lock Screen"))
-        make_switch(TweakID.DisableSpecularEverywhere, QCoreApplication.translate("IOSTweaksPage", "Disable Specular Everywhere"))
+        make_switch(TweakID.IgnoreSolariumLinkedOnCheck, QCoreApplication.translate("Nugget", "Ignore Solarium Linked-On Check"))
+        make_switch(TweakID.ForceSolariumIntelligence, QCoreApplication.translate("Nugget", "Force Solarium Intelligence"))
+        make_switch(TweakID.ForceEnhancedSpeculars, QCoreApplication.translate("Nugget", "Force Enhanced Speculars"))
+        make_switch(TweakID.UISolariumFallback, QCoreApplication.translate("Nugget", "UI Solarium Fallback"))
+        make_switch(TweakID.IgnoreSolariumHardwareCheck, QCoreApplication.translate("Nugget", "Ignore Solarium Hardware Check"))
+        make_switch(TweakID.IgnoreSolariumOptOut, QCoreApplication.translate("Nugget", "Ignore Solarium Opt-Out"))
+        make_switch(TweakID.DisallowGlassButtons, QCoreApplication.translate("Nugget", "Disallow Glass Buttons"))
+        make_switch(TweakID.DisallowGlassLockScreen, QCoreApplication.translate("Nugget", "Disallow Glass Lock Screen"))
+        make_switch(TweakID.DisableSpecularEverywhere, QCoreApplication.translate("Nugget", "Disable Specular Everywhere"))
         make_switch(TweakID.NoLiquidClock, QCoreApplication.translate("Nugget", "Disable Liquid Glass on LS Clock"))
         make_switch(TweakID.NoLiquidDock, QCoreApplication.translate("Nugget", "Disable Liquid Glass on Dock"))
         make_switch(TweakID.DisableSpecularMotion, QCoreApplication.translate("Nugget", "Disable Specular Motion"))
@@ -290,7 +278,7 @@ class IOSTweaksPage(QWidget):
         make_switch(TweakID.DisableSolariumHDR, QCoreApplication.translate("Nugget", "Disable Solarium HDR"))
 
         # SpringBoard section
-        content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("IOSTweaksPage", "SpringBoard")))
+        content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "SpringBoard")))
         make_text_input(TweakID.LockScreenFootnote, QCoreApplication.translate("Nugget", "Lock Screen Footnote Text"))
         make_switch(TweakID.WatchOSCompatibility, QCoreApplication.translate("Nugget", "Allow pairing with any watchOS version"))
         make_switch(TweakID.AirDropDisableTimeLimit, QCoreApplication.translate("Nugget", "Disable AirDrop Time Limit for Everyone Option"))
@@ -327,10 +315,6 @@ class IOSTweaksPage(QWidget):
         make_switch(TweakID.EnableWakeGestureHaptic, QCoreApplication.translate("Nugget", "Vibrate on Raise-to-Wake"))
         make_switch(TweakID.PlaySoundOnPaste, QCoreApplication.translate("Nugget", "Play Sound on Paste"))
         make_switch(TweakID.AnnounceAllPastes, QCoreApplication.translate("Nugget", "Show Notifications for System Pastes"))
-
-        # Risky / Advanced
-        content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Risky Options")))
-        make_switch(TweakID.DisableOTAFile, QCoreApplication.translate("Nugget", "Disable OTA Updates (file)"))
 
         content_layout.addStretch()
 

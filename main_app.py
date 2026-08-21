@@ -12,6 +12,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src", "qt"))
 # 1. SILENCE WARNINGS
 warnings.filterwarnings("ignore")
 
+# Silence noisy Qt Wayland textinput logs (zwp_text_input_v3_leave spam)
+os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.wayland.textinput=false")
+
 from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import QCoreApplication
 
@@ -97,11 +100,23 @@ if __name__ == "__main__":
             cpu="t8140",
             locale="en_US"
         )
+        mock_device_2 = Device(
+            udid=0x1122334455667788,
+            usb=True,
+            name="Test iPhone 16",
+            version="26.6",
+            build="26G96",
+            model="iPhone17,3",
+            hardware="D59AP",
+            cpu="t8140",
+            locale="en_US"
+        )
         dm.data_singleton.current_device = mock_device
         dm.data_singleton.device_available = True
         dm.devices.append(mock_device)
+        dm.devices.append(mock_device_2)
         dm.current_device_index = 0
-        logger.info("Test mode: Mock device created")
+        logger.info("Test mode: Mock devices created")
 
     QCoreApplication.setOrganizationDomain("com.leemin")
     QCoreApplication.setApplicationName("GoldenNugget")

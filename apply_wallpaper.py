@@ -5,10 +5,6 @@ os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QCoreApplication
 
-# Import order matters: the gui package must load before device_manager to
-# avoid a circular import (bookrestore -> apply_worker -> gui.pages -> tweaks
-# -> pb_config_manager -> preference_manager).
-from src.gui.pages import *
 from src.controllers.settings import Settings
 from src.devicemanagement.device_manager import DeviceManager
 from src.tweaks.tweaks import tweaks, TweakID

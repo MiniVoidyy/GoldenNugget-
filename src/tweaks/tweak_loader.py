@@ -1,31 +1,5 @@
 from .tweaks import tweaks, TweakID
-from .tweak_classes import FeatureFlagTweak, BasicPlistTweak, FileLocation, AdvancedPlistTweak, NullifyFileTweak
-from src.devicemanagement.constants import Version
-
-
-def load_featureflags():
-    if TweakID.ClockAnim in tweaks:
-        return
-    additional_tweaks = {
-        TweakID.ClockAnim: FeatureFlagTweak(flag_category='SpringBoard',
-                     flag_names=['SwiftUITimeAnimation']),
-        TweakID.Lockscreen: FeatureFlagTweak(flag_category="SpringBoard",
-                        flag_names=['AutobahnQuickSwitchTransition', 'SlipSwitch', 'PosterEditorKashida']),
-        TweakID.KioskMode: FeatureFlagTweak(flag_category='PreferencesFramework', flag_names=['ForcedRetailKioskMode']),
-
-        TweakID.SolariumFFSwiftUI: FeatureFlagTweak(flag_category='SwiftUI', flag_names=['Solarium'], inverted=True),
-        TweakID.SolariumFFSpringBoard: FeatureFlagTweak(flag_category='SpringBoard', flag_names=['SolariumElasticHUD'], inverted=True),
-
-        TweakID.SolariumFFIconServices: FeatureFlagTweak(flag_category='IconServices', flag_names=['EnhancedGlass', 'SolariumCornerRadius'], inverted=True),
-
-        TweakID.SolariumFFDocumentCamera: FeatureFlagTweak(flag_category='DocumentCamera', flag_names=['CaptureLiquidGlass'], inverted=True),
-        TweakID.SolariumFFPhotos: FeatureFlagTweak(flag_category='Photos', flag_names=['SolariumGridMagicPocket'], inverted=True),
-        TweakID.SolariumFFAppleMediaServices: FeatureFlagTweak(flag_category='AppleMediaServices', flag_names=['Solarium'], inverted=True),
-
-        TweakID.SolariumFFSharing: FeatureFlagTweak(flag_category='Sharing', flag_names=['ShareSheetSolarium'], inverted=True),
-        TweakID.SolariumFFMail: FeatureFlagTweak(flag_category='Mail', flag_names=['SolariumSearch'], inverted=True)
-    }
-    tweaks.update(additional_tweaks)
+from .tweak_classes import BasicPlistTweak, FileLocation, AdvancedPlistTweak, NullifyFileTweak
 
 
 def load_internal():
@@ -283,12 +257,3 @@ def load_daemons():
         TweakID.ClearScreenTimeAgentPlist: NullifyFileTweak(FileLocation.screentime),
     }
     tweaks.update(additional_tweaks)
-
-
-def load_all_tweaks(version: str):
-    # iOS 26.2+ (iOS 27 era) - all tweaks available
-    load_featureflags()
-    load_internal()
-    load_liquidglass()
-    load_springboard()
-    load_daemons()

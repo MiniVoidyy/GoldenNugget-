@@ -2,16 +2,15 @@ import base64
 import json
 import os
 import time
-from datetime import datetime
-from typing import Optional, Any
+from typing import Optional
 
-from PySide6.QtCore import QStandardPaths, QCoreApplication
+from PySide6.QtCore import QStandardPaths
 
 from src.tweaks.tweak_names import TweakID
 from src.tweaks import tweak_loader
 from src.tweaks.tweaks import tweaks
 from src.tweaks.tweak_classes import (
-    FeatureFlagTweak, BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak,
+    BasicPlistTweak, AdvancedPlistTweak,
 )
 from src.tweaks.posterboard.posterboard_tweak import PosterboardTweak
 from src.tweaks.posterboard.template_options.templates_tweak import TemplatesTweak
@@ -78,7 +77,8 @@ class PresetManager:
                 })
         return sorted(result, key=lambda x: x.get("updated_at", 0), reverse=True)
 
-    def save_preset(self, name: str, description: str = "", tags: list = None) -> bool:
+    def save_preset(self, name: str, description: str = "", tags: list = None,
+                    device_model: str = "", ios_version: str = "") -> bool:
         data = self._serialize()
         if data is None:
             return False
@@ -88,8 +88,8 @@ class PresetManager:
         meta = {
             "version": PRESET_VERSION,
             "description": description or "",
-            "device_model": self._get_current_device_model(),
-            "ios_version": self._get_current_ios_version(),
+            "device_model": device_model or "Unknown",
+            "ios_version": ios_version or "Unknown",
             "created_at": now,
             "updated_at": now,
             "tags": tags or [],
@@ -109,22 +109,6 @@ class PresetManager:
         except Exception as e:
             print(f"Failed to save preset: {e}")
             return False
-
-    def _get_current_device_model(self) -> str:
-        try:
-            from src.devicemanagement.device_manager import DeviceManager
-            dm = DeviceManager()
-            # This is a simplified approach - in reality we'd get from current device
-            return "Unknown"
-        except Exception:
-            return "Unknown"
-
-    def _get_current_ios_version(self) -> str:
-        try:
-            from src.devicemanagement.device_manager import DeviceManager
-            return "Unknown"
-        except Exception:
-            return "Unknown"
 
     def load_preset(self, name: str) -> bool:
         file_path = self.get_preset_path(name)
@@ -217,6 +201,10 @@ class PresetManager:
     def _serialize(self) -> dict:
         tweak_data = {}
         for key, tweak in tweaks.items():
+            # PosterBoard is excluded from presets: wallpapers are
+            # device-specific and heavy, so they must not travel with a preset.
+            if key == TweakID.PosterBoard:
+                continue
             try:
                 tweak_data[key.name] = self._serialize_tweak(tweak)
             except Exception as e:
@@ -254,7 +242,7 @@ class PresetManager:
             data["language_code"] = tweak.language_code
             data["big_keys"] = tweak.big_keys
             data["current_size"] = tweak.current_size
-        # FeatureFlagTweak, NullifyFileTweak only need "enabled"
+        # NullifyFileTweak only needs "enabled"
         return data
 
     ## DESERIALIZATION
@@ -272,6 +260,10 @@ class PresetManager:
                         continue
                     if key not in tweaks:
                         continue
+                    # PosterBoard is excluded from presets (see _serialize); skip
+                    # it on load too so old presets cannot restore wallpapers.
+                    if key == TweakID.PosterBoard:
+                        continue
                     try:
                         self._apply_tweak(tweaks[key], tweak_data)
                     except Exception as e:
@@ -284,7 +276,6 @@ class PresetManager:
 
     def _load_all_tweaks(self):
         # idempotent: the loaders return early if the tweaks already exist
-        tweak_loader.load_featureflags()
         tweak_loader.load_internal()
         tweak_loader.load_springboard()
         tweak_loader.load_liquidglass()

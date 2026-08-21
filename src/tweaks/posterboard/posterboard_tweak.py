@@ -10,7 +10,7 @@ from PySide6.QtCore import QCoreApplication
 from ..tweak_classes import Tweak
 from .tendie_file import TendieFile
 from .template_file import TemplateFile
-from .pb_config_manager import PBConfigItem, PBConfigManager
+from .pb_config_manager import PBConfigManager
 from src.restore.restore import FileToRestore
 from src.controllers.plist_handler import set_plist_value
 from src.controllers.files_handler import get_bundle_files

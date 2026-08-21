@@ -18,7 +18,6 @@ payload files.
 import asyncio
 import plistlib
 import sqlite3
-import traceback
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional
@@ -27,6 +26,7 @@ from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 
 from src.exceptions.nugget_exception import NuggetException
+from src.restore.protective import check_disk_space_for_backup
 
 # Keys from lockdown ``all_values`` whose string values are device-specific
 # and should be replaced with placeholders when templating.
@@ -110,16 +110,6 @@ def is_empty_plist(data: bytes) -> bool:
         return False
 
 
-def get_device_values(all_values: dict) -> dict[str, str]:
-    """Extract the templatable device-specific values from lockdown values."""
-    values = {}
-    for key in _TEMPLATE_KEYS:
-        value = all_values.get(key)
-        if isinstance(value, str) and value:
-            values[key] = value
-    return values
-
-
 def _walk(obj, transform):
     if isinstance(obj, dict):
         return {k: _walk(v, transform) for k, v in obj.items()}
@@ -128,21 +118,6 @@ def _walk(obj, transform):
     if isinstance(obj, tuple):
         return tuple(_walk(v, transform) for v in obj)
     return transform(obj)
-
-
-def template_plist(plist, device_values: dict[str, str]):
-    """Replace device-specific string values with ``<Key>`` placeholders."""
-    inverse = {}
-    for key, value in device_values.items():
-        if len(value) >= 5 and value not in inverse:
-            inverse[value] = key
-
-    def transform(value):
-        if isinstance(value, str) and value in inverse:
-            return f"<{inverse[value]}>"
-        return value
-
-    return _walk(plist, transform)
 
 
 def materialize_plist(plist, device_values: dict[str, str]):
@@ -196,6 +171,8 @@ async def psysbackup(
     for attempt in range(1, max_retries + 1):
         ld = await create_using_usbmux(serial=udid)
         try:
+            if attempt == 1:
+                await check_disk_space_for_backup(ld)
             # Check if backup encryption is enabled on device
             is_encrypted = False
             try:
@@ -231,15 +208,21 @@ async def psysbackup(
                             delay = min(2 ** attempt, 15)
                             update_label(f"Connection lost, retrying in {delay}s... (attempt {attempt}/{max_retries})")
                             await asyncio.sleep(delay)
-                            raise  # Continue to next retry
+                            continue
                         raise
                 return _read_originals(Path(tmp_dir) / udid, paths)
+        except NuggetException:
+            raise
+        except Exception as e:
+            if _is_connection_error(e) and attempt < max_retries:
+                continue
+            raise
         finally:
             try:
                 await ld.close()
             except Exception:
                 pass
-        break  # Success
+        return {}  # unreachable safety net
 
 
 def _validate_sqlite_db(db_path: Path) -> bool:

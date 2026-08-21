@@ -1,6 +1,5 @@
 from .status_setter import Setter, StatusBarItem
 from ..tweak_classes import Tweak
-from src.restore.restore import FileToRestore
 from src.devicemanagement.constants import Version
 
 from cffi import FFI
@@ -293,23 +292,6 @@ class StatusBarTweak(Tweak):
 
 
     ### MISC TEXT INPUTS
-    # DATE STRING (Unused)
-    def is_date_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideDateString == 1
-    def get_date_override(self) -> str:
-        overrides = self.setter.get_overrides()
-        return ffi.string(overrides.values.dateString).decode()
-    def set_date(self, text: str) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideDateString = 1
-        overrides.values.dateString = text[:256].encode()
-        self.setter.apply_changes(overrides)
-    def unset_date(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideDateString = 0
-        self.setter.apply_changes(overrides)
-
     # TIME STRING
     def is_time_overridden(self) -> bool:
         overrides = self.setter.get_overrides()
@@ -465,152 +447,6 @@ class StatusBarTweak(Tweak):
         overrides.overrideItemIsEnabled[item.value] = 0
         self.setter.apply_changes(overrides)
 
-
-    ## HIDE OPTION TOGGLES
-    # DND
-    def is_dnd_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.QuietModeStatusBarItem.value] == 1
-    def hide_dnd(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.QuietModeStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.QuietModeStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.QuietModeStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-    # AIRPLANE
-    def is_airplane_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.AirplaneModeStatusBarItem.value] == 1
-    def hide_airplane(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.AirplaneModeStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.AirplaneModeStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.AirplaneModeStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-    # CELL
-    def is_cell_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.CellularServiceStatusBarItem.value] == 1
-    def hide_cell(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.CellularServiceStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.CellularServiceStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.CellularServiceStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-    # WIFI
-    def is_wifi_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.CellularDataNetworkStatusBarItem.value] == 1
-    def hide_wifi(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.CellularDataNetworkStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.CellularDataNetworkStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.CellularDataNetworkStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-    # BATTERY
-    def is_battery_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.MainBatteryStatusBarItem.value] == 1
-    def hide_battery(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.MainBatteryStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.MainBatteryStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.MainBatteryStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-    # BLUETOOTH
-    def is_bluetooth_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.BluetoothStatusBarItem.value] == 1
-    def hide_bluetooth(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.BluetoothStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.BluetoothStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.BluetoothStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-    # ALARM
-    def is_alarm_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.AlarmStatusBarItem.value] == 1
-    def hide_alarm(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.AlarmStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.AlarmStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.AlarmStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-    # LOCATION
-    def is_location_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.LocationStatusBarItem.value] == 1
-    def hide_location(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.LocationStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.LocationStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.LocationStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-    # ROTATION LOCK
-    def is_rotation_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.RotationLockStatusBarItem.value] == 1
-    def hide_rotation(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.RotationLockStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.RotationLockStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.RotationLockStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-    # AIRPLAY
-    def is_airplay_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.AirPlayStatusBarItem.value] == 1
-    def hide_airplay(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.AirPlayStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.AirPlayStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.AirPlayStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-    # CARPLAY
-    def is_carplay_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.CarPlayStatusBarItem.value] == 1
-    def hide_carplay(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.CarPlayStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.CarPlayStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.CarPlayStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-    # VPN
-    def is_vpn_hidden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.VPNStatusBarItem.value] == 1
-    def hide_vpn(self, hidden: bool) -> None:
-        overrides = self.setter.get_overrides()
-        if hidden:
-            overrides.overrideItemIsEnabled[StatusBarItem.VPNStatusBarItem.value] = 1
-            overrides.values.itemIsEnabled[StatusBarItem.VPNStatusBarItem.value] = 0
-        else:
-            overrides.overrideItemIsEnabled[StatusBarItem.VPNStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
 
     def is_silly_mode_enabled(self) -> bool:
         return self.setter.silly_mode

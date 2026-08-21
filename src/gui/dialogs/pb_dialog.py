@@ -23,6 +23,8 @@ from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 from shutil import rmtree
 
+from src.restore.protective import check_disk_space_for_backup
+
 from src.exceptions.nugget_exception import NuggetException
 from src.devicemanagement.constants import is_supported_by_fork
 from src.gui.thread_workers.pb_worker import PBDBThread
@@ -60,6 +62,8 @@ async def backup_posterboard_database(udid: str, update_label=lambda x: None, up
     for attempt in range(1, max_retries + 1):
         service_provider = await create_using_usbmux(serial=udid)
         try:
+            if attempt == 1:
+                await check_disk_space_for_backup(service_provider, path=app_data_path)
             # hard-block fetching the database from an unsupported (old) iOS version
             if not is_supported_by_fork(service_provider.all_values.get("ProductVersion", "0.0")):
                 raise NuggetException(
@@ -235,8 +239,3 @@ class PosterBoardDBWizard(QWizard):
             self.worker_thread.finished.connect(self.worker_thread.deleteLater)
             self.worker_thread.start()
         return super().initializePage(id)
-    
-    # def isComplete(self):
-    #     # need to emit completeChanged() every time a different value is returned
-    #     # this should be for the page not the QWizard itself
-    #     return not self.backup_started or self.backup_complete

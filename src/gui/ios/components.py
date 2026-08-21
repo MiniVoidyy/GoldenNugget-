@@ -1,8 +1,6 @@
 from PySide6.QtCore import Qt, QCoreApplication, Signal as pyqtSignal
-from PySide6.QtGui import QFontDatabase, QFont, QIcon
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFrame, QDialog,
-    QDialogButtonBox, QLineEdit, QSpinBox, QFormLayout, QScrollArea
+    QWidget, QHBoxLayout, QLabel, QPushButton, QFrame,
 )
 
 
@@ -41,7 +39,7 @@ class IOSNavBar(QWidget):
 
         # Show back button if on_back callback is provided OR window is provided (to go back to iOS home)
         if on_back or window:
-            back_btn = QPushButton(QCoreApplication.translate("IOSNavBar", "←  Back"), self)
+            back_btn = QPushButton(QCoreApplication.translate("Nugget", "←  Back"), self)
             back_btn.setCursor(Qt.PointingHandCursor)
             back_btn.setStyleSheet("""
                 QPushButton {

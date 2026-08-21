@@ -33,7 +33,6 @@ import struct
 import time
 import uuid as _uuid
 import warnings
-import traceback
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -44,15 +43,103 @@ import pymobiledevice3.service_connection as _sc
 from pymobiledevice3.lockdown import LockdownClient
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 
+from PySide6.QtCore import QCoreApplication
+
 from src.exceptions.nugget_exception import NuggetException
+
+
+# Minimum free disk space required before any device backup is started.
+# Backups (protective, psysbackup, PosterBoard) are written to the system
+# temp directory and can easily reach several GB (photos, app data). Overridable
+# via the GOLDENNUGGET_MIN_FREE_GB environment variable.
+MIN_FREE_DISK_GB = 5.0
+
+
+def _min_free_disk_bytes() -> int:
+    try:
+        return int(float(os.environ.get("GOLDENNUGGET_MIN_FREE_GB", str(MIN_FREE_DISK_GB))) * (1024 ** 3))
+    except ValueError:
+        return int(MIN_FREE_DISK_GB * (1024 ** 3))
+
+
+def check_disk_space(path: str = None, min_free_bytes: int = None) -> None:
+    """Raise ``NuggetException`` if free disk space is below the backup threshold.
+
+    Device backups are written to disk (temp directory by default); a full
+    backup can be tens of GB. Fail early with a clear error instead of filling
+    the disk mid-backup, which would corrupt the backup and the apply flow.
+    """
+    import tempfile
+    if path is None:
+        path = tempfile.gettempdir()
+    if min_free_bytes is None:
+        min_free_bytes = _min_free_disk_bytes()
+    usage = shutil.disk_usage(path)
+    if usage.free < min_free_bytes:
+        free_gb = usage.free / (1024 ** 3)
+        required_gb = min_free_bytes / (1024 ** 3)
+        raise NuggetException(
+            QCoreApplication.translate(
+                "Nugget",
+                "Not enough free disk space: only {0} GB available, at least {1} GB is required for the backup. "
+                "Free up space on your computer (backups are written to {2}) and try again.",
+            ).format(f"{free_gb:.1f}", f"{required_gb:.1f}", path)
+        )
+    return usage
+
+
+async def _get_device_used_storage(lockdown_client) -> Optional[int]:
+    """Return the device's used data storage in bytes, or ``None`` if unreadable.
+
+    Queries the diagnostics relay's ``All`` report. ``TotalDataCapacity`` is the
+    total size of the data partition and ``TotalDataSpace`` is its free space, so
+    the difference is how much data a full device backup would carry. A full
+    backup mirrors roughly the used capacity, so this is the disk space a backup
+    needs to be written to the computer without exhausting it.
+    """
+    try:
+        from pymobiledevice3.services.diagnostics import DiagnosticsService
+        async with DiagnosticsService(lockdown_client) as diag:
+            report = await diag.info("All")
+        if not isinstance(report, dict):
+            return None
+        capacity = report.get("TotalDataCapacity")
+        free = report.get("TotalDataSpace")
+        if capacity is None or free is None:
+            nested = report.get("DiskUsage")
+            if isinstance(nested, dict):
+                capacity = nested.get("TotalDataCapacity", capacity)
+                free = nested.get("TotalDataSpace", free)
+        if capacity is None or free is None:
+            return None
+        used = int(capacity) - int(free)
+        return used if used > 0 else None
+    except Exception:
+        return None
+
+
+async def check_disk_space_for_backup(lockdown_client=None, path: str = None,
+                                      min_free_bytes: int = None) -> int:
+    """Check free disk space before a device backup, sized to the device's data.
+
+    The required free space is derived from the amount of data actually stored
+    on the device (a full backup mirrors used capacity), never below the
+    ``MIN_FREE_DISK_GB`` floor. If the device cannot be queried, the floor is
+    used. Returns the required free space in bytes that was enforced.
+    """
+    if min_free_bytes is None:
+        min_free_bytes = _min_free_disk_bytes()
+        if lockdown_client is not None:
+            used = await _get_device_used_storage(lockdown_client)
+            if used is not None:
+                min_free_bytes = max(min_free_bytes, used)
+    check_disk_space(path=path, min_free_bytes=min_free_bytes)
+    return min_free_bytes
 
 # Bump SSL handshake timeout — the default 10 seconds is too short for
 # mobilebackup2 service startup on busy or post-reboot devices (iOS 27+).
 # Importing this module applies it process-wide.
 _sc.DEFAULT_SSL_HANDSHAKE_TIMEOUT = 60
-
-# Debug mode: set gNugget_DEV_MODE=enable in environment for verbose output
-_DEBUG_MODE = os.environ.get("gNugget_DEV_MODE", "").lower() in ("1", "true", "yes", "enable")
 
 # Log file path
 _LOG_FILE = "/tmp/goldennugget_log.txt"
@@ -64,18 +151,6 @@ def _log_write(msg: str) -> None:
             f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}\n")
     except Exception:
         pass  # Never fail on logging
-
-def _dbg(msg: str) -> None:
-    """Print debug message only in dev mode, also write to log."""
-    if _DEBUG_MODE:
-        print(f"[DEBUG] {msg}")
-    _log_write(f"[DEBUG] {msg}")
-
-def _dbg_verbose(msg: str) -> None:
-    """Print verbose debug message only in dev mode, also write to log."""
-    if _DEBUG_MODE:
-        print(f"[DEBUG-VERBOSE] {msg}")
-    _log_write(f"[DEBUG-VERBOSE] {msg}")
 
 def log_info(msg: str) -> None:
     """Log info message (always writes to log file)."""
@@ -178,29 +253,6 @@ def _is_protective_file(domain: str, relative_path: str, include_photos: bool = 
     return False
 
 
-def _create_preserve_callback(include_photos: bool) -> Callable[[str, str], bool]:
-    """Create a preserve_file callback for the selective backup.
-
-    Called during DLMessageUploadFiles with:
-      - file_name: host-side filename (hash name, or a metadata name)
-      - device_name: on-device path (e.g. "HomeDomain/Library/Accounts/Accounts3.sqlite")
-
-    Returns True to write the file to disk, False to discard it mid-stream.
-    Anything that does not look like a "<Domain>/<path>" entry (backup
-    metadata, unknown layouts) is kept — losing Manifest.db would brick the
-    whole backup, keeping a few extra files is harmless.
-    """
-    def _preserve(file_name: str, device_name: str) -> bool:
-        if Path(file_name).name in _BACKUP_METADATA_FILES:
-            return True
-        if "/" not in device_name:
-            return True
-        domain, rel_path = device_name.split("/", 1)
-        return _is_protective_file(domain, rel_path, include_photos)
-
-    return _preserve
-
-
 class _SelectiveDeviceLink:
     """DeviceLink wrapper that discards non-protective files mid-stream.
 
@@ -281,142 +333,6 @@ class _SelectiveDeviceLink:
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, dest)
         await self._dl.status_response(0)
-
-
-class ProtectiveBackupService(Mobilebackup2Service):
-    """DeviceLink wrapper that discards non-protective files mid-stream.
-
-    During backup the device sends every file via DLMessageUploadFiles.
-    When ``preserve_file`` returns False for a file, its data is read off
-    the socket and thrown away — no placeholder is created (an empty file's
-    SHA1 never matches the Manifest.db digest, and clean_backup_for_restore
-    removes the dangling Manifest rows before the backup is restored).
-
-    All other DeviceLink operations delegate to the wrapped instance.
-    """
-
-    def __init__(self, device_link, preserve_file: Callable[[str, str], bool]):
-        self._dl = device_link
-        self._preserve_file = preserve_file
-
-    def __getattr__(self, name):
-        return getattr(self._dl, name)
-
-    async def _recv_chunk_header(self) -> tuple:
-        (size,) = struct.unpack(
-            _SIZE_FORMAT, await self._dl.service.recvall(struct.calcsize(_SIZE_FORMAT)))
-        (code,) = struct.unpack(
-            _CODE_FORMAT, await self._dl.service.recvall(struct.calcsize(_CODE_FORMAT)))
-        return size - struct.calcsize(_CODE_FORMAT), code
-        (size,) = struct.unpack(
-            _SIZE_FORMAT, self._dl.service.recvall(struct.calcsize(_SIZE_FORMAT)))
-        (code,) = struct.unpack(
-            _CODE_FORMAT, self._dl.service.recvall(struct.calcsize(_CODE_FORMAT)))
-        return size - struct.calcsize(_CODE_FORMAT), code
-
-    async def upload_files(self, _message):
-        while True:
-            device_name = await self._dl._prefixed_recv()
-            if not device_name:
-                break
-            file_name = await self._dl._prefixed_recv()
-            size, code = await self._recv_chunk_header()
-
-            if self._preserve_file(file_name, device_name):
-                dest = self._dl.root_path / file_name
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                with open(dest, "wb") as fd:
-                    while size and code == _CODE_FILE_DATA:
-                        fd.write(await self._dl.service.recvall(size))
-                        size, code = await self._recv_chunk_header()
-            else:
-                # Discard incoming data — do NOT create an empty placeholder.
-                while size and code == _CODE_FILE_DATA:
-                    await self._dl.service.recvall(size)
-                    size, code = await self._recv_chunk_header()
-
-            if code == _CODE_ERROR_REMOTE:
-                error_message = (await self._dl.service.recvall(size)).decode()
-                warnings.warn(
-                    f"Failed to fully upload: {file_name}. "
-                    f"Device file name: {device_name}. Reason: {error_message}",
-                    stacklevel=2,
-                )
-                continue
-            assert code == _CODE_SUCCESS
-        await self._dl.status_response(0)
-        while True:
-            device_name = self._dl._prefixed_recv()
-            if not device_name:
-                break
-            file_name = self._dl._prefixed_recv()
-            size, code = self._recv_chunk_header()
-
-            if self._preserve_file(file_name, device_name):
-                dest = self._dl.root_path / file_name
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                with open(dest, "wb") as fd:
-                    while size and code == _CODE_FILE_DATA:
-                        fd.write(self._dl.service.recvall(size))
-                        size, code = self._recv_chunk_header()
-            else:
-                # Discard incoming data — do NOT create an empty placeholder.
-                while size and code == _CODE_FILE_DATA:
-                    self._dl.service.recvall(size)
-                    size, code = self._recv_chunk_header()
-
-            if code == _CODE_ERROR_REMOTE:
-                error_message = self._dl.service.recvall(size).decode()
-                warnings.warn(
-                    f"Failed to fully upload: {file_name}. "
-                    f"Device file name: {device_name}. Reason: {error_message}",
-                    stacklevel=2,
-                )
-                continue
-            assert code == _CODE_SUCCESS
-        self._dl.status_response(0)
-
-    async def move_items(self, message):
-        items = cast(Mapping[str, str], message[1])
-        for src, dst in items.items():
-            source = self._dl.root_path / src
-            if not source.exists():
-                # File was discarded during upload — nothing to move.
-                continue
-            dest = self._dl.root_path / dst
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(source, dest)
-        await self._dl.status_response(0)
-        items = cast(Mapping[str, str], message[1])
-        for src, dst in items.items():
-            source = self._dl.root_path / src
-            if not source.exists():
-                # File was discarded during upload — nothing to move.
-                continue
-            dest = self._dl.root_path / dst
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(source, dest)
-        self._dl.status_response(0)
-
-    async def copy_item(self, message):
-        # DLMessageCopyItem carries (src, dst) as positional message fields.
-        # If the source was discarded during upload, skip instead of failing.
-        src, dst = message[1], message[2]
-        source = self._dl.root_path / src
-        if source.exists():
-            dest = self._dl.root_path / dst
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, dest)
-        await self._dl.status_response(0)
-        # DLMessageCopyItem carries (src, dst) as positional message fields.
-        # If the source was discarded during upload, skip instead of failing.
-        src, dst = message[1], message[2]
-        source = self._dl.root_path / src
-        if source.exists():
-            dest = self._dl.root_path / dst
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, dest)
-        self._dl.status_response(0)
 
 
 class ProtectiveBackupService(Mobilebackup2Service):
@@ -529,6 +445,8 @@ async def perform_protective_backup(
 
     is_encrypted = False
 
+    await check_disk_space_for_backup(lockdown_client, path=backup_root)
+
     shutil.rmtree(backup_root, ignore_errors=True)
     Path(backup_root).mkdir(parents=True, exist_ok=True)
 
@@ -572,357 +490,6 @@ async def perform_protective_backup(
             raise
 
     return is_encrypted
-
-
-async def create_encrypted_keychain_backup(
-    lockdown_client: LockdownClient,
-    backup_root: str,
-    progress_callback=None,
-) -> str | None:
-    """Create an ENCRYPTED backup of KeychainDomain + HomeDomain (Apple ID, profiles, prefs).
-
-    This is called during Phase 1 (before the wipe) to capture keychain data
-    in encrypted form. If encryption is already enabled on the device, we use
-    that existing encryption. If not, we temporarily enable it with a random
-    password, then disable after the backup completes.
-
-    Returns the encryption password (str) if we enabled it ourselves (caller
-    must use this to disable after restore), None if using device's existing
-    encryption (password unknown), or None if failed.
-    """
-    if progress_callback is None:
-        progress_callback = lambda x: None
-
-    import secrets
-    temp_password = secrets.token_urlsafe(32)
-
-    progress_callback("Creating encrypted keychain + Apple ID backup (Phase 1)...")
-
-    # Step 1: Check if encryption is already enabled
-    progress_callback("Checking backup encryption status...")
-    encryption_was_enabled = False
-    async with ProtectiveBackupService(lockdown_client) as mb:
-        is_encrypted = await mb.get_will_encrypt()
-        if is_encrypted:
-            encryption_was_enabled = True
-            print("[KeychainBackup] Backup encryption already enabled on device")
-            progress_callback("Using existing backup encryption")
-        else:
-            # Step 2: Enable encryption with our temp password
-            progress_callback("Enabling backup encryption...")
-            try:
-                await mb.change_password(new=temp_password)
-                print("[KeychainBackup] Backup encryption enabled with temp password")
-            except Exception as e:
-                print(f"[KeychainBackup] Failed to enable encryption: {e}")
-                progress_callback("Failed to enable encryption")
-                return None
-
-            is_encrypted = await mb.get_will_encrypt()
-            if not is_encrypted:
-                print("[KeychainBackup] Warning: backup is NOT encrypted after enabling!")
-                progress_callback("Encryption not active")
-                try:
-                    await mb.change_password(old=temp_password, new="")
-                except Exception:
-                    pass
-                return None
-
-    # Step 3: Create a NEW service for the backup (change_password closes the connection)
-    progress_callback("Starting encrypted backup...")
-
-    # We want KeychainDomain + HomeDomain (Apple ID + profiles + preferences) + SystemPreferencesDomain + daemon AppDomains
-    captured_domains = set()
-    skipped_domains = set()
-    total_calls = 0
-    def _keep_keychain_and_appleid(file_name: str, device_name: str) -> bool:
-        nonlocal total_calls
-        total_calls += 1
-        if Path(file_name).name in _BACKUP_METADATA_FILES:
-            return True
-        if "/" not in device_name:
-            return True
-        domain, rel_path = device_name.split("/", 1)
-        # DEBUG: log device_names to understand format (first 50 in verbose mode)
-        if total_calls <= 100:
-            _dbg_verbose(f"KeychainBackup CALL #{total_calls}: device_name={device_name}, file_name={file_name}")
-        # Keep KeychainDomain entirely
-        if domain == "KeychainDomain":
-            captured_domains.add(domain)
-            _dbg(f"KeychainBackup CAPTURED: {domain}")
-            return True
-        # Keep HomeDomain Apple ID / profiles / preferences
-        if domain == "HomeDomain":
-            if (rel_path.startswith("Library/Accounts")
-                    or rel_path.startswith("Library/ConfigurationProfiles")
-                    or rel_path.startswith("Library/Preferences")):
-                captured_domains.add(f"{domain}/{rel_path}")
-                _dbg(f"KeychainBackup CAPTURED: {domain}/{rel_path}")
-                return True
-            else:
-                skipped_domains.add(f"{domain}/{rel_path}")
-                _dbg_verbose(f"KeychainBackup SKIPPED HomeDomain: {rel_path}")
-        # Keep SystemPreferencesDomain (may have profile/MDM data)
-        if domain == "SystemPreferencesDomain":
-            captured_domains.add(domain)
-            _dbg(f"KeychainBackup CAPTURED: {domain}")
-            return True
-        # Keep daemon AppDomains that store auth/profile state
-        if domain.startswith("AppDomain-"):
-            bundle = domain.removeprefix("AppDomain-")
-            if bundle in {
-                "com.apple.accountsd",       # Apple ID auth tokens, session
-                "com.apple.imagent",         # iMessage encryption keys
-                "com.apple.mdmd",            # MDM daemon state
-                "com.apple.profilesd",       # Profile daemon state
-                "com.apple.apsd",            # Push notification tokens
-                "com.apple.identityservicesd", # iCloud identity
-                "com.apple.mobileassetd",    # Asset downloads (profiles)
-            }:
-                captured_domains.add(domain)
-                _dbg(f"KeychainBackup CAPTURED: {domain}")
-                return True
-            else:
-                skipped_domains.add(domain)
-                _dbg_verbose(f"KeychainBackup SKIPPED AppDomain: {bundle}")
-        return False
-
-    async with ProtectiveBackupService(lockdown_client, preserve_file=_keep_keychain_and_appleid) as mb:
-        # Verify encryption is active
-        is_encrypted = await mb.get_will_encrypt()
-        if not is_encrypted:
-            print("[KeychainBackup] Warning: backup is NOT encrypted on new connection!")
-            progress_callback("Encryption lost")
-            return None
-
-        shutil.rmtree(backup_root, ignore_errors=True)
-        Path(backup_root).mkdir(parents=True, exist_ok=True)
-
-        await mb.backup(full=True, backup_directory=backup_root,
-                        progress_callback=progress_callback)
-
-        _dbg(f"KeychainBackup CAPTURED SUMMARY: {sorted(captured_domains)}")
-        _dbg(f"KeychainBackup SKIPPED SUMMARY: {sorted(skipped_domains)}")
-        print(f"[KeychainBackup] Captured: {len(captured_domains)} domains/paths, Skipped: {len(skipped_domains)} domains, Total calls: {total_calls}")
-
-    # Step 4: Disable encryption only if we enabled it ourselves
-    if not encryption_was_enabled:
-        progress_callback("Disabling backup encryption...")
-        async with ProtectiveBackupService(lockdown_client) as mb:
-            try:
-                await mb.change_password(old=temp_password, new="")
-                print("[KeychainBackup] Backup encryption disabled")
-            except Exception as e:
-                print(f"[KeychainBackup] Failed to disable encryption: {e}")
-    else:
-        print("[KeychainBackup] Keeping existing backup encryption (user's password)")
-
-    progress_callback("Encrypted keychain + Apple ID backup complete")
-    # Return temp password only if we enabled it ourselves; None means use existing encryption
-    return None if encryption_was_enabled else temp_password
-
-
-async def restore_encrypted_keychain_backup(
-    lockdown_client: LockdownClient,
-    backup_root: str,
-    backup_password: str | None = None,
-    progress_callback=None,
-) -> bool:
-    """Restore the encrypted KeychainDomain + HomeDomain backup created in Phase 1.
-
-    This is called during Phase 4 (after Phase 3's unencrypted restore).
-    The backup must already be encrypted (created with create_encrypted_keychain_backup).
-    After restore, backup encryption is disabled on the device using the backup_password.
-
-    Returns True if the restore was successful.
-    """
-    if progress_callback is None:
-        progress_callback = lambda x: None
-
-    progress_callback("Restoring encrypted keychain + Apple ID backup (Phase 4)...")
-
-    async with ProtectiveBackupService(lockdown_client) as mb:
-        # Check if backup is encrypted
-        is_encrypted = await mb.get_will_encrypt()
-        if not is_encrypted:
-            print("[KeychainRestore] Warning: backup directory is not encrypted!")
-
-        # Restore KeychainDomain + HomeDomain + SystemPreferencesDomain + daemon AppDomains
-        # We use the same selective filter to only restore those domains
-        restored_domains = set()
-        skipped_restore = set()
-        restore_calls = 0
-        def _restore_keychain_and_appleid(file_name: str, device_name: str) -> bool:
-            nonlocal restore_calls
-            restore_calls += 1
-            if Path(file_name).name in _BACKUP_METADATA_FILES:
-                return True
-            if "/" not in device_name:
-                return True
-            domain, rel_path = device_name.split("/", 1)
-            if restore_calls <= 100:
-                _dbg_verbose(f"KeychainRestore CALL #{restore_calls}: device_name={device_name}, file_name={file_name}")
-            if domain == "KeychainDomain":
-                restored_domains.add(domain)
-                _dbg(f"KeychainRestore WILL RESTORE: {domain}")
-                return True
-            if domain == "HomeDomain":
-                if (rel_path.startswith("Library/Accounts")
-                        or rel_path.startswith("Library/ConfigurationProfiles")
-                        or rel_path.startswith("Library/Preferences")):
-                    restored_domains.add(f"{domain}/{rel_path}")
-                    _dbg(f"KeychainRestore WILL RESTORE: {domain}/{rel_path}")
-                    return True
-                else:
-                    skipped_restore.add(f"{domain}/{rel_path}")
-                    _dbg_verbose(f"KeychainRestore SKIPPED HomeDomain: {rel_path}")
-            if domain == "SystemPreferencesDomain":
-                restored_domains.add(domain)
-                _dbg(f"KeychainRestore WILL RESTORE: {domain}")
-                return True
-            if domain.startswith("AppDomain-"):
-                bundle = domain.removeprefix("AppDomain-")
-                if bundle in {
-                    "com.apple.accountsd",
-                    "com.apple.imagent",
-                    "com.apple.mdmd",
-                    "com.apple.profilesd",
-                    "com.apple.apsd",
-                    "com.apple.identityservicesd",
-                    "com.apple.mobileassetd",
-                }:
-                    restored_domains.add(domain)
-                    _dbg(f"KeychainRestore WILL RESTORE: {domain}")
-                    return True
-                else:
-                    skipped_restore.add(domain)
-                    _dbg_verbose(f"KeychainRestore SKIPPED AppDomain: {bundle}")
-            return False
-
-        _dbg(f"KeychainRestore WILL RESTORE SUMMARY: {sorted(restored_domains)}")
-        _dbg(f"KeychainRestore SKIPPED SUMMARY: {sorted(skipped_restore)}")
-        print(f"[KeychainRestore] Will restore: {len(restored_domains)} domains/paths, Skipped: {len(skipped_restore)} domains, Total calls: {restore_calls}")
-
-        # The restore will restore everything in the backup directory,
-        # but we only populated it with KeychainDomain + HomeDomain
-        await mb.restore(
-            backup_root,
-            system=True, copy=True, remove=False,
-            reboot=False,  # Don't reboot - Phase 3 already rebooted
-            progress_callback=progress_callback,
-        )
-
-        # Disable encryption after restore using the backup password
-        progress_callback("Disabling backup encryption...")
-        try:
-            if backup_password:
-                await mb.change_password(old=backup_password, new="")
-                print("[KeychainRestore] Backup encryption disabled with saved password")
-            else:
-                # Try without password (may work if encryption was already off)
-                await mb.change_password(old="", new="")
-                print("[KeychainRestore] Backup encryption disabled (no password)")
-        except Exception as e:
-            print(f"[KeychainRestore] Failed to disable encryption: {e}")
-
-    progress_callback("Encrypted keychain + Apple ID restore complete")
-    return True
-
-
-async def perform_keychain_appleid_backup(
-    lockdown_client: LockdownClient,
-    backup_root: str,
-    progress_callback=None,
-) -> bool:
-    """Phase 4: Create an ENCRYPTED backup containing KeychainDomain + HomeDomain
-    (Apple ID accounts, ConfigurationProfiles, user settings).
-
-    This backup is encrypted so the keychain data is actually usable. The
-    protective backup (Phase 1) intentionally skips KeychainDomain because
-    enabling backup encryption is slow. This phase runs AFTER the three-phase flow
-    completes, giving the user a complete encrypted backup they can restore
-    from if anything goes wrong.
-
-    Encryption is temporarily enabled with a random password, then disabled
-    after the backup completes — no user interaction required.
-
-    Returns True if the backup was created successfully.
-    """
-    if progress_callback is None:
-        progress_callback = lambda x: None
-
-    import secrets
-    temp_password = secrets.token_urlsafe(32)
-
-    progress_callback("Creating encrypted keychain + Apple ID backup...")
-
-    async with ProtectiveBackupService(lockdown_client) as mb:
-        # Temporarily enable backup encryption
-        progress_callback("Enabling backup encryption...")
-        try:
-            await mb.change_password(new=temp_password)
-            print("[KeychainBackup] Backup encryption enabled")
-        except Exception as e:
-            print(f"[KeychainBackup] Failed to enable encryption: {e}")
-            progress_callback("Failed to enable encryption")
-            return False
-
-        is_encrypted = await mb.get_will_encrypt()
-        if not is_encrypted:
-            print("[KeychainBackup] Warning: backup is NOT encrypted after enabling!")
-            progress_callback("Encryption not active")
-            # Try to disable anyway
-            try:
-                await mb.change_password(old=temp_password, new="")
-            except Exception:
-                pass
-            return False
-
-        # We want ONLY KeychainDomain + HomeDomain (Apple ID + profiles)
-        # So we use a selective preserve callback that keeps only those.
-        def _keep_keychain_and_appleid(file_name: str, device_name: str) -> bool:
-            if Path(file_name).name in _BACKUP_METADATA_FILES:
-                return True
-            if "/" not in device_name:
-                return True
-            domain, rel_path = device_name.split("/", 1)
-            # Keep KeychainDomain entirely
-            if domain == "KeychainDomain":
-                return True
-            # Keep HomeDomain Apple ID / profiles / preferences
-            if domain == "HomeDomain":
-                return (rel_path.startswith("Library/Accounts")
-                        or rel_path.startswith("Library/ConfigurationProfiles")
-                        or rel_path.startswith("Library/Preferences"))
-            return False
-
-        # Wrap with selective filter
-        selective = _SelectiveDeviceLink(mb.service, preserve_file=_keep_keychain_and_appleid)
-        handlers = getattr(mb.service, "_dl_handlers", {})
-        if "DLMessageUploadFiles" in handlers:
-            handlers["DLMessageUploadFiles"] = selective.upload_files
-        if "DLMessageMoveItems" in handlers:
-            handlers["DLMessageMoveItems"] = selective.move_items
-        if "DLMessageCopyItem" in handlers:
-            handlers["DLMessageCopyItem"] = selective.copy_item
-
-        shutil.rmtree(backup_root, ignore_errors=True)
-        Path(backup_root).mkdir(parents=True, exist_ok=True)
-
-        await mb.backup(full=True, backup_directory=backup_root,
-                        progress_callback=progress_callback)
-
-        # Disable encryption after backup
-        progress_callback("Disabling backup encryption...")
-        try:
-            await mb.change_password(old=temp_password, new="")
-            print("[KeychainBackup] Backup encryption disabled")
-        except Exception as e:
-            print(f"[KeychainBackup] Failed to disable encryption: {e}")
-            # Don't fail the whole operation if disable fails
-
-    progress_callback("Encrypted keychain + Apple ID backup complete")
-    return True
 
 
 def _iter_payload_files(device_dir: Path):

@@ -1,8 +1,6 @@
-from PySide6.QtCore import QCoreApplication, Qt
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QToolButton, QLabel, QVBoxLayout
+from PySide6.QtCore import QCoreApplication
 from ..page import Page
 from src.qt.mainwindow_ui import Ui_Nugget
-from src.devicemanagement.constants import Version
 
 class HomePage(Page):
     def __init__(self, window, ui: Ui_Nugget):
@@ -45,4 +43,6 @@ class HomePage(Page):
         support_str: str = "<span style=\"color: #32d74b;\">" + QCoreApplication.tr("Supported!") + "</span></a>"
         if not self.window.device_manager.get_current_device_is_supported_by_fork():
             support_str = "<span style=\"color: #ff0000;\">" + QCoreApplication.tr("Not Supported.") + "</span></a>"
+        elif self.window.device_manager.get_current_device_partially_supported():
+            support_str = "<span style=\"color: #ffd60a;\">" + QCoreApplication.tr("Partially Supported") + "</span></a>"
         self.ui.phoneVersionLbl.setText(f"<a style=\"text-decoration:none; color: white;\" href=\"#\">iOS {version} ({build}) {support_str}")

@@ -5,14 +5,13 @@ from ..page import Page
 from ..pages_list import Page as PageItem
 from src.qt.mainwindow_ui import Ui_Nugget
 
-from PySide6.QtCore import QCoreApplication, QLocale, QSize, Qt
+from PySide6.QtCore import QCoreApplication, QSize, Qt
 from PySide6.QtWidgets import (
-    QFileDialog, QFrame, QHBoxLayout, QInputDialog, QLabel,
-    QLineEdit, QListWidget, QMessageBox, QSizePolicy, QSpacerItem,
+    QFileDialog, QFrame, QHBoxLayout, QLabel,
+    QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QSizePolicy, QSpacerItem,
     QToolButton, QVBoxLayout, QWidget,
 )
 
-from src.tweaks.tweaks import tweaks
 from src.controllers.video_handler import set_ignore_frame_limit
 from src.controllers.preset_manager import PresetManager
 from src.gui.dialogs import AboutProgramDialog
@@ -60,7 +59,7 @@ class SettingsPage(Page):
         self.presetNameTxt = None
         self.setup_presets_ui()
         self.setup_pb_database_ui()
-        self.setup_originals_ui()
+        self.setup_about_ui()
 
     def setup_presets_ui(self):
         # Presets section
@@ -154,7 +153,7 @@ class SettingsPage(Page):
 
         # insert the section after the PosterBoard checkboxes
         layout = self.ui._21
-        idx = layout.indexOf(self.ui.rebuildSBApplicationStateDBChk)
+        idx = layout.indexOf(self.ui.forcePBRefreshChk)
         layout.insertWidget(idx + 1, presets_widget)
 
     def setup_pb_database_ui(self):
@@ -169,63 +168,8 @@ class SettingsPage(Page):
         self.ui.descriptorsSpacer.changeSize(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
         layout = self.ui._21
-        idx = layout.indexOf(self.ui.rebuildSBApplicationStateDBChk)
-        layout.insertWidget(idx, pb_setup)
-
-    def setup_originals_ui(self):
-        # Original Plists section: back up the system plists Nugget overwrites
-        # so Reset can restore the user's original settings.
-        originals_widget = QWidget(self.ui.settingsPageContent)
-        originals_widget.setObjectName("originalsWidget")
-        originals_layout = QVBoxLayout(originals_widget)
-        originals_layout.setObjectName("originalsLayout")
-        originals_layout.setContentsMargins(0, 0, 0, 0)
-        originals_layout.setSpacing(6)
-
-        originals_divider = QFrame(originals_widget)
-        originals_divider.setObjectName("originalsDivider")
-        originals_divider.setStyleSheet("QFrame {\n\tcolor: #414141;\n}")
-        originals_divider.setFrameShadow(QFrame.Plain)
-        originals_divider.setFrameShape(QFrame.Shape.HLine)
-        originals_layout.addWidget(originals_divider)
-
-        originals_title = QLabel(originals_widget)
-        originals_title.setObjectName("originalsTitle")
-        originals_title.setText(QCoreApplication.tr("Original Plists"))
-        originals_layout.addWidget(originals_title)
-
-        originals_desc = QLabel(originals_widget)
-        originals_desc.setObjectName("originalsDesc")
-        originals_desc.setWordWrap(True)
-        originals_desc.setText(QCoreApplication.tr(
-            "Back up the system plists Nugget overwrites so Reset can restore your "
-            "original settings instead of empty ones. Save from a clean (just "
-            "restored) device for the best result. Saved files only apply to "
-            "devices of the same model and iOS build."))
-        originals_layout.addWidget(originals_desc)
-
-        self.originalsStatusLbl = QLabel(originals_widget)
-        self.originalsStatusLbl.setObjectName("originalsStatusLbl")
-        originals_layout.addWidget(self.originalsStatusLbl)
-
-        originals_btns = QHBoxLayout()
-        originals_btns.setContentsMargins(-1, -1, -1, 0)
-        self.originalsSaveBtn = QToolButton(originals_widget)
-        self.originalsSaveBtn.setObjectName("originalsSaveBtn")
-        self.originalsSaveBtn.setText(QCoreApplication.tr("Save Originals"))
-        originals_btns.addWidget(self.originalsSaveBtn)
-        self.originalsDeleteBtn = QToolButton(originals_widget)
-        self.originalsDeleteBtn.setObjectName("originalsDeleteBtn")
-        self.originalsDeleteBtn.setText(QCoreApplication.tr("Delete Originals"))
-        originals_btns.addWidget(self.originalsDeleteBtn)
-        originals_layout.addLayout(originals_btns)
-
-        layout = self.ui._21
-        idx = layout.indexOf(self.ui.rebuildSBApplicationStateDBChk)
-        layout.insertWidget(idx, originals_widget)
-
-        # About Program section
-        self.setup_about_ui()
+        idx = layout.indexOf(self.ui.forcePBRefreshChk)
+        layout.insertWidget(idx + 1, pb_setup)
 
     def setup_about_ui(self):
         about_widget = QWidget(self.ui.settingsPageContent)
@@ -254,11 +198,10 @@ class SettingsPage(Page):
         about_layout.addWidget(self.aboutBtn)
 
         layout = self.ui._21
-        idx = layout.indexOf(self.ui.rebuildSBApplicationStateDBChk)
-        layout.insertWidget(idx, about_widget)
+        idx = layout.indexOf(self.ui.forcePBRefreshChk)
+        layout.insertWidget(idx + 1, about_widget)
 
     def load_page(self):
-        self.ui.allowWifiApplyingChk.toggled.connect(self.on_allowWifiApplyingChk_toggled)
         self.ui.autoRebootChk.toggled.connect(self.on_autoRebootChk_toggled)
 
         self.setup_theme_toggle_ui()
@@ -266,9 +209,7 @@ class SettingsPage(Page):
         self.ui.ignorePBFrameLimitChk.toggled.connect(self.on_ignorePBFrameLimitChk_toggled)
         self.ui.disableTendiesLimitChk.toggled.connect(self.on_disableTendiesLimitChk_toggled)
         self.ui.forcePBRefreshChk.toggled.connect(self.on_forcePBRefreshChk_toggled)
-        self.ui.rebuildSBApplicationStateDBChk.toggled.connect(self.on_rebuildSBApplicationStateDBChk_toggled)
 
-        self.ui.trustStoreChk.toggled.connect(self.on_trustStoreChk_toggled)
         # Experimental: encrypted backup option
         if not hasattr(self.ui, 'encryptedBackupChk'):
             from PySide6.QtWidgets import QCheckBox
@@ -284,11 +225,11 @@ class SettingsPage(Page):
             ))
             self.ui.encryptedBackupChk.setText(QCoreApplication.tr(
                 "Use Encrypted Backups (Experimental)"))
-            # Insert after trustStoreChk in the layout
+            # Insert before skipSetupChk in the layout
             layout = self.ui._21
-            idx = layout.indexOf(self.ui.trustStoreChk)
+            idx = layout.indexOf(self.ui.skipSetupChk)
             if idx >= 0:
-                layout.insertWidget(idx + 1, self.ui.encryptedBackupChk)
+                layout.insertWidget(idx, self.ui.encryptedBackupChk)
             else:
                 layout.addWidget(self.ui.encryptedBackupChk)
         self.ui.encryptedBackupChk.toggled.connect(self.on_encryptedBackupChk_toggled)
@@ -315,15 +256,11 @@ class SettingsPage(Page):
         self.presetExportBtn.clicked.connect(self.on_presetExportBtn_clicked)
         self.presetImportBtn.clicked.connect(self.on_presetImportBtn_clicked)
 
-        self.originalsSaveBtn.clicked.connect(self.on_originalsSaveBtn_clicked)
-        self.originalsDeleteBtn.clicked.connect(self.on_originalsDeleteBtn_clicked)
-
         self.aboutBtn.clicked.connect(self.on_aboutBtn_clicked)
 
         self.load_available_languages()
         self.ui.langDrp.activated.connect(self.on_langDrp_activated)
         self.refresh_presets()
-        self.update_originals_status()
 
     def setup_theme_toggle_ui(self):
         # iOS-style interface toggle (switches between iOS and classic UI)
@@ -364,27 +301,12 @@ class SettingsPage(Page):
             idx = 0
         self.ui.langDrp.setCurrentIndex(idx)
 
-    # Toggle the UAC info
-    def toggle_UAC_btn(self, visible: bool):
-        if os.name != 'nt':
-            self.ui.restartUACLbl.hide()
-            self.ui.restartUACBtn.hide()
-            return
-        import pyuac
-        show_btn = visible and not pyuac.isUserAdmin()
-        self.ui.restartUACLbl.setVisible(show_btn)
-        self.ui.restartUACBtn.setVisible(show_btn)
-
     ## ACTIONS
     def on_langDrp_activated(self, index: int):
         new_lang = self.lang_indexes[index]
         if new_lang != self.window.translator.get_saved_locale_code():
             self.window.translator.set_new_language(new_lang, restart=True)
 
-    def on_allowWifiApplyingChk_toggled(self, checked: bool):
-        self.window.device_manager.pref_manager.apply_over_wifi = checked
-        # save the setting
-        self.window.settings.setValue("apply_over_wifi", checked)
     def on_ignorePBFrameLimitChk_toggled(self, checked: bool):
         set_ignore_frame_limit(checked)
         # save the setting
@@ -396,16 +318,10 @@ class SettingsPage(Page):
     def on_forcePBRefreshChk_toggled(self, checked: bool):
         self.window.device_manager.pref_manager.auto_refresh_posterboard = checked
         self.window.settings.setValue("auto_refresh_posterboard", checked)
-    def on_rebuildSBApplicationStateDBChk_toggled(self, checked: bool):
-        self.window.device_manager.pref_manager.rebuild_sb_application_state_db = checked
     def on_autoRebootChk_toggled(self, checked: bool):
         self.window.device_manager.pref_manager.auto_reboot = checked
         # save the setting
         self.window.settings.setValue("auto_reboot", checked)
-    def on_trustStoreChk_toggled(self, checked: bool):
-        self.window.device_manager.pref_manager.restore_truststore = checked
-        # save the setting
-        self.window.settings.setValue("restore_truststore", checked)
 
     # Experimental options
     def on_encryptedBackupChk_toggled(self, checked: bool):
@@ -447,33 +363,26 @@ class SettingsPage(Page):
                 item_text = f"{name}\n  {desc}  ({model} • iOS {ios}){tag_str}"
             else:
                 item_text = f"{name}  ({model} • iOS {ios}){tag_str}"
-            self.presetList.addItem(item_text)
+            item = QListWidgetItem(item_text)
+            self.presetList.addItem(item)
+            item.setData(Qt.UserRole, name)
 
     def on_presetSaveBtn_clicked(self):
-        default_name = self.presetNameTxt.text().strip()
-        default_desc = self.presetDescTxt.text().strip()
-        name, ok = QInputDialog.getText(
-            self.window, QCoreApplication.tr("Save Preset"),
-            QCoreApplication.tr("Enter a name for this preset:"),
-            text=default_name
-        )
-        if not ok or name.strip() == "":
+        name = self.presetNameTxt.text().strip()
+        desc = self.presetDescTxt.text().strip()
+        if not name:
+            QMessageBox.warning(
+                self.window, QCoreApplication.tr("Save Preset"),
+                QCoreApplication.tr("Enter a name for this preset.")
+            )
             return
-        desc, ok2 = QInputDialog.getText(
-            self.window, QCoreApplication.tr("Save Preset"),
-            QCoreApplication.tr("Enter a description (optional):"),
-            text=default_desc
-        )
-        if not ok2:
-            desc = default_desc
-        if self.preset_manager.save_preset(name.strip(), desc.strip(), tags=[]):
+        if self.preset_manager.save_preset(
+                name, desc, tags=[],
+                device_model=self.window.device_manager.get_current_device_model() or "",
+                ios_version=self.window.device_manager.get_current_device_version() or ""):
             self.presetNameTxt.clear()
             self.presetDescTxt.clear()
             self.refresh_presets()
-            QMessageBox.information(
-                self.window, QCoreApplication.tr("Save Preset"),
-                QCoreApplication.tr("Preset \"{0}\" saved successfully.").format(name.strip())
-            )
         else:
             QMessageBox.critical(
                 self.window, QCoreApplication.tr("Save Preset"),
@@ -489,7 +398,7 @@ class SettingsPage(Page):
             return
         # Extract name from the first line of the item text
         item_text = self.presetList.currentItem().text()
-        name = item_text.split("\n")[0].strip()
+        name = self.presetList.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
         meta = self.preset_manager.get_preset_metadata(name)
         desc = meta.get("description", "") if meta else ""
         model = meta.get("device_model", "Unknown") if meta else "Unknown"
@@ -524,7 +433,7 @@ class SettingsPage(Page):
             )
             return
         item_text = self.presetList.currentItem().text()
-        name = item_text.split("\n")[0].strip()
+        name = self.presetList.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
         confirm = QMessageBox.question(
             self.window, QCoreApplication.tr("Delete Preset"),
             QCoreApplication.tr("Delete preset \"{0}\"?").format(name)
@@ -550,7 +459,7 @@ class SettingsPage(Page):
             )
             return
         item_text = self.presetList.currentItem().text()
-        name = item_text.split("\n")[0].strip()
+        name = self.presetList.currentItem().data(Qt.UserRole) or item_text.split("\n")[0].strip()
         file_path, _ = QFileDialog.getSaveFileName(
             self.window, QCoreApplication.tr("Export Preset"),
             f"{name}.json",
@@ -589,53 +498,6 @@ class SettingsPage(Page):
                 self.window, QCoreApplication.tr("Import Preset"),
                 QCoreApplication.tr("Failed to import preset:\n{0}").format(result)
             )
-
-    ## ORIGINAL PLISTS
-    def update_originals_status(self):
-        model = self.window.device_manager.get_current_device_model()
-        build = self.window.device_manager.get_current_device_build()
-        originals = {}
-        if model and build:
-            originals = self.window.device_manager.pref_manager.get_original_plists(model, build)
-        if originals:
-            self.originalsStatusLbl.setText(QCoreApplication.tr(
-                "Saved: {0} files for {1} ({2})").format(len(originals), model, build))
-            self.originalsStatusLbl.setStyleSheet("color: #7ed67e;")
-        else:
-            self.originalsStatusLbl.setText(QCoreApplication.tr(
-                "Not saved yet. Connect a clean device and tap \"Save Originals\"."))
-            self.originalsStatusLbl.setStyleSheet("color: #e8a33d;")
-
-    def on_originalsSaveBtn_clicked(self):
-        if not self.window.device_manager.get_current_device_udid():
-            QMessageBox.warning(
-                self.window, QCoreApplication.tr("Save Originals"),
-                QCoreApplication.tr("No device connected."))
-            return
-        confirm = QMessageBox.question(
-            self.window, QCoreApplication.tr("Save Originals"),
-            QCoreApplication.tr(
-                "Back up the current device's original plists?\n\n"
-                "This may take a few minutes and the device may ask for its passcode. "
-                "Save from a clean (just restored) device for the best result."))
-        if confirm != QMessageBox.StandardButton.Yes:
-            return
-        self.window.capture_originals()
-
-    def on_originalsDeleteBtn_clicked(self):
-        model = self.window.device_manager.get_current_device_model()
-        build = self.window.device_manager.get_current_device_build()
-        if not model or not build:
-            return
-        confirm = QMessageBox.question(
-            self.window, QCoreApplication.tr("Delete Originals"),
-            QCoreApplication.tr(
-                "Delete the saved original plists for {0} ({1})?\n\n"
-                "Reset will fall back to writing empty plists.").format(model, build))
-        if confirm != QMessageBox.StandardButton.Yes:
-            return
-        self.window.device_manager.pref_manager.remove_original_plists(model, build)
-        self.update_originals_status()
 
     def on_aboutBtn_clicked(self):
         dialog = AboutProgramDialog(self.window)

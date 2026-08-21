@@ -98,37 +98,6 @@ class Directory(BackupFile):
         )
     
 @dataclass
-class SymbolicLink(BackupFile):
-    target: str
-    owner: int = 0
-    group: int = 0
-    inode: Optional[int] = None
-    mode: _FileMode = DEFAULT
-
-    def to_record(self) -> mbdb.MbdbRecord:
-        if self.inode is None:
-            self.inode = int.from_bytes(randbytes(8), "big")
-        return mbdb.MbdbRecord(
-            domain=self.domain,
-            filename=self.path,
-            link=self.target,
-            hash=b"",
-            key=b"",
-            mode=self.mode | _FileMode.S_IFLNK,
-            #unknown2=0,
-            #unknown3=0,
-            inode=self.inode,
-            user_id=self.owner,
-            group_id=self.group,
-            mtime=int(datetime.now().timestamp()),
-            atime=int(datetime.now().timestamp()),
-            ctime=int(datetime.now().timestamp()),
-            size=0,
-            flags=4,
-            properties=[]
-        )
-    
-@dataclass
 class AppBundle:
     identifier: str
     path: str

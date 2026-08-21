@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QPixmap
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt
 
 class ResizableImageLabel(QLabel):
     def __init__(self, parent=None):

@@ -2,7 +2,6 @@ import asyncio
 import os.path
 import plistlib
 import sys
-import time
 import traceback
 
 from tempfile import TemporaryDirectory
@@ -14,7 +13,7 @@ from cryptography.hazmat.primitives.serialization import Encoding
 from uuid import uuid4
 
 from PySide6.QtWidgets import QMessageBox, QInputDialog, QLineEdit
-from PySide6.QtCore import QSettings, QCoreApplication, QTimer
+from PySide6.QtCore import QSettings, QCoreApplication
 
 from packaging.version import Version
 
@@ -22,7 +21,7 @@ from pymobiledevice3 import usbmux
 from pymobiledevice3.ca import create_keybag_file
 from pymobiledevice3.services.mobile_config import MobileConfigService
 from pymobiledevice3.lockdown import create_using_usbmux
-from pymobiledevice3.exceptions import MuxException, PasswordRequiredError, ConnectionTerminatedError, AccessDeniedError, InvalidServiceError, PyMobileDevice3Exception
+from pymobiledevice3.exceptions import MuxException, PasswordRequiredError, ConnectionTerminatedError, AccessDeniedError, InvalidServiceError
 from pymobiledevice3.services.afc import AfcService
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 import pymobiledevice3.service_connection as _sc
@@ -39,51 +38,25 @@ _sc.DEFAULT_SSL_HANDSHAKE_TIMEOUT = 60
 # Temporarily allow writing up to this many PosterBoard tendies in a single
 # restore. Applying more than one tendie at once can race PosterBoard's sqlite
 # regeneration, so the count is capped.
-# Reset-critical managed plists that must all have a usable (non-empty)
-# original before the capture is considered done. A reset nulls these files
-# (writes {}), so an empty saved original would make every reset restore the
-# nulled state. Each path has a HomeDomain fallback, so a successful capture
-# always fills them — even on a device whose files were already nulled.
-_ORIGINAL_CAPTURE_REQUIRED = (
-    "/var/Managed Preferences/mobile/com.apple.springboard.plist",
-    "/var/Managed Preferences/mobile/com.apple.UIKit.plist",
-    "/var/Managed Preferences/mobile/.GlobalPreferences.plist",
-    "/var/Managed Preferences/mobile/com.apple.AppStore.plist",
-    "/var/Managed Preferences/mobile/com.apple.backboardd.plist",
-    "/var/Managed Preferences/mobile/com.apple.mobilenotes.plist",
-)
-
 MAX_TENDIES_PER_RESTORE = 3
 
-from src.devicemanagement.constants import Device, Version, is_supported_by_fork
+from src.devicemanagement.constants import Device, Version
 from src.devicemanagement.data_singleton import DataSingleton
 from .preference_manager import PreferenceManager
 
 from src.gui.thread_workers.apply_worker import ApplyAlertMessage
 from src.gui.pages.pages_list import Page
 from src.controllers.path_handler import fix_windows_path
-from src.controllers.files_handler import get_bundle_files
 
 from src.exceptions.nugget_exception import NuggetException
 
-from src.tweaks.tweaks import tweaks, TweakID, FeatureFlagTweak, BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak, StatusBarTweak, PasscodeThemeTweak
+from src.tweaks.tweaks import tweaks, TweakID, BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak, StatusBarTweak, PasscodeThemeTweak
 from src.tweaks.posterboard.posterboard_tweak import PosterboardTweak
 from src.tweaks.posterboard.template_options.templates_tweak import TemplatesTweak
 from src.tweaks.basic_plist_locations import FileLocation
 
-from src.restore import reboot_device
 from src.restore.restore import restore_files, FileToRestore
 from src.restore.original_plist import psysbackup, materialize_plist, is_empty_plist, mobile_user_fallback_path
-from src.restore.mbdb import _FileMode
-
-def show_error_msg(txt: str, title: str = "Error!", icon = QMessageBox.Critical, detailed_txt: str = None):
-    detailsBox = QMessageBox()
-    detailsBox.setIcon(icon)
-    detailsBox.setWindowTitle(title)
-    detailsBox.setText(txt)
-    if detailed_txt != None:
-        detailsBox.setDetailedText(detailed_txt)
-    detailsBox.exec()
 
 def get_files_list_str(files_list: list[FileToRestore] = None) -> str:
     files_str: str = ""
@@ -94,7 +67,6 @@ def get_files_list_str(files_list: list[FileToRestore] = None) -> str:
             file_info = f"\n    Domain: {file.domain}\n    Path: {file.restore_path}"
             files_str += file_info
             print(file_info)
-        files_list += "\n\n"
     return files_str
 
 def show_apply_error(e: Exception, update_label=lambda x: None, files_list: list[FileToRestore] = None):
@@ -154,58 +126,6 @@ class DeviceManager:
         
         # Test mode
         self._test_mode = "--test-mode" in sys.argv
-        
-        # Device watchdog
-        self._watchdog_timer: Optional[QTimer] = None
-        self._watchdog_interval_ms = 5000  # Check every 5 seconds
-        self._device_connected_callback: Optional[callable] = None
-    
-    def start_device_watchdog(self, on_disconnected: Optional[callable] = None):
-        """Start monitoring device connection status.
-        
-        Args:
-            on_disconnected: Callback when device disconnects. Receives (udid: str).
-        """
-        self.stop_device_watchdog()
-        self._device_connected_callback = on_disconnected
-        
-        if self._watchdog_timer is None:
-            self._watchdog_timer = QTimer()
-            self._watchdog_timer.setInterval(self._watchdog_interval_ms)
-            self._watchdog_timer.timeout.connect(self._check_device_connection)
-        
-        if self._watchdog_timer and not self._watchdog_timer.isActive():
-            self._watchdog_timer.start()
-    
-    def stop_device_watchdog(self):
-        """Stop the device connection watchdog."""
-        if self._watchdog_timer and self._watchdog_timer.isActive():
-            self._watchdog_timer.stop()
-        self._device_connected_callback = None
-    
-    def _check_device_connection(self):
-        """Periodic check for device connection status."""
-        udid = self.get_current_device_udid()
-        if not udid:
-            self.stop_device_watchdog()
-            return
-        
-        try:
-            # Quick connection test via usbmux
-            connected = asyncio.run(self._verify_device_connected(udid))
-            if not connected and self._device_connected_callback:
-                self._device_connected_callback(udid)
-        except Exception:
-            # Ignore check errors to avoid watchdog crash
-            pass
-    
-    async def _verify_device_connected(self, udid: str) -> bool:
-        """Verify device is still connected via usbmux."""
-        try:
-            connected_devices = await usbmux.list_devices()
-            return any(d.serial == udid for d in connected_devices)
-        except Exception:
-            return False
     
     def _get_backup_password(self) -> str:
         """Get backup password from settings or return empty string."""
@@ -218,33 +138,6 @@ class DeviceManager:
                 self._backup_password = pwd
                 return pwd
         return ""
-    
-    def set_backup_password(self, password: str):
-        """Set backup password and save to settings."""
-        self._backup_password = password
-        if hasattr(self, 'pref_manager') and self.pref_manager.settings:
-            if password:
-                self.pref_manager.settings.setValue("backup_password", password)
-            else:
-                self.pref_manager.settings.remove("backup_password")
-            self.pref_manager.settings.sync()
-    
-    async def _prompt_backup_password(self, update_label=lambda x: None) -> str:
-        """Prompt user for backup password."""
-        # This is called from async context, need to run in main thread
-        # For now return empty - will be improved later
-        return self._get_backup_password()
-    
-    def get_current_device_udid(self) -> Optional[str]:
-        """Get current device UDID or None."""
-        if self.current_device_index is not None and 0 <= self.current_device_index < len(self.devices):
-            return self.devices[self.current_device_index].serial
-        return None
-        
-        # Device watchdog
-        self._watchdog_timer: Optional[QTimer] = None
-        self._watchdog_interval_ms = 5000  # Check every 5 seconds
-        self._device_connected_callback: Optional[callable] = None
     
     def get_devices(self, settings: QSettings, show_alert=lambda x: None):
         asyncio.run(self._get_devices(settings, show_alert))
@@ -269,82 +162,81 @@ class DeviceManager:
             return
         # Connect via usbmuxd
         for device in connected_devices:
-            if self.pref_manager.apply_over_wifi or device.is_usb:
-                try:
-                    ld = await create_using_usbmux(serial=device.serial)
-                    # Check backup encryption status if experimental option not enabled
-                    if not self.pref_manager.use_encrypted_backup:
-                        try:
-                            from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
-                            mb = Mobilebackup2Service(ld)
-                            await mb.connect()
-                            is_encrypted = await mb.get_will_encrypt()
-                            await mb.close()
-                            if is_encrypted:
-                                show_alert(ApplyAlertMessage(
-                                    txt=QCoreApplication.tr("Backup encryption is enabled on your iPhone."),
-                                    detailed_txt=QCoreApplication.tr(
-                                        "GoldenNugget needs to temporarily disable backup encryption to apply tweaks safely.\n\n"
-                                        "Please choose one:\n"
-                                        "1. Disable encryption on your iPhone: Settings → General → Transfer or Reset iPhone → Backup Password → Turn Off\n"
-                                        "2. Or enable \"Use Encrypted Backups (Experimental)\" in GoldenNugget Settings → enter your backup password when prompted.\n\n"
-                                        "Tip: Option 1 is simpler if you don't know your backup password."
-                                    )
-                                ))
-                                self.set_current_device(index=None)
-                                return
-                        except Exception:
-                            pass  # If we can't check, continue anyway
-                    vals = ld.all_values
-                    model = vals['ProductType']
-                    hardware = vals['HardwareModel']
-                    cpu = vals['HardwarePlatform']
+            try:
+                ld = await create_using_usbmux(serial=device.serial)
+                # Check backup encryption status if experimental option not enabled
+                if not self.pref_manager.use_encrypted_backup:
                     try:
-                        product_type = settings.value(device.serial + "_model", "", type=str)
-                        hardware_type = settings.value(device.serial + "_hardware", "", type=str)
-                        cpu_type = settings.value(device.serial + "_cpu", "", type=str)
-                        if product_type == "":
-                            # save the new product type
-                            settings.setValue(device.serial + "_model", model)
-                        else:
-                            model = product_type
-                        if hardware_type == "":
-                            # save the new hardware model
-                            settings.setValue(device.serial + "_hardware", hardware)
-                        else:
-                            hardware = hardware_type
-                        if cpu_type == "":
-                            # save the new cpu model
-                            settings.setValue(device.serial + "_cpu", cpu)
-                        else:
-                            cpu = cpu_type
+                        from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
+                        mb = Mobilebackup2Service(ld)
+                        await mb.connect()
+                        is_encrypted = await mb.get_will_encrypt()
+                        await mb.close()
+                        if is_encrypted:
+                            show_alert(ApplyAlertMessage(
+                                txt=QCoreApplication.tr("Backup encryption is enabled on your iPhone."),
+                                detailed_txt=QCoreApplication.tr(
+                                    "GoldenNugget needs to temporarily disable backup encryption to apply tweaks safely.\n\n"
+                                    "Please choose one:\n"
+                                    "1. Disable encryption on your iPhone: Settings → General → Transfer or Reset iPhone → Backup Password → Turn Off\n"
+                                    "2. Or enable \"Use Encrypted Backups (Experimental)\" in GoldenNugget Settings → enter your backup password when prompted.\n\n"
+                                    "Tip: Option 1 is simpler if you don't know your backup password."
+                                )
+                            ))
+                            self.set_current_device(index=None)
+                            return
                     except Exception:
-                        show_alert(ApplyAlertMessage(txt=QCoreApplication.tr("Click \"Show Details\" for the traceback."), detailed_txt=str(traceback.format_exc())))
-                    locale = await ld.get_locale()
-                    dev = Device(
-                            udid=device.serial,
-                            usb=device.is_usb,
-                            name=vals['DeviceName'],
-                            version=vals['ProductVersion'],
-                            build=vals['BuildVersion'],
-                            model=model,
-                            hardware=hardware,
-                            cpu=cpu,
-                            locale=locale,
-                        )
-                    self.devices.append(dev)
-                except PasswordRequiredError as e:
-                    show_alert(ApplyAlertMessage(txt=QCoreApplication.tr("Device is password protected! You must trust the computer on your device.\n\nUnlock your device. On the popup, click \"Trust\", enter your password, then try again.")))
-                except MuxException as e:
-                    # there is probably a cable issue
-                    print(f"MUX ERROR with lockdown device with UUID {device.serial}")
-                    show_alert(ApplyAlertMessage(txt="MuxException: " + repr(e) + "\n\n" + QCoreApplication.tr("If you keep receiving this error, try using a different cable or port."),
-                                   detailed_txt=str(traceback.format_exc())))
-                except Exception as e:
-                    print(f"ERROR with lockdown device with UUID {device.serial}")
-                    show_alert(ApplyAlertMessage(txt=f"{type(e).__name__}: {repr(e)}", detailed_txt=str(traceback.format_exc())))
-                finally:
-                    await ld.close()
+                        pass  # If we can't check, continue anyway
+                vals = ld.all_values
+                model = vals['ProductType']
+                hardware = vals['HardwareModel']
+                cpu = vals['HardwarePlatform']
+                try:
+                    product_type = settings.value(device.serial + "_model", "", type=str)
+                    hardware_type = settings.value(device.serial + "_hardware", "", type=str)
+                    cpu_type = settings.value(device.serial + "_cpu", "", type=str)
+                    if product_type == "":
+                        # save the new product type
+                        settings.setValue(device.serial + "_model", model)
+                    else:
+                        model = product_type
+                    if hardware_type == "":
+                        # save the new hardware model
+                        settings.setValue(device.serial + "_hardware", hardware)
+                    else:
+                        hardware = hardware_type
+                    if cpu_type == "":
+                        # save the new cpu model
+                        settings.setValue(device.serial + "_cpu", cpu)
+                    else:
+                        cpu = cpu_type
+                except Exception:
+                    show_alert(ApplyAlertMessage(txt=QCoreApplication.tr("Click \"Show Details\" for the traceback."), detailed_txt=str(traceback.format_exc())))
+                locale = await ld.get_locale()
+                dev = Device(
+                        udid=device.serial,
+                        usb=device.is_usb,
+                        name=vals['DeviceName'],
+                        version=vals['ProductVersion'],
+                        build=vals['BuildVersion'],
+                        model=model,
+                        hardware=hardware,
+                        cpu=cpu,
+                        locale=locale,
+                    )
+                self.devices.append(dev)
+            except PasswordRequiredError as e:
+                show_alert(ApplyAlertMessage(txt=QCoreApplication.tr("Device is password protected! You must trust the computer on your device.\n\nUnlock your device. On the popup, click \"Trust\", enter your password, then try again.")))
+            except MuxException as e:
+                # there is probably a cable issue
+                print(f"MUX ERROR with lockdown device with UUID {device.serial}")
+                show_alert(ApplyAlertMessage(txt="MuxException: " + repr(e) + "\n\n" + QCoreApplication.tr("If you keep receiving this error, try using a different cable or port."),
+                               detailed_txt=str(traceback.format_exc())))
+            except Exception as e:
+                print(f"ERROR with lockdown device with UUID {device.serial}")
+                show_alert(ApplyAlertMessage(txt=f"{type(e).__name__}: {repr(e)}", detailed_txt=str(traceback.format_exc())))
+            finally:
+                await ld.close()
         
         if len(self.devices) > 0:
             self.set_current_device(index=0)
@@ -385,9 +277,9 @@ class DeviceManager:
         else:
             return self.data_singleton.current_device.build
     
-    def get_current_device_udid(self) -> str:
+    def get_current_device_udid(self) -> Optional[str]:
         if self.data_singleton.current_device == None:
-            return ""
+            return None
         else:
             return self.data_singleton.current_device.udid
         
@@ -414,6 +306,15 @@ class DeviceManager:
             return False
         else:
             return self.data_singleton.current_device.is_supported_by_fork()
+
+    def get_current_device_partially_supported(self) -> bool:
+        """iOS 27 devices use the experimental three-phase protective restore."""
+        if self.data_singleton.current_device == None:
+            return False
+        try:
+            return Version(self.data_singleton.current_device.version) >= Version("27.0")
+        except Exception:
+            return False
         
     def reset_device_pairing(self):
         asyncio.run(self._reset_device_pairing())
@@ -428,14 +329,6 @@ class DeviceManager:
         await ld.close()
         QMessageBox.information(None, QCoreApplication.tr("Pairing Reset"), QCoreApplication.tr("Your device's pairing was successfully reset. Refresh the device list before applying."))
         
-    def add_rebuild_sb_application_state_db(self, files_to_restore: list[FileToRestore]):
-        if self.pref_manager.rebuild_sb_application_state_db:
-            files_to_restore.append(FileToRestore(
-                contents=b"",
-                restore_path="Library/FrontBoard/applicationState.db",
-                domain="HomeDomain"
-            ))
-
     async def add_skip_setup(self, files_to_restore: list[FileToRestore], restoring_domains: bool):
         # TODO: Probably should move this to its own file
         if self.pref_manager.skip_setup and (not self.get_current_device_supported() or restoring_domains):
@@ -607,10 +500,9 @@ class DeviceManager:
                 "GoldenNugget only supports iOS 26.2 and newer. "
                 "Please use the original Nugget for iOS 26.1 and earlier."))
 
-    async def start_restore(self, files_to_restore: list[FileToRestore], update_label=lambda x: None, skips_br_for_folders: bool=False, reboot_for_br: bool=False, backup_password: str = ""):
+    async def start_restore(self, files_to_restore: list[FileToRestore], update_label=lambda x: None, backup_password: str = ""):
         # hard-block any restore on an unsupported (old) iOS version
         self._raise_if_unsupported()
-        # if skips_br_for_folders is True, the message will be added to the result letting them know that they can apply feature flags now
         self.update_label = update_label
         self.do_not_unplug = ""
         if self.data_singleton.current_device.connected_via_usb:
@@ -678,9 +570,6 @@ class DeviceManager:
         try:
             self._raise_if_unsupported()
             update_label(QCoreApplication.tr("Applying changes to files..."))
-            if not os.environ.get("GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE"):
-                await self._maybe_capture_originals(update_label)
-                await self._snapshot_last_apply(update_label)
             device_values = await self._get_lockdown_values()
 
             # iOS 26.2+ (iOS 27 era) uses the heavy three-phase protective restore
@@ -749,83 +638,6 @@ class DeviceManager:
             else:
                 update_label(QCoreApplication.tr("Warning: could not back up the PosterBoard database automatically."))
 
-    ## ORIGINAL PLIST SAVING
-    async def _snapshot_last_apply(self, update_label=lambda x: None):
-        """Snapshot the plists that are about to be overwritten so the most
-        recent apply can be reverted ("auto-revert").
-
-        The snapshot is stored per device (UDID) and is replaced on every
-        apply, so it always represents the state before the last apply.
-        """
-        udid = self.get_current_device_udid()
-        if not udid:
-            return
-        try:
-            update_label(QCoreApplication.tr("Capturing pre-apply state..."))
-            backup_password = self._get_backup_password()
-            captured = await psysbackup(
-                udid, self._get_original_plist_paths(), update_label,
-                self._backup_progress(update_label), backup_password)
-            self.pref_manager.save_last_apply(udid, captured)
-        except Exception as e:
-            print(f"Failed to snapshot pre-apply state: {e}")
-            print(traceback.format_exc())
-            if _is_device_locked_error(e):
-                update_label(QCoreApplication.tr("Warning: could not snapshot pre-apply state — device is locked. Please unlock your device and try again. Reverting the last apply may not be possible."))
-            else:
-                update_label(QCoreApplication.tr(
-                    "Warning: could not snapshot the pre-apply state. "
-                    "Reverting the last apply may not be possible."))
-
-    def revert_last_apply(self, update_label=lambda x: None, show_alert=lambda x: None):
-        asyncio.run(self._revert_last_apply(update_label, show_alert))
-
-    async def _revert_last_apply(self, update_label=lambda x: None, show_alert=lambda x: None):
-        files_to_restore: list[FileToRestore] = []
-        final_alert = None
-        try:
-            self._raise_if_unsupported()
-            udid = self.get_current_device_udid()
-            if not udid:
-                raise NuggetException(QCoreApplication.tr("No device connected."))
-            snapshot = self.pref_manager.get_last_apply(udid)
-            if not snapshot:
-                raise NuggetException(QCoreApplication.tr(
-                    "No saved state to revert. Apply tweaks first to create a revert point."))
-            update_label(QCoreApplication.tr("Reverting last apply..."))
-            device_values = await self._get_lockdown_values()
-            uses_domains = False
-            for path, contents in snapshot.items():
-                file_path, domain = self.get_domain_for_path(path)
-                try:
-                    # Re-materialize the templated snapshot so device-specific
-                    # placeholders (<DeviceName>, ...) get the current values.
-                    contents = plistlib.dumps(materialize_plist(plistlib.loads(contents), device_values))
-                except Exception:
-                    pass
-                files_to_restore.append(FileToRestore(
-                    contents=contents, restore_path=file_path, domain=domain))
-                if domain != "":
-                    uses_domains = True
-            await self.add_skip_setup(files_to_restore, uses_domains)
-            await self.start_restore(files_to_restore, update_label)
-            self.pref_manager.remove_last_apply(udid)
-            update_label(QCoreApplication.tr("Success!"))
-            msg = QCoreApplication.tr("Your tweaks were reverted to the state before the last apply.")
-            if self.pref_manager.auto_reboot:
-                msg += QCoreApplication.tr("\n\nYour device will now restart.\n\nRemember to turn Find My back on!")
-            else:
-                msg += QCoreApplication.tr("\n\nPlease restart your device to see changes.")
-            final_alert = ApplyAlertMessage(
-                txt=QCoreApplication.tr("All done! ") + msg,
-                title=QCoreApplication.tr("Success!"),
-                icon=QMessageBox.Information,
-                is_revert=True)
-        except Exception as e:
-            final_alert = show_apply_error(e, update_label, files_list=files_to_restore)
-        finally:
-            show_alert(final_alert)
-
     async def _get_lockdown_values(self) -> dict:
         udid = self.get_current_device_udid()
         if not udid:
@@ -882,17 +694,16 @@ class DeviceManager:
         preferred over the managed copy: tweaks and resets write only to
         ``/var/Managed Preferences/mobile/*.plist``, so the HomeDomain copy is
         the truest original even when tweaks were applied before the capture
-        ran (e.g. when "Save Originals" is tapped after an apply). The managed
-        copy is used only when no HomeDomain copy exists. Entries that are
-        still empty after both sources are dropped — a nulled plist must never
-        be stored as an "original", otherwise reset keeps restoring the nulled
-        state.
+        ran. The managed copy is used only when no HomeDomain copy exists.
+        Entries that are still empty after both sources are dropped — a nulled
+        plist must never be stored as an "original", otherwise reset keeps
+        restoring the nulled state.
         """
         paths = self._get_original_plist_paths()
         fallbacks = [mobile_user_fallback_path(p) for p in paths]
         fallbacks = [f for f in fallbacks if f is not None and f not in paths]
         captured = await psysbackup(
-            udid, paths + fallbacks, update_label, self._backup_progress(update_label), backup_password)
+            udid, paths + fallbacks, update_label, self._backup_progress(update_label), self._get_backup_password())
         originals = {}
         for path in paths:
             data = None
@@ -904,137 +715,6 @@ class DeviceManager:
             if data is not None and not is_empty_plist(data):
                 originals[path] = data
         return originals
-
-    def _original_plists_usable(self, model: str, build: str) -> bool:
-        """True when every reset-critical plist has a non-empty original.
-
-        Stale captures that stored nulled (empty) plists — taken from a
-        device that was already reset — count as missing, so they are redone.
-        """
-        if not model or not build:
-            return False
-        return all(
-            self.pref_manager.has_nonempty_original_plist(model, build, path)
-            for path in _ORIGINAL_CAPTURE_REQUIRED
-        )
-
-    async def _maybe_capture_originals(self, update_label=lambda x: None):
-        """Capture original plists on the first apply for this model/build.
-
-        Skipped when GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE=1 is set. Failure is
-        non-fatal: applying tweaks does not need the originals. Only non-empty
-        originals count as captured, so a poisoned (nulled) capture is redone
-        on a later apply.
-        """
-        if os.environ.get("GOLDENNUGGET_SKIP_ORIGINAL_CAPTURE"):
-            return
-        udid = self.get_current_device_udid()
-        if not udid:
-            return
-        try:
-            all_values = await self._get_lockdown_values()
-            model = all_values.get("ProductType", "")
-            build = all_values.get("BuildVersion", "")
-            if not model or not build:
-                return
-            if self._original_plists_usable(model, build):
-                return
-            update_label(QCoreApplication.tr("Capturing original plists..."))
-            originals = await self._capture_original_plists(udid, update_label)
-            if not originals:
-                update_label(QCoreApplication.tr(
-                    "Warning: could not capture original plists automatically."))
-                return
-            for path, data in originals.items():
-                self.pref_manager.save_original_plist(model, build, path, data)
-            update_label(QCoreApplication.tr("Original plists saved."))
-        except Exception as e:
-            print(f"Failed to capture original plists: {e}")
-            print(traceback.format_exc())
-            update_label(QCoreApplication.tr("Warning: could not capture original plists automatically."))
-
-    def capture_originals(self, update_label=lambda x: None, show_alert=lambda x: None):
-        asyncio.run(self._capture_originals(update_label, show_alert))
-
-    async def _capture_originals(self, update_label=lambda x: None, show_alert=lambda x: None):
-        try:
-            self._raise_if_unsupported()
-            udid = self.get_current_device_udid()
-            if not udid:
-                raise NuggetException(QCoreApplication.tr("No device connected."))
-            all_values = await self._get_lockdown_values()
-            model = all_values.get("ProductType", "")
-            build = all_values.get("BuildVersion", "")
-            if not model or not build:
-                raise NuggetException(QCoreApplication.tr(
-                    "Could not read the device model and iOS build."))
-            update_label(QCoreApplication.tr("Capturing original plists..."))
-            templated = await self._capture_original_plists(udid, update_label)
-            if not templated:
-                raise NuggetException(QCoreApplication.tr(
-                    "No original plists were found on the device."))
-            for path, data in templated.items():
-                self.pref_manager.save_original_plist(model, build, path, data)
-            show_alert(ApplyAlertMessage(
-                txt=QCoreApplication.tr(
-                    "Saved {0} original plists for {1} ({2}).\n\n"
-                    "Reset will now restore your original files instead of empty plists."
-                ).format(len(templated), model, build),
-                title=QCoreApplication.tr("Success!"),
-                icon=QMessageBox.Information))
-        except Exception as e:
-            show_alert(show_apply_error(e, update_label))
-
-    def _load_original_plists(self, model: str, build: str) -> dict:
-        original_plists = {}
-        if not model or not build:
-            return original_plists
-        for path, data in self.pref_manager.get_original_plists(model, build).items():
-            try:
-                original_plists[path] = plistlib.loads(data)
-            except Exception:
-                continue
-        return original_plists
-
-    def _original_plists_required(self, reset_pages: list[Page]) -> bool:
-        for page in reset_pages:
-            if page == Page.FeatureFlags:
-                return True
-            if page == Page.InternalOptions:
-                return True
-            if page == Page.Springboard:
-                return True
-        return False
-
-    def get_missing_original_plists(self, reset_pages: list[Page]) -> list[str]:
-        """Return the nulled plist paths lacking a usable original (for pre-reset warnings).
-
-        Only paths the reset will null without a non-empty saved original are
-        reported, so the warning reflects exactly what would be written as an
-        empty plist.
-        """
-        if not self._original_plists_required(reset_pages):
-            return []
-        model = self.get_current_device_model()
-        build = self.get_current_device_build()
-        if not model or not build:
-            return []
-        paths = []
-        if Page.FeatureFlags in reset_pages:
-            paths.append(FileLocation.featureflags.value)
-        if Page.InternalOptions in reset_pages:
-            paths.extend([
-                FileLocation.globalPreferences.value,
-                FileLocation.appStore.value,
-                FileLocation.backboardd.value,
-                FileLocation.coreMotion.value,
-                FileLocation.pasteboard.value,
-                FileLocation.notes.value,
-            ])
-        return [
-            path for path in paths
-            if not self.pref_manager.has_nonempty_original_plist(model, build, path)
-        ]
 
     async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None, device_values: dict = None):
         """Generate all tweak files and restore them to the device in one pass.
@@ -1059,9 +739,7 @@ class DeviceManager:
             # set the plist keys
             for tweak_name in tweaks:
                 tweak = tweaks[tweak_name]
-                if isinstance(tweak, FeatureFlagTweak):
-                    flag_plist = tweak.apply_tweak(flag_plist)
-                elif isinstance(tweak, PasscodeThemeTweak):
+                if isinstance(tweak, PasscodeThemeTweak):
                     passcode_files = tweak.apply_tweak()
                     if passcode_files is not None and len(passcode_files) > 0:
                         files_to_restore.extend(passcode_files)
@@ -1087,25 +765,8 @@ class DeviceManager:
                 elif isinstance(tweak, StatusBarTweak):
                     # iOS 27: the status bar is Speakeasy, a SpringBoard
                     # feature flag — writing fails due to no write permissions.
-# The feature is disabled on iOS 27+.
+                    # The feature is disabled on iOS 27+.
                     flag_plist = tweak.apply_tweak(flag_plist, version=self.get_current_device_version())
-            
-            # Merge the saved original plists into the files being applied so
-            # untouched user settings survive the tweak, and device-specific
-            # placeholders (<DeviceName>, ...) get the current device's values.
-            if device_values is not None:
-                original_plists = self._load_original_plists(
-                    device_values.get("ProductType", ""), device_values.get("BuildVersion", ""))
-                if len(flag_plist) > 0 and FileLocation.featureflags.value in original_plists:
-                    merged = materialize_plist(original_plists[FileLocation.featureflags.value], device_values)
-                    merged.update(flag_plist)
-                    flag_plist = merged
-                for location, plist in list(basic_plists.items()):
-                    original = original_plists.get(location.value)
-                    if original is not None:
-                        merged = materialize_plist(original, device_values)
-                        merged.update(plist)
-                        basic_plists[location] = merged
 
             # Generate backup
             update_label(QCoreApplication.tr("Generating backup..."))
@@ -1116,8 +777,7 @@ class DeviceManager:
                     files_to_restore=files_to_restore
                 )
             
-            self.add_rebuild_sb_application_state_db(files_to_restore)
-            await self.add_skip_setup(files_to_restore, uses_domains)
+            self.add_skip_setup(files_to_restore, uses_domains)
             for location, plist in basic_plists.items():
                 if location in basic_plists_ownership:
                     ownership = basic_plists_ownership[location]
@@ -1160,37 +820,7 @@ class DeviceManager:
                     owner=ownership, group=ownership
                 )
 
-            # Restore Mobileconfig Profiles
-            # Read multiple configuration files from a directory
-            # config_files = glob.glob('path/to/configuration/files/*.stub')
-
-            # for idx, config_file in enumerate(config_files):
-            #     with open(config_file, 'rb') as f:
-            #         content = f.read()
-
-            #     original_file_name = config_file.split('/')[-1]
-            #     files_to_restore.append(FileToRestore(
-            #         contents=content,
-            #         restore_path=f"Library/ConfigurationProfiles/{original_file_name}",
-            #         domain="SysSharedContainerDomain-systemgroup.com.apple.configurationprofiles"
-            #     ))
-
-            # Restore SSL Configuration Profiles
-            if uses_domains and self.pref_manager.restore_truststore:
-                with open(get_bundle_files('files/SSLconf/TrustStore.sqlite3'), 'rb') as f:
-                    certsDB = f.read()
-
-                files_to_restore.append(FileToRestore(
-                    contents=certsDB,
-                    restore_path="trustd/private/TrustStore.sqlite3",
-                    domain="ProtectedDomain",
-                    owner=501, group=501,
-                    mode=_FileMode.S_IRUSR | _FileMode.S_IWUSR  | _FileMode.S_IRGRP | _FileMode.S_IWGRP | _FileMode.S_IROTH | _FileMode.S_IWOTH
-                ))
-
-            
-
-# Check if backup encryption is enabled and handle it
+            # Check if backup encryption is enabled and handle it
             backup_password = ""
             if Version(self.get_current_device_version()) >= Version("27.0"):
                 # Check if backup encryption is enabled on device
@@ -1212,6 +842,7 @@ class DeviceManager:
                             )
                             if ok and password:
                                 backup_password = password
+                                from src.restore.protective import log_info
                                 log_info("Using existing backup encryption with provided password")
                                 update_label(QCoreApplication.tr("Password accepted. Proceeding with encrypted restore..."))
                             else:
@@ -1238,7 +869,7 @@ class DeviceManager:
                         pass
 
             # restore to the device
-            final_alert = await self.start_restore(files_to_restore, update_label, reboot_for_br=(len(flag_plist) > 0), backup_password=backup_password)
+            final_alert = await self.start_restore(files_to_restore, update_label, backup_password=backup_password)
             return final_alert, files_to_restore
         finally:
             if len(tmp_dirs) > 0:
@@ -1257,28 +888,26 @@ class DeviceManager:
             self._raise_if_unsupported()
             # create the restore file list
             files_to_restore: list[FileToRestore] = []
-            # Generate backup
-            update_label(QCoreApplication.tr("Generating backup..."))
+            # Capture the device's original plists fresh via psysbackup so the
+            # reset can restore the user's files instead of empty ones.
+            udid = self.get_current_device_udid()
+            if not udid:
+                raise NuggetException(QCoreApplication.tr("No device connected."))
             all_values = await self._get_lockdown_values()
-            original_plists = self._load_original_plists(
-                all_values.get("ProductType", ""), all_values.get("BuildVersion", ""))
+            update_label(QCoreApplication.tr("Capturing original plists..."))
+            captured = await self._capture_original_plists(udid, update_label)
+            original_plists = {}
+            for path, data in captured.items():
+                try:
+                    original_plists[path] = plistlib.loads(data)
+                except Exception:
+                    continue
             files_to_null: list[str] = []
             uses_domains = False
 
             # use if-statements instead of match (switch) statements for compatibility with Python 3.9
             for page in reset_pages:
-                if page == Page.FeatureFlags:
-                    ## FEATURE FLAGS
-                    self.concat_file(
-                        contents=plistlib.dumps({
-                            "Nugget": {
-                                'Enabled': False
-                            }
-                        }),
-                        path=FileLocation.featureflags.value,
-                        files_to_restore=files_to_restore
-                    )
-                elif page == Page.StatusBar:
+                if page == Page.StatusBar:
                     ## STATUS BAR
                     # iOS 26.2+ (iOS 27 era): the status bar is Speakeasy, a SpringBoard
                     # feature flag — disable it instead of writing the
@@ -1324,20 +953,8 @@ class DeviceManager:
                     files_to_null.append(FileLocation.coreMotion.value)
                     files_to_null.append(FileLocation.pasteboard.value)
                     files_to_null.append(FileLocation.notes.value)
-            
+
             # add the files to null from the list
-            if self._original_plists_required(reset_pages):
-                model = all_values.get("ProductType", "")
-                build = all_values.get("BuildVersion", "")
-                missing_or_empty = [
-                    path for path in files_to_null
-                    if not self.pref_manager.has_nonempty_original_plist(model, build, path)
-                ]
-                if missing_or_empty and not self._original_plists_usable(model, build):
-                    raise NuggetException(QCoreApplication.tr(
-                        "Cannot reset: the saved original plists for this device are empty.\n\n"
-                        "Open Settings and tap \"Save Originals\" (with this device connected) "
-                        "so the reset can restore your original files instead of empty ones."))
             for file_path in files_to_null:
                 original = original_plists.get(file_path)
                 if original is not None:
@@ -1355,7 +972,7 @@ class DeviceManager:
                     path=file_path,
                     files_to_restore=files_to_restore
                 )
-            
+
             await self.add_skip_setup(files_to_restore, uses_domains)
 
             # restore to the device
