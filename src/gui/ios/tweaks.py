@@ -6,13 +6,12 @@ from PySide6.QtWidgets import (
 
 from src.gui.ios.components import (
     IOSNavBar, IOSSectionHeader, IOSCard, IOSSettingsRow,
-    IOSSwitch, IOSValueLabel
+    IOSSwitch
 )
 from src.gui.ios.compat import is_tweak_compatible
 from src.tweaks.tweaks import tweaks, TweakID
-from src.tweaks.tweak_loader import (
-    load_internal, load_liquidglass, load_springboard
-)
+from src.tweaks.registry import SPECS_BY_SECTION, Kind, Section
+from src.tweaks.tweak_loader import load_plist_tweaks
 
 
 class TextInputDialog(QDialog):
@@ -177,9 +176,7 @@ class IOSTweaksPage(QWidget):
         content_layout.setSpacing(8)
 
         # Load tweaks (idempotent) so the sections below actually populate
-        load_internal()
-        load_liquidglass()
-        load_springboard()
+        load_plist_tweaks()
 
         try:
             device_ver = self.window.device_manager.get_current_device_version()
@@ -195,7 +192,7 @@ class IOSTweaksPage(QWidget):
             return is_tweak_compatible(tweak_id, device_ver, is_iphone)
 
         # Helper to create a switch row for boolean tweaks
-        def make_switch(tweak_id: TweakID, title: str, show_value=False):
+        def make_switch(tweak_id: TweakID, title: str):
             if tweak_id not in tweaks:
                 return
             if not is_compatible(tweak_id):
@@ -210,11 +207,6 @@ class IOSTweaksPage(QWidget):
             label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
             row_layout.addWidget(label, 1)
 
-            value_label = None
-            if show_value and hasattr(tweak, 'value') and tweak.value:
-                value_label = IOSValueLabel(f"({tweak.value})")
-                row_layout.addWidget(value_label)
-
             switch = IOSSwitch(tweak.enabled)
             switch.toggled.connect(lambda checked: tweak.set_enabled(checked))
             row_layout.addWidget(switch)
@@ -222,7 +214,7 @@ class IOSTweaksPage(QWidget):
             content_layout.addWidget(card)
 
         # Helper for text input tweaks
-        def make_text_input(tweak_id: TweakID, title: str, placeholder: str = ""):
+        def make_text_input(tweak_id: TweakID, title: str):
             if tweak_id not in tweaks:
                 return
             if not is_compatible(tweak_id):
@@ -259,62 +251,18 @@ class IOSTweaksPage(QWidget):
             card_layout.addWidget(row)
             content_layout.addWidget(card)
 
-        # Liquid Glass section
-        content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Liquid Glass")))
-        make_switch(TweakID.ForceSolariumFallback, QCoreApplication.translate("Nugget", "Force Solarium Fallback"))
-        make_switch(TweakID.IgnoreSolariumLinkedOnCheck, QCoreApplication.translate("Nugget", "Ignore Solarium Linked-On Check"))
-        make_switch(TweakID.ForceSolariumIntelligence, QCoreApplication.translate("Nugget", "Force Solarium Intelligence"))
-        make_switch(TweakID.ForceEnhancedSpeculars, QCoreApplication.translate("Nugget", "Force Enhanced Speculars"))
-        make_switch(TweakID.UISolariumFallback, QCoreApplication.translate("Nugget", "UI Solarium Fallback"))
-        make_switch(TweakID.IgnoreSolariumHardwareCheck, QCoreApplication.translate("Nugget", "Ignore Solarium Hardware Check"))
-        make_switch(TweakID.IgnoreSolariumOptOut, QCoreApplication.translate("Nugget", "Ignore Solarium Opt-Out"))
-        make_switch(TweakID.DisallowGlassButtons, QCoreApplication.translate("Nugget", "Disallow Glass Buttons"))
-        make_switch(TweakID.DisallowGlassLockScreen, QCoreApplication.translate("Nugget", "Disallow Glass Lock Screen"))
-        make_switch(TweakID.DisableSpecularEverywhere, QCoreApplication.translate("Nugget", "Disable Specular Everywhere"))
-        make_switch(TweakID.NoLiquidClock, QCoreApplication.translate("Nugget", "Disable Liquid Glass on LS Clock"))
-        make_switch(TweakID.NoLiquidDock, QCoreApplication.translate("Nugget", "Disable Liquid Glass on Dock"))
-        make_switch(TweakID.DisableSpecularMotion, QCoreApplication.translate("Nugget", "Disable Specular Motion"))
-        make_switch(TweakID.DisableOuterRefraction, QCoreApplication.translate("Nugget", "Disable Outer Refraction"))
-        make_switch(TweakID.DisableSolariumHDR, QCoreApplication.translate("Nugget", "Disable Solarium HDR"))
-
-        # SpringBoard section
-        content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "SpringBoard")))
-        make_text_input(TweakID.LockScreenFootnote, QCoreApplication.translate("Nugget", "Lock Screen Footnote Text"))
-        make_switch(TweakID.WatchOSCompatibility, QCoreApplication.translate("Nugget", "Allow pairing with any watchOS version"))
-        make_switch(TweakID.AirDropDisableTimeLimit, QCoreApplication.translate("Nugget", "Disable AirDrop Time Limit for Everyone Option"))
-        make_switch(TweakID.SBDontLockAfterCrash, QCoreApplication.translate("Nugget", "Disable Lock After Respring"))
-        make_switch(TweakID.SBDontDimOrLockOnAC, QCoreApplication.translate("Nugget", "Disable Screen Dimming While Charging"))
-        make_switch(TweakID.SBHideLowPowerAlerts, QCoreApplication.translate("Nugget", "Disable Low Battery Alerts"))
-        make_switch(TweakID.SBHideACPower, QCoreApplication.translate("Nugget", "Hide AC Power on Lock Screen"))
-        make_switch(TweakID.SBNeverBreadcrumb, QCoreApplication.translate("Nugget", "Disable Breadcrumbs"))
-        make_switch(TweakID.SBShowSupervisionTextOnLockScreen, QCoreApplication.translate("Nugget", "Show Supervision Text on Lock Screen"))
-        make_switch(TweakID.AirplaySupport, QCoreApplication.translate("Nugget", "Enable AirPlay support for Stage Manager"))
-        make_number_input(TweakID.SBMinimumLockscreenIdleTime, QCoreApplication.translate("Nugget", "Auto‑Lock (Lock Screen)"), 0, 600)
-        make_switch(TweakID.SBAlwaysShowSystemApertureInSnapshots, QCoreApplication.translate("Nugget", "Show Dynamic Island in Screenshots"))
-        make_switch(TweakID.HideDICompletely, QCoreApplication.translate("Nugget", "Hide Dynamic Island Completely"))
-        make_switch(TweakID.SBShowAuthenticationEngineeringUI, QCoreApplication.translate("Nugget", "Show Red/Green Authentication Line on Lock Screen"))
-        make_switch(TweakID.UseFloatingTabBar, QCoreApplication.translate("Nugget", "Disable Floating Tab Bar"))
-
-        # Internal Options section
-        content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Internal Options")))
-        make_switch(TweakID.SBBuildNumber, QCoreApplication.translate("Nugget", "Show Build Version in Status Bar"))
-        make_switch(TweakID.RTL, QCoreApplication.translate("Nugget", "Force Right-to-Left Layout"))
-        make_switch(TweakID.LTR, QCoreApplication.translate("Nugget", "Force Left-to-Right Layout"))
-        make_switch(TweakID.SBIconVisibility, QCoreApplication.translate("Nugget", "Show Hidden Icons on Home Screen"))
-        make_switch(TweakID.iMessageDiagnosticsEnabled, QCoreApplication.translate("Nugget", "iMessage Debugging"))
-        make_switch(TweakID.IDSDiagnosticsEnabled, QCoreApplication.translate("Nugget", "Continuity Debugging"))
-        make_switch(TweakID.VCDiagnosticsEnabled, QCoreApplication.translate("Nugget", "FaceTime Debugging"))
-        make_switch(TweakID.AccessoryDeveloperEnabled, QCoreApplication.translate("Nugget", "Show Accessory Developer Settings"))
-        make_switch(TweakID.DisableSecondsHand, QCoreApplication.translate("Nugget", "Disable Clock Icon Seconds Hand"))
-        make_switch(TweakID.DisableSearchingWebsites, QCoreApplication.translate("Nugget", "Disable Spotlight Searching in Websites"))
-        make_switch(TweakID.ShowButtonHints, QCoreApplication.translate("Nugget", "Show Hardware Button Hints in Screenshots"))
-        make_switch(TweakID.AppStoreDebug, QCoreApplication.translate("Nugget", "App Store Debug Gesture"))
-        make_switch(TweakID.NotesDebugMode, QCoreApplication.translate("Nugget", "Notes Debug Mode"))
-        make_switch(TweakID.BKDigitizerVisualizeTouches, QCoreApplication.translate("Nugget", "Show Touches With Debug Info"))
-        make_switch(TweakID.BKHideAppleLogoOnLaunch, QCoreApplication.translate("Nugget", "Hide Respring Icon"))
-        make_switch(TweakID.EnableWakeGestureHaptic, QCoreApplication.translate("Nugget", "Vibrate on Raise-to-Wake"))
-        make_switch(TweakID.PlaySoundOnPaste, QCoreApplication.translate("Nugget", "Play Sound on Paste"))
-        make_switch(TweakID.AnnounceAllPastes, QCoreApplication.translate("Nugget", "Show Notifications for System Pastes"))
+        # Render every section straight from the registry
+        renderers = {
+            Kind.SWITCH: lambda spec: make_switch(spec.id, spec.title),
+            Kind.TEXT: lambda spec: make_text_input(spec.id, spec.title),
+            Kind.NUMBER: lambda spec: make_number_input(
+                spec.id, spec.title, spec.min_value, spec.max_value),
+        }
+        for section in Section:
+            content_layout.addWidget(IOSSectionHeader(
+                QCoreApplication.translate("Nugget", section.value)))
+            for spec in SPECS_BY_SECTION[section]:
+                renderers[spec.kind](spec)
 
         content_layout.addStretch()
 

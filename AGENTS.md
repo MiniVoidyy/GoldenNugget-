@@ -2,6 +2,28 @@
 
 This document describes the background threads, async backup/restore operations, and error handling used in GoldenNugget.
 
+## Tweak Registry (src/tweaks/registry.py)
+
+Single source of truth for every plist-based tweak: id, section, title,
+plist location, key, default value, UI kind (switch/text/number).
+- `tweak_loader.load_plist_tweaks()` builds the runtime instances from the
+  registry (`load_internal`/`load_liquidglass`/`load_springboard` are thin
+  aliases kept for classic pages; daemons stay hand-defined there).
+- The iOS tweaks page (`src/gui/ios/tweaks.py`) renders its sections straight
+  from `SPECS_BY_SECTION` — adding a tweak means adding one registry entry.
+- Titles are wrapped in `QCoreApplication.translate("Nugget", ...)` at
+  definition time; keep `src/tweaks/registry.py` in the pyside6-lupdate file
+  list so new strings reach the translators.
+- Device compatibility (min iOS version, iPad/iPhone-only) stays in
+  `src/gui/ios/compat.py`.
+
+## Lockdown Sessions (src/devicemanagement/session.py)
+
+`lockdown_session(serial)` is the one way to open a lockdown connection:
+an async context manager that always closes safely (a rebooted device makes
+`close()` raise ConnectionTerminatedError, which must never mask the real
+result). Do not call `create_using_usbmux` directly in new code.
+
 ## Thread Workers (src/gui/thread_workers/)
 
 ### PBDBThread
