@@ -4,11 +4,9 @@ from src.exceptions.nugget_exception import NuggetException
 
 import os
 import glob
-from dataclasses import dataclass
 from typing import Optional
 from PySide6 import QtWidgets, QtGui, QtCore
 
-@dataclass
 class ReplaceOption(TemplateOption):
     allowed_files: str # Qt format - ex. "Image Files (*.png)"
     button_label: str = "Import"
@@ -99,8 +97,7 @@ class ReplaceOption(TemplateOption):
         if self.value == None:
             if not self.required:
                 return
-            elif self.required and self.value == None:
-                raise NuggetException(QtCore.QCoreApplication.tr("Error applying template:\n\nNo selected file for required option") + f" {self.label}")
+            raise NuggetException(QtCore.QCoreApplication.tr("Error applying template:\n\nNo selected file for required option") + f" {self.label}")
         contents=None
         in_path = os.path.join(container_path, self.value)
         with open(in_path, "rb") as in_file:

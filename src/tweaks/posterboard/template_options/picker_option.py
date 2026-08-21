@@ -122,7 +122,7 @@ class PickerOption(TemplateOption):
                 # rename files or directories
                 old_path = os.path.join(container_path, self.options[self.selection].files[i])
                 new_path = os.path.join(container_path, self.names[i])
-                if os.path.isdir(path):
+                if os.path.isdir(old_path):
                     # rename whole directory
                     move(old_path, new_path)
                 else:

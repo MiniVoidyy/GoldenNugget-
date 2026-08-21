@@ -2,7 +2,6 @@ from . import TemplateOption
 
 import os
 import glob
-from dataclasses import dataclass
 from typing import Optional
 from enum import Enum
 from PySide6.QtGui import QColor
@@ -17,7 +16,6 @@ class SetterType(Enum):
     toggle = "toggle"
     color_picker = "color_picker"
 
-@dataclass
 class SetOption(TemplateOption):
     identifier: str # nuggetId for properties in caml
     key: str # key of the property to change
@@ -50,8 +48,7 @@ class SetOption(TemplateOption):
             if '(' in value and ')' in value:
                 rm = value.split('(')
                 self.value_tag = rm[0]
-                rm = rm[1]
-                rm.removesuffix(')')
+                rm = rm[1].removesuffix(')')
             # split into values
             spl = rm.split(' ')
             parsed_spl = list(map(self.convert_str, spl))
@@ -277,7 +274,7 @@ class SetOption(TemplateOption):
             return int(value)
         else:
             if self.setter_type == SetterType.slider:
-                self.value_type == "float"
+                self.value_type = "float"
             return float(value)
     def convert_color(self, value: float):
         return round(min(1, value) * 255)
@@ -297,20 +294,6 @@ class SetOption(TemplateOption):
             back_str = self.value_tag + "(" + back_str + ")"
         return back_str
 
-    # def get_parsed_value(self, value):
-    #     if self.value_type == "float":
-    #         if isinstance(value, list):
-    #             # convert list
-    #             return list(map(self.convert_int, value))
-    #         return self.convert_int(value)
-    #     return value
-    # def get_value(self):
-    #     return self.get_parsed_value(self.value)
-    # def get_min(self):
-    #     return self.get_parsed_value(self.min_value)
-    # def get_max(self):
-    #     return self.get_parsed_value(self.max_value)
-    
     def update_value(self, nv: int, index: int=None):
         if self.setter_type == SetterType.slider:
             # correct it to the step
@@ -321,14 +304,11 @@ class SetOption(TemplateOption):
             self.value[index] = nv
         else:
             self.value = nv
-        if self.label_objects != None:
-            if index != None:
-                val = self.value
-                if isinstance(self.value, list):
-                    val = val[index]
-                self.label_objects[index].setText(f"{self.label}: {val}")
-            else:
-                self.label_objects.setText(f"{self.label}: {self.get_value()}")
+        if self.label_objects != None and index != None:
+            val = self.value
+            if isinstance(self.value, list):
+                val = val[index]
+            self.label_objects[index].setText(f"{self.label}: {val}")
     def update_color(self):
         color = QtWidgets.QColorDialog.getColor(initial=self.value, options=QtWidgets.QColorDialog.ColorDialogOption.ShowAlphaChannel)
         if color.isValid():

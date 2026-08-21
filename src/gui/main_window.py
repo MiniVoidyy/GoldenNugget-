@@ -303,23 +303,19 @@ class MainWindow(QtWidgets.QMainWindow):
             }
 
             device_ver = Version(self.device_manager.data_singleton.current_device.version)
-            patched: bool = self.device_manager.get_current_device_patched()
             # toggle option visibility for the minimum versions
             for version in MinTweakVersions.keys():
                 if version == "exploit":
                     # disable if the exploit is not available
                     for pair in MinTweakVersions[version]:
-                        if self.device_manager.data_singleton.current_device.has_exploit() and device_ver >= Version(pair[0]):
+                        if device_ver >= Version(pair[0]):
                             pair[1].show()
                         else:
                             pair[1].hide()
                 elif version == "no_patch":
-                    # hide patched version items
+                    # these items only apply to unpatched devices, which do not exist on this fork
                     for view in MinTweakVersions[version]:
-                        if patched:
-                            view.hide()
-                        else:
-                            view.show()
+                        view.hide()
                 else:
                     # show views if the version is higher
                     parsed_ver = Version(version)
@@ -362,10 +358,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.enableLGLPMChk.setVisible(supports_lg and not is_lglpm)
             self.ui.disableLGLPMChk.setVisible(supports_lg and is_lglpm)
 
-            # jjtech/duy books vs sparse restore
-            has_sparserestore = self.device_manager.data_singleton.current_device.has_partial_sparserestore()
-            self.ui.duyBtn.setVisible(not has_sparserestore)
-            self.ui.jjtechBtn.setVisible(has_sparserestore)
+            # sparse-restore book credits do not apply to this fork
+            self.ui.jjtechBtn.hide()
             keys_lang_code = self.device_manager.data_singleton.current_device.locale
             if keys_lang_code == 'en_US':
                 keys_lang_code = 'en'
