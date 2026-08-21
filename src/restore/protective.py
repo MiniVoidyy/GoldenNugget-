@@ -430,18 +430,8 @@ async def perform_protective_backup(
     if progress_callback is None:
         progress_callback = lambda x: None
 
-    def _is_device_locked_error(exc: Exception) -> bool:
-        msg = str(exc)
-        return "ErrorCode" in msg and ("208" in msg or "Device locked" in msg or "MBErrorDomain" in msg)
-
-    def _is_connection_error(exc: Exception) -> bool:
-        msg = str(exc).lower()
-        return isinstance(exc, (
-            _pm3_exc.ConnectionTerminatedError,
-            ConnectionError,
-            OSError,
-            asyncio.TimeoutError,
-        )) or "connection" in msg or "incomplete" in msg or "terminated" in msg
+    from src.exceptions.device_errors import is_device_locked_error as _is_device_locked_error
+    from src.exceptions.device_errors import is_connection_error as _is_connection_error
 
     is_encrypted = False
 

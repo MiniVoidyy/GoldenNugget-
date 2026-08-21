@@ -27,10 +27,7 @@ from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 import pymobiledevice3.service_connection as _sc
 
 
-def _is_device_locked_error(exc: Exception) -> bool:
-    """Check if an exception indicates the device is locked (ErrorCode 208)."""
-    msg = str(exc)
-    return "ErrorCode" in msg and ("208" in msg or "Device locked" in msg or "MBErrorDomain" in msg)
+from src.exceptions.device_errors import is_device_locked_error as _is_device_locked_error
 
 # Bump SSL handshake timeout from 10s to 60s for all lockdown services.
 _sc.DEFAULT_SSL_HANDSHAKE_TIMEOUT = 60

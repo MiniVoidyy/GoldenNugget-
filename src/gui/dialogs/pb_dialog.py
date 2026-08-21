@@ -33,17 +33,8 @@ from src.tweaks.tweaks import tweaks, TweakID
 
 async def backup_posterboard_database(udid: str, update_label=lambda x: None, update_progress=lambda x: None) -> str:
     """Back up the device and return the extracted PosterBoard sqlite db path."""
-    def _is_device_locked_error(exc: Exception) -> bool:
-        msg = str(exc)
-        return "ErrorCode" in msg and ("208" in msg or "Device locked" in msg or "MBErrorDomain" in msg)
-
-    def _is_connection_error(exc: Exception) -> bool:
-        msg = str(exc).lower()
-        return isinstance(exc, (
-            ConnectionError,
-            OSError,
-            asyncio.TimeoutError,
-        )) or "connection" in msg or "incomplete" in msg or "terminated" in msg
+    from src.exceptions.device_errors import is_device_locked_error as _is_device_locked_error
+    from src.exceptions.device_errors import is_connection_error as _is_connection_error
 
     app_data_path = path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), 'Backups')
     if not path.exists(app_data_path):
