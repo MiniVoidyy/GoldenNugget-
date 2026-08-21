@@ -396,19 +396,41 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
         progress_callback(_PHASE_BACKUP_END)
 
         # === Phase 2: apply tweaks → reboot (40-60%) ===
-        log_info("Phase 2: Applying tweaks via sparse restore")
+        log_info(f"Phase 2: Applying tweaks via sparse restore ({len(back.files)} files)")
+        if len(back.files) == 0:
+            log_error("Phase 2: file list is EMPTY — nothing to apply, the device "
+                      "will reboot without triggering security recovery")
+        sparse_progress = {"last": None, "calls": 0}
+
+        def _tracking_callback(value):
+            # remember how far the sparse restore actually got before any
+            # connection drop — a drop at 0% means it was rejected, not applied
+            sparse_progress["calls"] += 1
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                sparse_progress["last"] = value
+            progress_callback(_scaled_callback(
+                progress_callback, _PHASE_BACKUP_END, _PHASE_TWEAK_END)(value))
+
         try:
             await perform_restore(
                 backup=back, reboot=True,
                 lockdown_client=lockdown_client,
-                progress_callback=_scaled_callback(
-                    progress_callback, _PHASE_BACKUP_END, _PHASE_TWEAK_END),
+                progress_callback=_tracking_callback,
             )
+            log_info(f"Phase 2: sparse restore completed cleanly "
+                     f"({sparse_progress['calls']} progress events)")
         except (ConnectionTerminatedError, ssl.SSLEOFError,
                 ConnectionAbortedError, ConnectionResetError):
-            # Device rebooted before acknowledging — expected.
-            log_info("Phase 2: Device rebooted during sparse restore (expected)")
-            pass
+            # A connection drop usually means the device rebooted right after
+            # applying — but an early drop (no progress at all) means the
+            # restore was rejected and NO security recovery will happen.
+            if sparse_progress["last"] is None:
+                log_error("Phase 2: connection dropped with ZERO restore progress — "
+                          "the sparse restore was likely REJECTED. Security state "
+                          "recovery will not trigger; tweaks are NOT applied.")
+            else:
+                log_info(f"Phase 2: Device rebooted during sparse restore "
+                         f"(expected; last progress {sparse_progress['last']:.1f}%)")
         progress_callback(_PHASE_TWEAK_END)
 
         # === Phase 3: reconnect + restore protective backup (60-100%) ===
