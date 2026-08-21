@@ -19,10 +19,10 @@ from PySide6.QtWidgets import QWizard, QWizardPage, QLabel, QVBoxLayout, QProgre
 from PySide6.QtCore import QSize, Qt, QStandardPaths
 
 from os import path, makedirs
-from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 from shutil import rmtree
 
+from src.devicemanagement.session import lockdown_session
 from src.restore.protective import check_disk_space_for_backup
 
 from src.exceptions.nugget_exception import NuggetException
@@ -51,8 +51,7 @@ async def backup_posterboard_database(udid: str, update_label=lambda x: None, up
 
     max_retries = 3
     for attempt in range(1, max_retries + 1):
-        service_provider = await create_using_usbmux(serial=udid)
-        try:
+        async with lockdown_session(udid) as service_provider:
             if attempt == 1:
                 await check_disk_space_for_backup(service_provider, path=app_data_path)
             # hard-block fetching the database from an unsupported (old) iOS version
@@ -74,8 +73,7 @@ async def backup_posterboard_database(udid: str, update_label=lambda x: None, up
                     continue
                 raise
             break  # Success
-        finally:
-            await service_provider.close()
+        # lockdown_session closes the connection safely on every path
 
     # get the file, reading the sqlite db first to get the file id
     update_label("Getting the file...")

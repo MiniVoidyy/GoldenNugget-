@@ -38,6 +38,9 @@ class TweakSpec:
     kind: Kind = Kind.SWITCH
     min_value: int = 0         # NUMBER kind only
     max_value: int = 999       # NUMBER kind only
+    min_version: Optional[str] = None  # minimum iOS version for the tweak to make sense
+    iphone_only: bool = False
+    ipad_only: bool = False
     factory: Optional[Callable[[], object]] = None  # overrides BasicPlistTweak
 
 
@@ -70,27 +73,27 @@ GP = FileLocation.globalPreferences
 
 SPECS: tuple[TweakSpec, ...] = (
     # --- Liquid Glass ---
-    _t(TweakID.ForceSolariumFallback, Section.LIQUID_GLASS, "Force Solarium Fallback", GP, "SolariumForceFallback"),
-    _t(TweakID.IgnoreSolariumLinkedOnCheck, Section.LIQUID_GLASS, "Ignore Solarium Linked-On Check", GP, "com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"),
-    _t(TweakID.ForceSolariumIntelligence, Section.LIQUID_GLASS, "Force Solarium Intelligence", GP, "SolariumForceIntelligence"),
-    _t(TweakID.ForceEnhancedSpeculars, Section.LIQUID_GLASS, "Force Enhanced Speculars", GP, "SolariumForceEnhancedSpeculars"),
-    _t(TweakID.UISolariumFallback, Section.LIQUID_GLASS, "UI Solarium Fallback", GP, "UISolariumForceFallback"),
-    _t(TweakID.IgnoreSolariumHardwareCheck, Section.LIQUID_GLASS, "Ignore Solarium Hardware Check", GP, "com.apple.SwiftUI.IgnoreSolariumHardwareCheck"),
-    _t(TweakID.IgnoreSolariumOptOut, Section.LIQUID_GLASS, "Ignore Solarium Opt-Out", GP, "com.apple.SwiftUI.IgnoreSolariumOptOut"),
-    _t(TweakID.DisallowGlassButtons, Section.LIQUID_GLASS, "Disallow Glass Buttons", GP, "SBDisallowGlassButtons"),
-    _t(TweakID.DisallowGlassLockScreen, Section.LIQUID_GLASS, "Disallow Glass Lock Screen", GP, "SBDisallowGlassLockScreen"),
-    _t(TweakID.DisableSpecularEverywhere, Section.LIQUID_GLASS, "Disable Specular Everywhere", GP, "SBDisableSpecularEverywhere"),
-    _t(TweakID.NoLiquidClock, Section.LIQUID_GLASS, "Disable Liquid Glass on LS Clock", GP, "SBDisallowGlassTime"),
-    _t(TweakID.NoLiquidDock, Section.LIQUID_GLASS, "Disable Liquid Glass on Dock", GP, "SBDisableGlassDock"),
-    _t(TweakID.DisableSpecularMotion, Section.LIQUID_GLASS, "Disable Specular Motion", GP, "SBDisableSpecularEverywhereUsingLSSAssertion"),
-    _t(TweakID.DisableOuterRefraction, Section.LIQUID_GLASS, "Disable Outer Refraction", GP, "SolariumDisableOuterRefraction"),
-    _t(TweakID.DisableSolariumHDR, Section.LIQUID_GLASS, "Disable Solarium HDR", GP, "SolariumAllowHDR", value=False),
+    _t(TweakID.ForceSolariumFallback, Section.LIQUID_GLASS, "Force Solarium Fallback", GP, "SolariumForceFallback", min_version="26.0"),
+    _t(TweakID.IgnoreSolariumLinkedOnCheck, Section.LIQUID_GLASS, "Ignore Solarium Linked-On Check", GP, "com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck", min_version="26.0"),
+    _t(TweakID.ForceSolariumIntelligence, Section.LIQUID_GLASS, "Force Solarium Intelligence", GP, "SolariumForceIntelligence", min_version="27.0"),
+    _t(TweakID.ForceEnhancedSpeculars, Section.LIQUID_GLASS, "Force Enhanced Speculars", GP, "SolariumForceEnhancedSpeculars", min_version="27.0"),
+    _t(TweakID.UISolariumFallback, Section.LIQUID_GLASS, "UI Solarium Fallback", GP, "UISolariumForceFallback", min_version="27.0"),
+    _t(TweakID.IgnoreSolariumHardwareCheck, Section.LIQUID_GLASS, "Ignore Solarium Hardware Check", GP, "com.apple.SwiftUI.IgnoreSolariumHardwareCheck", min_version="27.0"),
+    _t(TweakID.IgnoreSolariumOptOut, Section.LIQUID_GLASS, "Ignore Solarium Opt-Out", GP, "com.apple.SwiftUI.IgnoreSolariumOptOut", min_version="27.0"),
+    _t(TweakID.DisallowGlassButtons, Section.LIQUID_GLASS, "Disallow Glass Buttons", GP, "SBDisallowGlassButtons", min_version="27.0"),
+    _t(TweakID.DisallowGlassLockScreen, Section.LIQUID_GLASS, "Disallow Glass Lock Screen", GP, "SBDisallowGlassLockScreen", min_version="27.0"),
+    _t(TweakID.DisableSpecularEverywhere, Section.LIQUID_GLASS, "Disable Specular Everywhere", GP, "SBDisableSpecularEverywhere", min_version="27.0"),
+    _t(TweakID.NoLiquidClock, Section.LIQUID_GLASS, "Disable Liquid Glass on LS Clock", GP, "SBDisallowGlassTime", min_version="26.0"),
+    _t(TweakID.NoLiquidDock, Section.LIQUID_GLASS, "Disable Liquid Glass on Dock", GP, "SBDisableGlassDock", min_version="26.0"),
+    _t(TweakID.DisableSpecularMotion, Section.LIQUID_GLASS, "Disable Specular Motion", GP, "SBDisableSpecularEverywhereUsingLSSAssertion", min_version="26.0"),
+    _t(TweakID.DisableOuterRefraction, Section.LIQUID_GLASS, "Disable Outer Refraction", GP, "SolariumDisableOuterRefraction", min_version="26.0"),
+    _t(TweakID.DisableSolariumHDR, Section.LIQUID_GLASS, "Disable Solarium HDR", GP, "SolariumAllowHDR", value=False, min_version="26.0"),
 
     # --- SpringBoard ---
     _t(TweakID.LockScreenFootnote, Section.SPRINGBOARD, "Lock Screen Footnote Text",
        FileLocation.footnote, "LockScreenFootnote", value="", kind=Kind.TEXT),
     _t(TweakID.WatchOSCompatibility, Section.SPRINGBOARD, "Allow pairing with any watchOS version",
-       FileLocation.nanoregistry, "", factory=_watchos_compatibility),
+       FileLocation.nanoregistry, "", factory=_watchos_compatibility, ipad_only=True),
     _t(TweakID.AirDropDisableTimeLimit, Section.SPRINGBOARD, "Disable AirDrop Time Limit for Everyone Option",
        FileLocation.airdrop, "OverrideTimeLimitEveryoneMode"),
     _t(TweakID.SBDontLockAfterCrash, Section.SPRINGBOARD, "Disable Lock After Respring",
@@ -111,13 +114,13 @@ SPECS: tuple[TweakSpec, ...] = (
        FileLocation.springboard, "SBMinimumLockscreenIdleTime", value=5, kind=Kind.NUMBER,
        min_value=0, max_value=600),
     _t(TweakID.SBAlwaysShowSystemApertureInSnapshots, Section.SPRINGBOARD, "Show Dynamic Island in Screenshots",
-       FileLocation.springboard, "SBAlwaysShowSystemApertureInSnapshots"),
+       FileLocation.springboard, "SBAlwaysShowSystemApertureInSnapshots", min_version="17.4", iphone_only=True),
     _t(TweakID.HideDICompletely, Section.SPRINGBOARD, "Hide Dynamic Island Completely",
-       FileLocation.springboard, "SBSuppressDynamicIslandCompletely"),
+       FileLocation.springboard, "SBSuppressDynamicIslandCompletely", min_version="17.4", iphone_only=True),
     _t(TweakID.SBShowAuthenticationEngineeringUI, Section.SPRINGBOARD, "Show Red/Green Authentication Line on Lock Screen",
        FileLocation.springboard, "SBShowAuthenticationEngineeringUI"),
     _t(TweakID.UseFloatingTabBar, Section.SPRINGBOARD, "Disable Floating Tab Bar",
-       FileLocation.uikit, "UseFloatingTabBar", value=False),
+       FileLocation.uikit, "UseFloatingTabBar", value=False, ipad_only=True),
 
     # --- Internal Options ---
     _t(TweakID.SBBuildNumber, Section.INTERNAL, "Show Build Version in Status Bar", GP, "UIStatusBarShowBuildVersion"),
