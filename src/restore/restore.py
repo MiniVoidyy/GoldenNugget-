@@ -381,16 +381,16 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                     owner=file.owner, group=file.group)
             elif (file.domain == "SystemPreferencesDomain"
                     and file.path in _SYSTEM_PREFERENCES_TWEAK_PATHS):
-                ok = inject_file_into_backup(
+                inject_file_into_backup(
                     backup_root, udid, file.domain, file.path,
                     file.read_contents(),
                     mode=_FileMode.S_IFREG | 0o644,
                     owner=file.owner, group=file.group)
-                log_info(f"Injected {file.domain}/{file.path} into protective backup: {ok}")
 
         # PosterBoard files (staged DB + configuration plists) ride the
         # protective restore on beta 6+, since AppDomain sparse restores are
         # rejected there — see the pb_via_protective note in restore_files.
+        injected = failed = 0
         for f in (pb_inject_files or []):
             rel = f.restore_path.lstrip("/")
             data = f.contents
@@ -399,11 +399,17 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                     data = fh.read()
             if isinstance(data, str):
                 data = data.encode("utf-8")
-            ok = inject_file_into_backup(
-                backup_root, udid, f.domain, rel, data,
-                mode=_FileMode.S_IFREG | 0o644,
-                owner=f.owner, group=f.group)
-            log_info(f"Injected {f.domain}/{rel} into protective backup: {ok}")
+            if inject_file_into_backup(
+                    backup_root, udid, f.domain, rel, data,
+                    mode=_FileMode.S_IFREG | 0o644,
+                    owner=f.owner, group=f.group):
+                injected += 1
+            else:
+                failed += 1
+        if pb_inject_files:
+            level = log_error if failed else log_info
+            level(f"PosterBoard files delivered via protective restore: "
+                  f"{injected} ok, {failed} failed")
 
         # Last line of defence against MBErrorDomain/205: the device requests
         # every regular-file row's payload — a single missing one aborts the

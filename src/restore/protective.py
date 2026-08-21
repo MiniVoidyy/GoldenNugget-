@@ -391,7 +391,6 @@ class ProtectiveBackupService(Mobilebackup2Service):
                 entry["PlaceholderIcon"] = b""
             info["Installed Applications"] = [bundle_id]
             info["Applications"] = {bundle_id: entry}
-            log_info(f"PosterBoard container included in protective backup: {app_info['Container']}")
         except Exception as e:
             log_warn(f"PosterBoard container inclusion failed: {e}")
 
@@ -655,7 +654,6 @@ def extract_posterboard_db(backup_root: str, udid: str, dest_path: str) -> Optio
     if not pb_rows:
         log_warn("Master manifest has NO PosterBoard rows — the device did not back up the container")
         return None
-    log_info(f"Master manifest has {len(pb_rows)} PosterBoard rows, e.g. {[r[1] for r in pb_rows[:3]]}")
 
     # resolve by FILE NAME: the store dir carries a structure version that
     # varies between iOS releases; prefer the highest-versioned match
@@ -665,7 +663,6 @@ def extract_posterboard_db(backup_root: str, udid: str, dest_path: str) -> Optio
         log_warn(f"No {POSTERBOARD_DB_NAME} among the PosterBoard rows")
         return None
     file_id, rel_path = candidates[0]
-    log_info(f"PosterBoard DB resolved at: {rel_path}")
 
     def _payload_for(suffix: str) -> Optional[Path]:
         target = rel_path + suffix
@@ -698,7 +695,6 @@ def extract_posterboard_db(backup_root: str, udid: str, dest_path: str) -> Optio
             side = sqlite3.connect(str(dest))
             side.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             side.close()
-            log_info("PosterBoard WAL checkpointed into the extracted database")
         finally:
             Path(str(dest) + "-wal").unlink(missing_ok=True)
             Path(str(dest) + "-shm").unlink(missing_ok=True)
