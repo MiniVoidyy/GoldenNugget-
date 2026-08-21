@@ -310,7 +310,8 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
 async def _restore_ios27(back: backup.Backup, reboot: bool,
                           lockdown_client: LockdownClient, progress_callback,
                           backup_password: str = "",
-                          prepared_backup_root: PreparedBackup = None):
+                          prepared_backup_root: PreparedBackup = None,
+                          pb_inject_files: list = None):
     """iOS 27+ three-phase restore: backup → tweak → reboot → restore.
 
     Phase 1 (0-40%):  Selective backup of photos, Apple ID, and user
@@ -386,6 +387,17 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                     mode=_FileMode.S_IFREG | 0o644,
                     owner=file.owner, group=file.group)
                 log_info(f"Injected {file.domain}/{file.path} into protective backup: {ok}")
+
+        # PosterBoard files (staged DB + configuration plists) ride the
+        # protective restore on beta 6+, since AppDomain sparse restores are
+        # rejected there — see the pb_via_protective note in restore_files.
+        for f in (pb_inject_files or []):
+            rel = f.restore_path.lstrip("/")
+            ok = inject_file_into_backup(
+                backup_root, udid, f.domain, rel, f.read_contents(),
+                mode=_FileMode.S_IFREG | 0o644,
+                owner=f.owner, group=f.group)
+            log_info(f"Injected {f.domain}/{rel} into protective backup: {ok}")
 
         # Last line of defence against MBErrorDomain/205: the device requests
         # every regular-file row's payload — a single missing one aborts the
@@ -491,40 +503,53 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
     last_path = ""
     # extra check for system version to prevent sparserestore from restoring on iOS 18.1+
     passed_version_check = has_sparserestore_capability(lockdown_client)
+    # iOS 27 dev beta 6 / public beta 4 reject sparse restores that contain
+    # AppDomain-* domains: the device drops the connection at 0% and no
+    # security recovery triggers. With a prepared protective backup we can
+    # deliver PosterBoard files through Phase 3's native restore instead —
+    # injected into the pruned working copy like every other tweak file.
+    # GOLDENNUGGET_PB_SPARSE=1 forces the old sparse delivery.
+    pb_via_protective = (prepared_backup_root is not None
+                         and os.environ.get("GOLDENNUGGET_PB_SPARSE") != "1")
+    pb_inject_files = []
     for file in sorted_files:
         if file.domain == "" or file.domain == "z":
             if passed_version_check:
                 last_domain = concat_exploit_file(file, files_list, last_domain)
         else:
+            if pb_via_protective and file.domain == "AppDomain-com.apple.PosterBoard":
+                pb_inject_files.append(file)
+                continue
             last_domain, last_path = concat_regular_file(file, files_list, last_domain, last_path)
             # add the app bundle to the list
             if last_domain.startswith("AppDomain"):
                 bundle_id = last_domain.removeprefix("AppDomain-")
-                if not bundle_id in active_bundle_ids:
-                    # All AppDomain-* bundles MUST be registered in
-                    # Manifest.plist's Applications dictionary, otherwise
-                    # the device-side restore daemon will reject the domain
-                    # with MBErrorDomain/205 ("Unknown domain name").
-                    # This includes system apps like com.apple.PosterBoard.
+                if bundle_id in active_bundle_ids:
+                    continue
+                # All AppDomain-* bundles MUST be registered in
+                # Manifest.plist's Applications dictionary, otherwise
+                # the device-side restore daemon will reject the domain
+                # with MBErrorDomain/205 ("Unknown domain name").
+                # This includes system apps like com.apple.PosterBoard.
+                if apps is None:
+                    # A failed lookup here would abort the whole sparse
+                    # restore later — retry hard, then fail loudly.
+                    last_err = None
+                    for attempt in range(1, 4):
+                        try:
+                            async with InstallationProxyService(lockdown=lockdown_client) as ips:
+                                apps = await ips.get_apps(application_type="Any", calculate_sizes=False)
+                            break
+                        except Exception as e:
+                            last_err = e
+                            log_warn(f"InstallationProxy query failed "
+                                     f"(attempt {attempt}/3): {e}")
+                            await asyncio.sleep(min(2 ** attempt, 8))
                     if apps is None:
-                        # A failed lookup here would abort the whole sparse
-                        # restore later — retry hard, then fail loudly.
-                        last_err = None
-                        for attempt in range(1, 4):
-                            try:
-                                async with InstallationProxyService(lockdown=lockdown_client) as ips:
-                                    apps = await ips.get_apps(application_type="Any", calculate_sizes=False)
-                                break
-                            except Exception as e:
-                                last_err = e
-                                log_warn(f"InstallationProxy query failed "
-                                         f"(attempt {attempt}/3): {e}")
-                                await asyncio.sleep(min(2 ** attempt, 8))
-                        if apps is None:
-                            raise NuggetException(
-                                "Could not query installed apps from the device "
-                                f"(needed to register {bundle_id} for the restore). "
-                                f"Last error: {last_err}")
+                        raise NuggetException(
+                            "Could not query installed apps from the device "
+                            f"(needed to register {bundle_id} for the restore). "
+                            f"Last error: {last_err}")
                 try:
                     app_info = apps[bundle_id]
                 except KeyError:
@@ -551,4 +576,5 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
     # iOS 26.2+ (iOS 27 era) uses three-phase protective backup + restore
     await _restore_ios27(back, reboot, lockdown_client, progress_callback,
                          backup_password=backup_password,
-                         prepared_backup_root=prepared_backup_root)
+                         prepared_backup_root=prepared_backup_root,
+                         pb_inject_files=pb_inject_files)
