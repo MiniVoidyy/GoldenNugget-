@@ -5,7 +5,6 @@ class TweakID(Enum):
     PosterBoard = auto()
     Templates = auto()
     StatusBar = auto()
-    Passcode = auto()
 
     # springboard
     LockScreenFootnote = auto()

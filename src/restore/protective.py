@@ -666,12 +666,43 @@ def extract_posterboard_db(backup_root: str, udid: str, dest_path: str) -> Optio
         return None
     file_id, rel_path = candidates[0]
     log_info(f"PosterBoard DB resolved at: {rel_path}")
-    payload = device_dir / file_id[:2] / file_id
-    if not payload.is_file():
+
+    def _payload_for(suffix: str) -> Optional[Path]:
+        target = rel_path + suffix
+        for fid, rp in pb_rows:
+            if rp == target:
+                p = device_dir / fid[:2] / fid
+                return p if p.is_file() else None
         return None
+
+    main_payload = _payload_for("")
+    if main_payload is None:
+        return None
+
     dest = Path(dest_path)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(payload, dest)
+    shutil.copyfile(main_payload, dest)
+
+    # the on-device database runs in WAL mode: recent wallpaper data may live
+    # in the -wal sibling rather than the main file. Extract the siblings and
+    # checkpoint them into one consolidated database — validating/copying the
+    # bare main file loses that data.
+    wal_payload = _payload_for("-wal")
+    shm_payload = _payload_for("-shm")
+    if wal_payload is not None:
+        wal_dest = Path(str(dest) + "-wal")
+        shutil.copyfile(wal_payload, wal_dest)
+        if shm_payload is not None:
+            shutil.copyfile(shm_payload, str(dest) + "-shm")
+        try:
+            side = sqlite3.connect(str(dest))
+            side.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            side.close()
+            log_info("PosterBoard WAL checkpointed into the extracted database")
+        finally:
+            Path(str(dest) + "-wal").unlink(missing_ok=True)
+            Path(str(dest) + "-shm").unlink(missing_ok=True)
+
     return str(dest)
 
 
