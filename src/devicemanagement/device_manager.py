@@ -21,7 +21,6 @@ from pymobiledevice3 import usbmux
 from pymobiledevice3.ca import create_keybag_file
 from pymobiledevice3.services.mobile_config import MobileConfigService
 from pymobiledevice3.exceptions import MuxException, PasswordRequiredError, ConnectionTerminatedError, AccessDeniedError, InvalidServiceError
-from pymobiledevice3.services.afc import AfcService
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 import pymobiledevice3.service_connection as _sc
 
@@ -700,33 +699,6 @@ class DeviceManager:
         async with lockdown_session(udid) as ld:
             return dict(ld.all_values)
 
-    async def _get_current_global_preferences_plist(self) -> Optional[dict]:
-        """Read the device's current HomeDomain .GlobalPreferences.plist.
-
-        On iOS 27 the "safe state recovery" wipe clears HomeDomain files that
-        are not part of the restore backup. The tweak pass writes its own
-        copy of .GlobalPreferences.plist to HomeDomain so tweak keys survive,
-        but that copy only carries tweak keys — the user's region, language
-        and appearance settings (AppleLanguages, AppleLocale,
-        AppleInterfaceStyle, UIBoldText, ...) would be lost. Merging the
-        on-device plist into the copy keeps both.
-
-        Returns the parsed plist, or None if it cannot be read (fresh device,
-        locked, AFC hiccup) — callers fall back to their own content.
-        """
-        udid = self.get_current_device_udid()
-        if not udid:
-            return None
-        try:
-            async with lockdown_session(udid) as ld:
-                async with AfcService(ld) as afc:
-                    data = await afc.get_file_contents(
-                        "Library/Preferences/.GlobalPreferences.plist")
-            return plistlib.loads(data)
-        except Exception as e:
-            print(f"Could not read device .GlobalPreferences.plist: {e}")
-            return None
-
     def _get_original_plist_paths(self) -> list[str]:
         return [loc.value for loc in FileLocation]
 
@@ -835,15 +807,9 @@ class DeviceManager:
             # iOS 27+: Also write .GlobalPreferences.plist to HomeDomain so
             # tweaks that depend on it survive the Phase 3 protective backup restore.
             # ManagedPreferencesDomain is the primary location; HomeDomain is a
-            # secondary copy for iOS 27 compatibility. The copy is merged with
-            # the device's current on-device plist so the user's region, language
-            # and appearance settings survive the "safe state recovery" wipe too
-            # (Phase 3 skips this file to avoid overwriting the tweak copy).
+            # secondary copy for iOS 27 compatibility. (Phase 3 skips this file
+            # to avoid overwriting the tweak copy.)
             home_plist = basic_plists.get(FileLocation.globalPreferences, {})
-            current = await self._get_current_global_preferences_plist()
-            if current:
-                current.update(home_plist)
-                home_plist = current
             self.concat_file(
                 contents=plistlib.dumps(home_plist),
                 path=FileLocation.globalPreferencesHomeDomain.value,
