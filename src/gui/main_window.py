@@ -9,7 +9,7 @@ from src.controllers.translator import Translator
 import src.controllers.video_handler as video_handler
 from src.controllers.preset_manager import PresetManager
 
-from src.devicemanagement.constants import Version, LEGACY_SUPPORT_ENABLED
+from src.devicemanagement.constants import Version
 from src.devicemanagement.device_manager import DeviceManager
 
 from src.gui.dialogs import UpdateAppDialog, AboutProgramDialog
@@ -175,10 +175,7 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def updateAppVersionLabel(self):
         new_text: str = self.ui.appVersionLbl.text()
-        version_str = App_Version
-        if LEGACY_SUPPORT_ENABLED:
-            version_str = f"{App_Version} (legacy)"
-        new_text = new_text.replace("%VERSION", version_str)
+        new_text = new_text.replace("%VERSION", App_Version)
         if App_Build > 0:
             new_text = new_text.replace("%BETATAG", f"(beta {App_Build})")
         else:
