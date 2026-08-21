@@ -289,20 +289,8 @@ class IOSSettingsPage(QWidget):
             QCoreApplication.translate("Nugget", "PosterBoard Database")
         ))
 
-        # apply method
-        card = QWidget()
-        row = QHBoxLayout(card)
-        row.setContentsMargins(16, 10, 16, 10)
-        row.setSpacing(12)
-
-        label = QLabel(QCoreApplication.translate("Nugget", "Apply Method"))
-        label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
-        row.addWidget(label, 1)
-
-        self.use_configs_switch = IOSSwitch(tweaks[TweakID.PosterBoard].use_configs)
-        self.use_configs_switch.toggled.connect(self._on_use_configs_toggled)
-        row.addWidget(self.use_configs_switch)
-        self.content_layout.addWidget(card)
+        # wallpapers are always applied as configurations (iOS 26+ data store
+        # layout); the descriptors apply method is broken and was removed
 
         self._make_label_row(QCoreApplication.translate("Nugget", "Database"), "sqlite: None")
 
@@ -389,9 +377,6 @@ class IOSSettingsPage(QWidget):
             QPushButton:hover { background-color: #4a4a4a; }
         """)
         return btn
-
-    def _on_use_configs_toggled(self, checked: bool):
-        tweaks[TweakID.PosterBoard].use_configs = checked
 
     def _on_pb_get_db(self):
         from src.gui.dialogs import PosterBoardDBWizard
