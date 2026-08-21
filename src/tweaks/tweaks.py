@@ -3,7 +3,6 @@ from .tweak_classes import BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak
 from .posterboard.posterboard_tweak import PosterboardTweak
 from .posterboard.template_options.templates_tweak import TemplatesTweak
 from .status_bar.status_bar_tweak import StatusBarTweak
-from .passcode_theme_tweak import PasscodeThemeTweak
     
 tweaks = {
     ## PosterBoard
@@ -15,6 +14,4 @@ tweaks = {
     ## Status Bar
     TweakID.StatusBar: StatusBarTweak(),
 
-    ## Passcode Theme
-    TweakID.Passcode: PasscodeThemeTweak(),
 }

@@ -186,11 +186,8 @@ _HOME_DOMAIN_TWEAK_PATHS = (
     "Library/FeatureFlags/Domain/SpringBoard.plist",
 )
 
-# HomeDomain tweak DIRECTORIES: every file under these prefixes is injected
-# (Passcode Themes write one image per icon, so paths are per-theme dynamic).
-_HOME_DOMAIN_TWEAK_PREFIXES = (
-    "Library/Caches/TelephonyUI",  # Passcode Themes images
-)
+# HomeDomain tweak DIRECTORIES: every file under these prefixes is injected.
+_HOME_DOMAIN_TWEAK_PREFIXES = ()
 
 # SystemPreferencesDomain tweak files, re-injected for the same reason as the
 # HomeDomain ones: the iOS 27 wipe clears whatever the sparse restore staged

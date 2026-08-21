@@ -14,7 +14,6 @@ from src.tweaks.tweak_classes import (
 )
 from src.tweaks.posterboard.template_options.templates_tweak import TemplatesTweak
 from src.tweaks.status_bar.status_bar_tweak import StatusBarTweak
-from src.tweaks.passcode_theme_tweak import PasscodeThemeTweak
 from src.tweaks.status_bar.status_bar_c.status_setter import ffi as status_ffi
 
 PRESETS_DIR_NAME = "Presets"
@@ -223,11 +222,6 @@ class PresetManager:
             data["enabled"] = tweak.enabled
             data["silly_mode"] = tweak.setter.silly_mode
             data["override_data"] = base64.b64encode(status_ffi.buffer(tweak.setter.current_overrides)).decode("ascii")
-        elif isinstance(tweak, PasscodeThemeTweak):
-            data["value"] = tweak.value
-            data["language_code"] = tweak.language_code
-            data["big_keys"] = tweak.big_keys
-            data["current_size"] = tweak.current_size
         # NullifyFileTweak only needs "enabled"
         return data
 
@@ -278,16 +272,6 @@ class PresetManager:
             self._apply_templates(tweak, data)
         elif isinstance(tweak, StatusBarTweak):
             self._apply_status_bar(tweak, data)
-        elif isinstance(tweak, PasscodeThemeTweak):
-            if "value" in data:
-                tweak.value = data["value"]
-                tweak.enabled = data["value"] not in (None, "")
-            if "language_code" in data:
-                tweak.language_code = data["language_code"]
-            if "big_keys" in data:
-                tweak.big_keys = data["big_keys"]
-            if "current_size" in data:
-                tweak.current_size = data["current_size"]
 
     def _apply_templates(self, tweak: TemplatesTweak, data: dict):
         if "templates" in data:

@@ -78,7 +78,6 @@ class MainWindow(QtWidgets.QMainWindow):
             Page.LiquidGlass: Pages.LiquidGlass(ui=self.ui),
             Page.Daemons: Pages.Daemons(ui=self.ui),
             Page.Templates: Pages.Templates(window=self, ui=self.ui),
-            Page.Passcode: Pages.Passcode(window=self, ui=self.ui),
             Page.Settings: Pages.Settings(window=self, ui=self.ui)
         }
 
@@ -157,7 +156,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.internalOptionsPageBtn.clicked.connect(self.on_internalOptionsPageBtn_clicked)
         self.ui.liquidGlassPageBtn.clicked.connect(self.on_liquidGlassPageBtn_clicked)
         self.ui.daemonsPageBtn.clicked.connect(self.on_daemonsPageBtn_clicked)
-        self.ui.passcodePageBtn.clicked.connect(self.on_passcodePageBtn_clicked)
         self.ui.posterboardPageBtn.clicked.connect(self.on_posterboardPageBtn_clicked)
         self.ui.templatesPageBtn.clicked.connect(self.on_templatesPageBtn_clicked)
         self.ui.tweaksPageBtn.clicked.connect(self.on_tweaksPageBtn_clicked)
@@ -266,8 +264,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.internalOptionsPageBtn.show()
             self.ui.daemonsPageBtn.show()
             self.ui.templatesPageBtn.show()
-            # passcode themes: legacy Nugget feature, being tested on iOS 27
-            self.ui.passcodePageBtn.show()
+            self.ui.passcodePageBtn.hide()
             self.ui.posterboardPageBtn.show()
             self.ui.tweaksPageBtn.show()
             
@@ -359,12 +356,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
             # sparse-restore book credits do not apply to this fork
             self.ui.jjtechBtn.hide()
-            keys_lang_code = self.device_manager.data_singleton.current_device.locale
-            if keys_lang_code == 'en_US':
-                keys_lang_code = 'en'
-            tweaks[TweakID.Passcode].language_code = keys_lang_code
-            self.ui.passthmLanguageCodeTxt.setText(keys_lang_code)
-
             # swap out the current posterboard file
             if tweaks[TweakID.PosterBoard].config_manager.update_for_saved_database(self.device_manager.get_current_device_udid()):
                 self.ui.pbDBLbl.setText("sqlite: Selected")
@@ -535,10 +526,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_daemonsPageBtn_clicked(self):
         self.pages[Page.Daemons].load()
         self.ui.pages.setCurrentIndex(Page.Daemons.value)
-
-    def on_passcodePageBtn_clicked(self):
-        self.pages[Page.Passcode].load()
-        self.ui.pages.setCurrentIndex(Page.Passcode.value)
 
     def on_posterboardPageBtn_clicked(self):
         self.pages[Page.Posterboard].load()

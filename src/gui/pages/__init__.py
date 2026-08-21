@@ -6,5 +6,4 @@ from .tools.internal import InternalPage as Internal
 from .tools.liquidglass import LiquidGlassPage as LiquidGlass
 from .tools.daemons import DaemonsPage as Daemons
 from .tools.templates import TemplatesPage as Templates
-from .tools.passcode import PasscodePage as Passcode
 from .main.settings import SettingsPage as Settings
