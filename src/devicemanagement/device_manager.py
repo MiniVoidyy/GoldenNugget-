@@ -20,13 +20,13 @@ from packaging.version import Version
 from pymobiledevice3 import usbmux
 from pymobiledevice3.ca import create_keybag_file
 from pymobiledevice3.services.mobile_config import MobileConfigService
-from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.exceptions import MuxException, PasswordRequiredError, ConnectionTerminatedError, AccessDeniedError, InvalidServiceError
 from pymobiledevice3.services.afc import AfcService
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 import pymobiledevice3.service_connection as _sc
 
 
+from src.devicemanagement.session import lockdown_session
 from src.exceptions.device_errors import is_device_locked_error as _is_device_locked_error
 
 # Bump SSL handshake timeout from 10s to 60s for all lockdown services.
@@ -161,68 +161,68 @@ class DeviceManager:
         # Connect via usbmuxd
         for device in connected_devices:
             try:
-                ld = await create_using_usbmux(serial=device.serial)
-                # Check backup encryption status if experimental option not enabled
-                if not self.pref_manager.use_encrypted_backup:
+                async with lockdown_session(device.serial) as ld:
+                    # Check backup encryption status if experimental option not enabled
+                    if not self.pref_manager.use_encrypted_backup:
+                        try:
+                            from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
+                            mb = Mobilebackup2Service(ld)
+                            await mb.connect()
+                            is_encrypted = await mb.get_will_encrypt()
+                            await mb.close()
+                            if is_encrypted:
+                                show_alert(ApplyAlertMessage(
+                                    txt=QCoreApplication.tr("Backup encryption is enabled on your iPhone."),
+                                    detailed_txt=QCoreApplication.tr(
+                                        "GoldenNugget needs to temporarily disable backup encryption to apply tweaks safely.\n\n"
+                                        "Please choose one:\n"
+                                        "1. Disable encryption on your iPhone: Settings → General → Transfer or Reset iPhone → Backup Password → Turn Off\n"
+                                        "2. Or enable \"Use Encrypted Backups (Experimental)\" in GoldenNugget Settings → enter your backup password when prompted.\n\n"
+                                        "Tip: Option 1 is simpler if you don't know your backup password."
+                                    )
+                                ))
+                                self.set_current_device(index=None)
+                                return
+                        except Exception:
+                            pass  # If we can't check, continue anyway
+                    vals = ld.all_values
+                    model = vals['ProductType']
+                    hardware = vals['HardwareModel']
+                    cpu = vals['HardwarePlatform']
                     try:
-                        from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
-                        mb = Mobilebackup2Service(ld)
-                        await mb.connect()
-                        is_encrypted = await mb.get_will_encrypt()
-                        await mb.close()
-                        if is_encrypted:
-                            show_alert(ApplyAlertMessage(
-                                txt=QCoreApplication.tr("Backup encryption is enabled on your iPhone."),
-                                detailed_txt=QCoreApplication.tr(
-                                    "GoldenNugget needs to temporarily disable backup encryption to apply tweaks safely.\n\n"
-                                    "Please choose one:\n"
-                                    "1. Disable encryption on your iPhone: Settings → General → Transfer or Reset iPhone → Backup Password → Turn Off\n"
-                                    "2. Or enable \"Use Encrypted Backups (Experimental)\" in GoldenNugget Settings → enter your backup password when prompted.\n\n"
-                                    "Tip: Option 1 is simpler if you don't know your backup password."
-                                )
-                            ))
-                            self.set_current_device(index=None)
-                            return
+                        product_type = settings.value(device.serial + "_model", "", type=str)
+                        hardware_type = settings.value(device.serial + "_hardware", "", type=str)
+                        cpu_type = settings.value(device.serial + "_cpu", "", type=str)
+                        if product_type == "":
+                            # save the new product type
+                            settings.setValue(device.serial + "_model", model)
+                        else:
+                            model = product_type
+                        if hardware_type == "":
+                            # save the new hardware model
+                            settings.setValue(device.serial + "_hardware", hardware)
+                        else:
+                            hardware = hardware_type
+                        if cpu_type == "":
+                            # save the new cpu model
+                            settings.setValue(device.serial + "_cpu", cpu)
+                        else:
+                            cpu = cpu_type
                     except Exception:
-                        pass  # If we can't check, continue anyway
-                vals = ld.all_values
-                model = vals['ProductType']
-                hardware = vals['HardwareModel']
-                cpu = vals['HardwarePlatform']
-                try:
-                    product_type = settings.value(device.serial + "_model", "", type=str)
-                    hardware_type = settings.value(device.serial + "_hardware", "", type=str)
-                    cpu_type = settings.value(device.serial + "_cpu", "", type=str)
-                    if product_type == "":
-                        # save the new product type
-                        settings.setValue(device.serial + "_model", model)
-                    else:
-                        model = product_type
-                    if hardware_type == "":
-                        # save the new hardware model
-                        settings.setValue(device.serial + "_hardware", hardware)
-                    else:
-                        hardware = hardware_type
-                    if cpu_type == "":
-                        # save the new cpu model
-                        settings.setValue(device.serial + "_cpu", cpu)
-                    else:
-                        cpu = cpu_type
-                except Exception:
-                    show_alert(ApplyAlertMessage(txt=QCoreApplication.tr("Click \"Show Details\" for the traceback."), detailed_txt=str(traceback.format_exc())))
-                locale = await ld.get_locale()
-                dev = Device(
-                        udid=device.serial,
-                        usb=device.is_usb,
-                        name=vals['DeviceName'],
-                        version=vals['ProductVersion'],
-                        build=vals['BuildVersion'],
-                        model=model,
-                        hardware=hardware,
-                        cpu=cpu,
-                        locale=locale,
-                    )
-                self.devices.append(dev)
+                        show_alert(ApplyAlertMessage(txt=QCoreApplication.tr("Click \"Show Details\" for the traceback."), detailed_txt=str(traceback.format_exc())))
+                    locale = await ld.get_locale()
+                    dev = Device(
+                            udid=device.serial,
+                            usb=device.is_usb,
+                            name=vals['DeviceName'],
+                            version=vals['ProductVersion'],
+                            build=vals['BuildVersion'],
+                            model=model,
+                            hardware=hardware,
+                            cpu=cpu,
+                            locale=locale,
+                        )
+                    self.devices.append(dev)
             except PasswordRequiredError as e:
                 show_alert(ApplyAlertMessage(txt=QCoreApplication.tr("Device is password protected! You must trust the computer on your device.\n\nUnlock your device. On the popup, click \"Trust\", enter your password, then try again.")))
             except MuxException as e:
@@ -233,8 +233,6 @@ class DeviceManager:
             except Exception as e:
                 print(f"ERROR with lockdown device with UUID {device.serial}")
                 show_alert(ApplyAlertMessage(txt=f"{type(e).__name__}: {repr(e)}", detailed_txt=str(traceback.format_exc())))
-            finally:
-                await ld.close()
         
         if len(self.devices) > 0:
             self.set_current_device(index=0)
@@ -297,21 +295,19 @@ class DeviceManager:
         # first, unpair it
         if self.data_singleton.current_device == None:
             return
-        ld = await create_using_usbmux(serial=self.data_singleton.current_device.udid)
-        await ld.unpair()
-        # next, pair it again
-        await ld.pair()
-        await ld.close()
+        async with lockdown_session(self.data_singleton.current_device.udid) as ld:
+            await ld.unpair()
+            # next, pair it again
+            await ld.pair()
         QMessageBox.information(None, QCoreApplication.tr("Pairing Reset"), QCoreApplication.tr("Your device's pairing was successfully reset. Refresh the device list before applying."))
-        
+
     async def add_skip_setup(self, files_to_restore: list[FileToRestore], restoring_domains: bool):
         # TODO: Probably should move this to its own file
         if self.pref_manager.skip_setup and restoring_domains:
             # get the already existing cloud config info
-            ld = await create_using_usbmux(serial=self.data_singleton.current_device.udid)
-            async with MobileConfigService(lockdown=ld) as mcs:
-                cloud_config_plist = await mcs.get_cloud_configuration()
-            await ld.close()
+            async with lockdown_session(self.data_singleton.current_device.udid) as ld:
+                async with MobileConfigService(lockdown=ld) as mcs:
+                    cloud_config_plist = await mcs.get_cloud_configuration()
             # add the 2 skip setup files
             cloud_config_plist["SkipSetup"] = [
                     'Location',
@@ -485,8 +481,8 @@ class DeviceManager:
         # Use manual try/finally instead of async with so that ld.close()
         # errors (e.g. ConnectionTerminatedError after device reboot) do not
         # propagate as a misleading "Connection Lost" error to the UI.
-        ld = await create_using_usbmux(serial=self.data_singleton.current_device.udid)
-        try:
+        # lockdown_session suppresses close() errors the same way.
+        async with lockdown_session(self.data_singleton.current_device.udid) as ld:
             update_label(QCoreApplication.tr("Preparing to restore...") + self.do_not_unplug)
             await restore_files(
                 files=files_to_restore, reboot=self.pref_manager.auto_reboot,
@@ -500,15 +496,6 @@ class DeviceManager:
             if not self.pref_manager.auto_reboot:
                 msg = QCoreApplication.tr("Please restart your device to see changes.")
             return ApplyAlertMessage(txt=QCoreApplication.tr("All done! ") + msg, title=QCoreApplication.tr("Success!"), icon=QMessageBox.Information)
-        finally:
-            # Safely close the lockdown client — after a device reboot the
-            # underlying connection is already severed and close() will raise
-            # ConnectionTerminatedError. Suppress it so the real result (success
-            # or a genuine error) reaches the caller correctly.
-            try:
-                await ld.close()
-            except Exception:
-                pass
 
     def progress_callback(self, progress):
         if self.update_label == None:
@@ -610,8 +597,7 @@ class DeviceManager:
             is_backup_encrypted,
         )
 
-        check_ld = await create_using_usbmux(serial=udid)
-        try:
+        async with lockdown_session(udid) as check_ld:
             encrypted = await is_backup_encrypted(check_ld)
             manifest_password = ""
             if encrypted:
@@ -635,11 +621,6 @@ class DeviceManager:
                 check_ld,
                 progress_callback=self._backup_progress(update_label),
                 include_photos=True, include_posterboard=needs_posterboard)
-        finally:
-            try:
-                await check_ld.close()
-            except Exception:
-                pass
 
         if not needs_posterboard or os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
             return PreparedBackup(root=master_root, manifest_password=manifest_password), True
@@ -716,14 +697,8 @@ class DeviceManager:
         udid = self.get_current_device_udid()
         if not udid:
             return {}
-        ld = await create_using_usbmux(serial=udid)
-        try:
+        async with lockdown_session(udid) as ld:
             return dict(ld.all_values)
-        finally:
-            try:
-                await ld.close()
-            except Exception:
-                pass
 
     async def _get_current_global_preferences_plist(self) -> Optional[dict]:
         """Read the device's current HomeDomain .GlobalPreferences.plist.
@@ -743,16 +718,10 @@ class DeviceManager:
         if not udid:
             return None
         try:
-            ld = await create_using_usbmux(serial=udid)
-            try:
+            async with lockdown_session(udid) as ld:
                 async with AfcService(ld) as afc:
                     data = await afc.get_file_contents(
                         "Library/Preferences/.GlobalPreferences.plist")
-            finally:
-                try:
-                    await ld.close()
-                except Exception:
-                    pass
             return plistlib.loads(data)
         except Exception as e:
             print(f"Could not read device .GlobalPreferences.plist: {e}")
@@ -894,53 +863,48 @@ class DeviceManager:
             backup_password = ""
             if Version(self.get_current_device_version()) >= Version("27.0"):
                 # Check if backup encryption is enabled on device
-                check_ld = await create_using_usbmux(serial=self.get_current_device_udid())
-                try:
-                    async with Mobilebackup2Service(check_ld) as mb:
-                        is_encrypted = await mb.get_will_encrypt()
-                    if is_encrypted:
-                        from PySide6.QtWidgets import QInputDialog
-                        if self.pref_manager.use_encrypted_backup:
-                            # reuse the password entered for the cached backup, if any
-                            backup_password = self._get_backup_password()
-                            if backup_password:
-                                log_info("Using existing backup encryption with provided password")
-                                update_label(QCoreApplication.tr("Password accepted. Proceeding with encrypted restore..."))
-                            else:
-                                # User wants to keep encryption - ask for password to use it
-                                update_label(QCoreApplication.tr("Backup encryption is enabled. We'll use it for the restore."))
-                                update_label(QCoreApplication.tr("Please enter your iTunes/Finder backup password:"))
-                                password, ok = QInputDialog.getText(
-                                    None,
-                                    QCoreApplication.tr("Backup Encryption Password"),
-                                    QCoreApplication.tr("Enter your iTunes/Finder backup password (required for encrypted restore):"),
-                                    QLineEdit.Password
-                                )
-                                if ok and password:
-                                    backup_password = password
+                async with lockdown_session(self.get_current_device_udid()) as check_ld:
+                    try:
+                        async with Mobilebackup2Service(check_ld) as mb:
+                            is_encrypted = await mb.get_will_encrypt()
+                        if is_encrypted:
+                            from PySide6.QtWidgets import QInputDialog
+                            if self.pref_manager.use_encrypted_backup:
+                                # reuse the password entered for the cached backup, if any
+                                backup_password = self._get_backup_password()
+                                if backup_password:
                                     log_info("Using existing backup encryption with provided password")
                                     update_label(QCoreApplication.tr("Password accepted. Proceeding with encrypted restore..."))
                                 else:
-                                    raise NuggetException(QCoreApplication.tr("Backup password is required for encrypted restore. Please provide the password or disable encryption in iTunes/Finder."))
-                        else:
-                            # User doesn't want encryption - show friendly error
-                            raise NuggetException(QCoreApplication.tr(
-                                "Backup encryption is enabled on your iPhone.\n\n"
-                                "GoldenNugget needs to temporarily disable it to apply tweaks safely.\n\n"
-                                "Please choose one:\n"
-                                "1. Disable encryption on your iPhone: Settings → General → Transfer or Reset iPhone → Backup Password → Turn Off\n"
-                                "2. Or enable \"Use Encrypted Backups (Experimental)\" in GoldenNugget Settings → enter your backup password when prompted.\n\n"
-                                "Tip: Option 1 is simpler if you don't know your backup password."
-                            ))
-                except Exception as e:
-                    if isinstance(e, NuggetException):
-                        raise
-                    log_warn(f"Failed to check backup encryption status: {e}")
-                finally:
-                    try:
-                        await check_ld.close()
-                    except Exception:
-                        pass
+                                    # User wants to keep encryption - ask for password to use it
+                                    update_label(QCoreApplication.tr("Backup encryption is enabled. We'll use it for the restore."))
+                                    update_label(QCoreApplication.tr("Please enter your iTunes/Finder backup password:"))
+                                    password, ok = QInputDialog.getText(
+                                        None,
+                                        QCoreApplication.tr("Backup Encryption Password"),
+                                        QCoreApplication.tr("Enter your iTunes/Finder backup password (required for encrypted restore):"),
+                                        QLineEdit.Password
+                                    )
+                                    if ok and password:
+                                        backup_password = password
+                                        log_info("Using existing backup encryption with provided password")
+                                        update_label(QCoreApplication.tr("Password accepted. Proceeding with encrypted restore..."))
+                                    else:
+                                        raise NuggetException(QCoreApplication.tr("Backup password is required for encrypted restore. Please provide the password or disable encryption in iTunes/Finder."))
+                            else:
+                                # User doesn't want encryption - show friendly error
+                                raise NuggetException(QCoreApplication.tr(
+                                    "Backup encryption is enabled on your iPhone.\n\n"
+                                    "GoldenNugget needs to temporarily disable it to apply tweaks safely.\n\n"
+                                    "Please choose one:\n"
+                                    "1. Disable encryption on your iPhone: Settings → General → Transfer or Reset iPhone → Backup Password → Turn Off\n"
+                                    "2. Or enable \"Use Encrypted Backups (Experimental)\" in GoldenNugget Settings → enter your backup password when prompted.\n\n"
+                                    "Tip: Option 1 is simpler if you don't know your backup password."
+                                ))
+                    except Exception as e:
+                        if isinstance(e, NuggetException):
+                            raise
+                        log_warn(f"Failed to check backup encryption status: {e}")
 
             # restore to the device
             final_alert = await self.start_restore(
