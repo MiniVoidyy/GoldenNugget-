@@ -2,14 +2,12 @@ from . import TemplateOption
 
 import os
 import glob
-from dataclasses import dataclass
 from shutil import rmtree
 from typing import Optional
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QCheckBox
 
 from src.controllers.xml_handler import delete_xml_value
 
-@dataclass
 class RemoveOption(TemplateOption):
     inverted: bool = False # if set to true, the files will only be deleted if the checkbox is unchecked
     value: bool = False # whether or not to delete the file

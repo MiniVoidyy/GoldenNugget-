@@ -46,7 +46,6 @@ class PosterboardTweak(Tweak):
         if new_tendie.descriptor_cnt + self.get_descriptor_count() <= 10:
             if is_template:
                 raise Exception(QCoreApplication.tr("Wrong type of file"))
-                self.templates.append(new_tendie)
             else:
                 self.tendies.append(new_tendie)
             # alert if prb reset is needed
@@ -99,9 +98,7 @@ class PosterboardTweak(Tweak):
         if ("assets" in plist
             and "lockAndHome" in plist["assets"]
             and "default" in plist["assets"]["lockAndHome"]):
-            print("modified name in assets")
             plist["assets"]["lockAndHome"]["default"]["name"] = "Lavender"
-        print("MODIFIED REGULAR NAME")
         plist["family"] = "Marble"
         plist["name"] = "Lavender"
         return plistlib.dumps(plist)
@@ -230,9 +227,6 @@ class PosterboardTweak(Tweak):
                     thumb_contents = thumb.read()
             else:
                 raise NuggetException("No thumbnail heic selected!")
-                # get the thumbnail from the video
-                thumb_contents = video_handler.get_thumbnail_from_contents(contents=video_contents)
-                del video_contents
             to_override = ["input.segmentation/asset.resource/Adjusted.HEIC", "input.segmentation/asset.resource/proxy.heic", "output.layerStack/portrait-layer_background.HEIC"]
             for file in to_override:
                 with open(os.path.join(contents_path, *(file.split("/"))), "wb") as overriding:
@@ -240,7 +234,6 @@ class PosterboardTweak(Tweak):
             del thumb_contents
 
     def create_video_loop_files(self, output_dir: str, update_label=lambda x: None):
-        print(f"file: {self.videoFile}, looping: {self.loop_video}")
         if self.videoFile and self.loop_video:
             source_dir = get_bundle_files("files/posterboard/VideoCAML")
             video_output_dir = os.path.join(output_dir, "descriptor", "VideoCAML")

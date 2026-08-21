@@ -2,10 +2,14 @@ from .tweaks import tweaks, TweakID
 from .tweak_classes import BasicPlistTweak, FileLocation, AdvancedPlistTweak, NullifyFileTweak
 
 
-def load_internal():
-    if TweakID.RTL in tweaks:
+def _load_once(sentinel: TweakID, additional_tweaks: dict):
+    if sentinel in tweaks:
         return
-    additional_tweaks = {
+    tweaks.update(additional_tweaks)
+
+
+def load_internal():
+    _load_once(TweakID.RTL, {
         TweakID.SBBuildNumber: BasicPlistTweak(
             FileLocation.globalPreferences,
             "UIStatusBarShowBuildVersion"
@@ -82,14 +86,11 @@ def load_internal():
             FileLocation.pasteboard,
             "AnnounceAllPastes"
         )
-    }
-    tweaks.update(additional_tweaks)
+    })
 
 
 def load_liquidglass():
-    if TweakID.DisableSolarium in tweaks:
-        return
-    additional_tweaks = {
+    _load_once(TweakID.DisableSolarium, {
         TweakID.ForceSolariumFallback: BasicPlistTweak(
             FileLocation.globalPreferences,
             "SolariumForceFallback"
@@ -156,14 +157,11 @@ def load_liquidglass():
             FileLocation.globalPreferences,
             "SBDisableSpecularEverywhere"
         )
-    }
-    tweaks.update(additional_tweaks)
+    })
 
 
 def load_springboard():
-    if TweakID.LockScreenFootnote in tweaks:
-        return
-    additional_tweaks = {
+    _load_once(TweakID.LockScreenFootnote, {
         TweakID.LockScreenFootnote: BasicPlistTweak(
             FileLocation.footnote,
             key="LockScreenFootnote", value=""
@@ -234,14 +232,11 @@ def load_springboard():
             key="UseFloatingTabBar",
             value=False
         )
-    }
-    tweaks.update(additional_tweaks)
+    })
 
 
 def load_daemons():
-    if TweakID.Daemons in tweaks:
-        return
-    additional_tweaks = {
+    _load_once(TweakID.Daemons, {
         TweakID.Daemons: AdvancedPlistTweak(
             FileLocation.disabledDaemons,
             {
@@ -255,5 +250,4 @@ def load_daemons():
             owner=0, group=0
         ),
         TweakID.ClearScreenTimeAgentPlist: NullifyFileTweak(FileLocation.screentime),
-    }
-    tweaks.update(additional_tweaks)
+    })

@@ -37,7 +37,7 @@ _sc.DEFAULT_SSL_HANDSHAKE_TIMEOUT = 60
 # regeneration, so the count is capped.
 MAX_TENDIES_PER_RESTORE = 3
 
-from src.devicemanagement.constants import Device, Version
+from src.devicemanagement.constants import Device, Version, is_supported_by_fork
 from src.devicemanagement.data_singleton import DataSingleton
 from .preference_manager import PreferenceManager
 
@@ -129,7 +129,7 @@ class DeviceManager:
         if self._backup_password:
             return self._backup_password
         # Try to get from settings
-        if hasattr(self, 'pref_manager') and self.pref_manager.settings:
+        if self.pref_manager.settings:
             pwd = self.pref_manager.settings.value("backup_password", "", type=str)
             if pwd:
                 self._backup_password = pwd
@@ -257,59 +257,36 @@ class DeviceManager:
             self.current_device_index = index
         
     def get_current_device_name(self) -> str:
-        if self.data_singleton.current_device == None:
-            return QCoreApplication.tr("No Device")
-        else:
-            return self.data_singleton.current_device.name
-        
+        device = self.data_singleton.current_device
+        return device.name if device != None else QCoreApplication.tr("No Device")
+
     def get_current_device_version(self) -> str:
-        if self.data_singleton.current_device == None:
-            return ""
-        else:
-            return self.data_singleton.current_device.version
-    
+        device = self.data_singleton.current_device
+        return device.version if device != None else ""
+
     def get_current_device_build(self) -> str:
-        if self.data_singleton.current_device == None:
-            return ""
-        else:
-            return self.data_singleton.current_device.build
-    
+        device = self.data_singleton.current_device
+        return device.build if device != None else ""
+
     def get_current_device_udid(self) -> Optional[str]:
-        if self.data_singleton.current_device == None:
-            return None
-        else:
-            return self.data_singleton.current_device.udid
-        
+        device = self.data_singleton.current_device
+        return device.udid if device != None else None
+
     def get_current_device_model(self) -> str:
-        if self.data_singleton.current_device == None:
-            return ""
-        else:
-            return self.data_singleton.current_device.model
-        
-    def get_current_device_supported(self) -> bool:
-        if self.data_singleton.current_device == None:
-            return False
-        else:
-            return self.data_singleton.current_device.supported()
-    
-    def get_current_device_patched(self) -> bool:
-        if self.data_singleton.current_device == None:
-            return True
-        else:
-            return self.data_singleton.current_device.is_exploit_fully_patched()
-        
+        device = self.data_singleton.current_device
+        return device.model if device != None else ""
+
     def get_current_device_is_supported_by_fork(self) -> bool:
-        if self.data_singleton.current_device == None:
-            return False
-        else:
-            return self.data_singleton.current_device.is_supported_by_fork()
+        device = self.data_singleton.current_device
+        return is_supported_by_fork(device.version) if device != None else False
 
     def get_current_device_partially_supported(self) -> bool:
         """iOS 27 devices use the experimental three-phase protective restore."""
-        if self.data_singleton.current_device == None:
+        device = self.data_singleton.current_device
+        if device == None:
             return False
         try:
-            return Version(self.data_singleton.current_device.version) >= Version("27.0")
+            return Version(device.version) >= Version("27.0")
         except Exception:
             return False
         
@@ -328,7 +305,7 @@ class DeviceManager:
         
     async def add_skip_setup(self, files_to_restore: list[FileToRestore], restoring_domains: bool):
         # TODO: Probably should move this to its own file
-        if self.pref_manager.skip_setup and (not self.get_current_device_supported() or restoring_domains):
+        if self.pref_manager.skip_setup and restoring_domains:
             # get the already existing cloud config info
             ld = await create_using_usbmux(serial=self.data_singleton.current_device.udid)
             async with MobileConfigService(lockdown=ld) as mcs:
@@ -567,7 +544,6 @@ class DeviceManager:
         try:
             self._raise_if_unsupported()
             update_label(QCoreApplication.tr("Applying changes to files..."))
-            device_values = await self._get_lockdown_values()
 
             # iOS 26.2+ (iOS 27 era) uses the heavy three-phase protective restore
             pb.tendies = original_tendies[:MAX_TENDIES_PER_RESTORE]
@@ -579,7 +555,6 @@ class DeviceManager:
             final_alert, files_to_restore = await self._apply_tweak_pass(
                 update_label,
                 templates=tweaks[TweakID.Templates].templates,
-                device_values=device_values,
             )
             update_label(QCoreApplication.tr("Success!"))
         except Exception as e:
@@ -713,7 +688,7 @@ class DeviceManager:
                 originals[path] = data
         return originals
 
-    async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None, device_values: dict = None):
+    async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None):
         """Generate all tweak files and restore them to the device in one pass.
 
         Returns (alert, files_to_restore) so the caller can surface the result
@@ -806,15 +781,11 @@ class DeviceManager:
             )
 
             for location, data in files_data.items():
-                if isinstance(data, NullifyFileTweak):
-                    ownership = data.owner
-                else:
-                    ownership = 501
                 self.concat_file(
                     contents=data,
                     path=location.value,
                     files_to_restore=files_to_restore,
-                    owner=ownership, group=ownership
+                    owner=501, group=501
                 )
 
             # Check if backup encryption is enabled and handle it

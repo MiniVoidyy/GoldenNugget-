@@ -57,7 +57,6 @@ if platform == "darwin":
 
 elif os.name == 'nt':
     args.append('--version-file=version.txt')
-    args.append('--add-binary=status_setter_windows.exe;.')
     args.append('--add-data=nugget.ico;.')
     
     try:

@@ -12,7 +12,6 @@ from PySide6 import QtWidgets, QtCore, QtGui
 
 from .tendie_file import TendieFile
 from .template_options import OptionType, TemplateOption, ReplaceOption, RemoveOption, SetOption, PickerOption
-from src.tweaks.posterboard.template_options import OptionType as TemplateOptionTypePB
 from src.exceptions.posterboard_exceptions import PBTemplateException
 from src.gui.custom_qt_elements.resizable_image_label import ResizableImageLabel
 from src.devicemanagement.constants import Version
@@ -298,7 +297,7 @@ class TemplateFile(TendieFile):
 
         for option in self.options:
             # provide the window
-            if option.type == TemplateOptionTypePB.replace and option.window == None:
+            if option.type == OptionType.replace and option.window == None:
                 option.window = window#.set_window(self.window)
             option.create_interface(options_widget=options_widget, options_layout=opt_layout)
             # add the previews and update it

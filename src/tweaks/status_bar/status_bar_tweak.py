@@ -33,7 +33,7 @@ class StatusBarTweak(Tweak):
         """
         overrides = self.setter.get_overrides()
         if self.setter.silly_mode:
-            # mirror Setter.get_data(): turn every non-overridden item on
+            # copy the struct and turn every non-overridden item on
             overrides = ffi.new("StatusBarOverrideData *")
             ffi.memmove(overrides, self.setter.get_overrides(), ffi.sizeof(self.setter.get_overrides()))
             for i in range(46):
@@ -48,54 +48,34 @@ class StatusBarTweak(Tweak):
                 int(overrides.overrideItemIsEnabled[i]) for i in range(46)]
             values["itemIsEnabled"] = [
                 int(overrides.values.itemIsEnabled[i]) for i in range(46)]
-        if overrides.overrideTimeString != 0:
-            override["overrideTimeString"] = 1
-            values["timeString"] = ffi.string(overrides.values.timeString).decode()
-        if overrides.overrideDateString != 0:
-            override["overrideDateString"] = 1
-            values["dateString"] = ffi.string(overrides.values.dateString).decode()
-        if overrides.overrideGSMSignalStrengthBars != 0:
-            override["overrideGSMSignalStrengthBars"] = 1
-            values["GSMSignalStrengthBars"] = overrides.values.GSMSignalStrengthBars
-        if overrides.overrideSecondaryGSMSignalStrengthBars != 0:
-            override["overrideSecondaryGSMSignalStrengthBars"] = 1
-            values["secondaryGSMSignalStrengthBars"] = overrides.values.secondaryGSMSignalStrengthBars
-        if overrides.overrideWifiSignalStrengthBars != 0:
-            override["overrideWifiSignalStrengthBars"] = 1
-            values["wifiSignalStrengthBars"] = overrides.values.wifiSignalStrengthBars
-        if overrides.overrideServiceString != 0:
-            override["overrideServiceString"] = 1
-            values["serviceString"] = ffi.string(overrides.values.serviceString).decode()
-        if overrides.overrideSecondaryServiceString != 0:
-            override["overrideSecondaryServiceString"] = 1
-            values["secondaryServiceString"] = ffi.string(overrides.values.secondaryServiceString).decode()
-        if overrides.overridePrimaryServiceBadgeString != 0:
-            override["overridePrimaryServiceBadgeString"] = 1
-            values["primaryServiceBadgeString"] = ffi.string(overrides.values.primaryServiceBadgeString).decode()
-        if overrides.overrideSecondaryServiceBadgeString != 0:
-            override["overrideSecondaryServiceBadgeString"] = 1
-            values["secondaryServiceBadgeString"] = ffi.string(overrides.values.secondaryServiceBadgeString).decode()
-        if overrides.overrideDataNetworkType != 0:
-            override["overrideDataNetworkType"] = 1
-            values["dataNetworkType"] = overrides.values.dataNetworkType
-        if overrides.overrideSecondaryDataNetworkType != 0:
-            override["overrideSecondaryDataNetworkType"] = 1
-            values["secondaryDataNetworkType"] = overrides.values.secondaryDataNetworkType
-        if overrides.overrideBatteryCapacity != 0:
-            override["overrideBatteryCapacity"] = 1
-            values["batteryCapacity"] = overrides.values.batteryCapacity
-        if overrides.overrideBatteryDetailString != 0:
-            override["overrideBatteryDetailString"] = 1
-            values["batteryDetailString"] = ffi.string(overrides.values.batteryDetailString).decode()
-        if overrides.overrideBreadcrumb != 0:
-            override["overrideBreadcrumb"] = 1
-            values["breadcrumbTitle"] = ffi.string(overrides.values.breadcrumbTitle).decode()
-        if overrides.overrideDisplayRawGSMSignal != 0:
-            override["overrideDisplayRawGSMSignal"] = 1
-            values["displayRawGSMSignal"] = overrides.values.displayRawGSMSignal
-        if overrides.overrideDisplayRawWifiSignal != 0:
-            override["overrideDisplayRawWifiSignal"] = 1
-            values["displayRawWifiSignal"] = overrides.values.displayRawWifiSignal
+
+        for flag, field in (
+            ("overrideTimeString", "timeString"),
+            ("overrideDateString", "dateString"),
+            ("overrideServiceString", "serviceString"),
+            ("overrideSecondaryServiceString", "secondaryServiceString"),
+            ("overridePrimaryServiceBadgeString", "primaryServiceBadgeString"),
+            ("overrideSecondaryServiceBadgeString", "secondaryServiceBadgeString"),
+            ("overrideBatteryDetailString", "batteryDetailString"),
+            ("overrideBreadcrumb", "breadcrumbTitle"),
+        ):
+            if getattr(overrides, flag) != 0:
+                override[flag] = 1
+                values[field] = ffi.string(getattr(overrides.values, field)).decode()
+
+        for flag, field in (
+            ("overrideGSMSignalStrengthBars", "GSMSignalStrengthBars"),
+            ("overrideSecondaryGSMSignalStrengthBars", "secondaryGSMSignalStrengthBars"),
+            ("overrideWifiSignalStrengthBars", "wifiSignalStrengthBars"),
+            ("overrideDataNetworkType", "dataNetworkType"),
+            ("overrideSecondaryDataNetworkType", "secondaryDataNetworkType"),
+            ("overrideBatteryCapacity", "batteryCapacity"),
+            ("overrideDisplayRawGSMSignal", "displayRawGSMSignal"),
+            ("overrideDisplayRawWifiSignal", "displayRawWifiSignal"),
+        ):
+            if getattr(overrides, flag) != 0:
+                override[flag] = 1
+                values[field] = getattr(overrides.values, field)
 
         payload: dict = {"Enabled": True}
         payload.update(override)
@@ -103,347 +83,272 @@ class StatusBarTweak(Tweak):
             payload["values"] = values
         return payload
 
-        
+    # --- generic helpers over the StatusBarOverrideData struct ---
+
+    def _overrides(self):
+        return self.setter.get_overrides()
+
+    def _is_flag_overridden(self, flag: str) -> bool:
+        return getattr(self._overrides(), flag) == 1
+
+    def _get_str(self, field: str) -> str:
+        return ffi.string(getattr(self._overrides().values, field)).decode()
+
+    def _get_int(self, field: str) -> int:
+        return getattr(self._overrides().values, field)
+
+    def _set_flag(self, flag: str, field: str = None, value=None, max_len: int = None) -> None:
+        overrides = self._overrides()
+        setattr(overrides, flag, 1)
+        if field is not None:
+            data = value[:max_len] if max_len is not None else value
+            setattr(overrides.values, field, data.encode() if isinstance(data, str) else data)
+        self.setter.apply_changes(overrides)
+
+    def _unset_flag(self, flag: str) -> None:
+        overrides = self._overrides()
+        setattr(overrides, flag, 0)
+        self.setter.apply_changes(overrides)
+
     ### PRIMARY CARRIER
     # CELLULAR SERVICE
     def is_cellular_service_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.CellularServiceStatusBarItem.value] == 1
+        return self.is_item_overridden(StatusBarItem.CellularServiceStatusBarItem)
     def get_cellular_service_override(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.values.itemIsEnabled[StatusBarItem.CellularServiceStatusBarItem.value] == 1
+        return self.get_item_override(StatusBarItem.CellularServiceStatusBarItem)
     def set_cellular_service(self, shown: bool) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideItemIsEnabled[StatusBarItem.CellularServiceStatusBarItem.value] = 1
-        overrides.values.itemIsEnabled[StatusBarItem.CellularServiceStatusBarItem.value] = 1 if shown else 0
-        self.setter.apply_changes(overrides)
+        self.set_item_override(StatusBarItem.CellularServiceStatusBarItem, shown)
     def unset_cellular_service(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideItemIsEnabled[StatusBarItem.CellularServiceStatusBarItem.value] = 0
-        self.setter.apply_changes(overrides)
-            
+        self.unset_item_override(StatusBarItem.CellularServiceStatusBarItem)
+
     # SERVICE STRING
     def is_carrier_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideServiceString == 1
+        return self._is_flag_overridden("overrideServiceString")
     def get_carrier_override(self) -> str:
-        overrides = self.setter.get_overrides()
-        return ffi.string(overrides.values.serviceString).decode()
+        return self._get_str("serviceString")
     def set_carrier_override(self, text: str) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideServiceString = 1
-        truncated = text[:100]
-        overrides.values.serviceString = truncated.encode()
-        overrides.values.serviceCrossfadeString = truncated.encode()
-        self.setter.apply_changes(overrides)
+        overrides = self._overrides()
+        truncated = text[:100].encode()
+        overrides.values.serviceString = truncated
+        overrides.values.serviceCrossfadeString = truncated
+        self._set_flag("overrideServiceString")
     def unset_carrier_override(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideServiceString = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideServiceString")
 
     # SERVICE BADGE
     def is_primary_service_badge_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overridePrimaryServiceBadgeString == 1
+        return self._is_flag_overridden("overridePrimaryServiceBadgeString")
     def get_primary_service_badge_override(self) -> str:
-        overrides = self.setter.get_overrides()
-        return ffi.string(overrides.values.primaryServiceBadgeString).decode()
+        return self._get_str("primaryServiceBadgeString")
     def set_primary_service_badge(self, text: str) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overridePrimaryServiceBadgeString = 1
-        overrides.values.primaryServiceBadgeString = text[:100].encode()
-        self.setter.apply_changes(overrides)
+        self._set_flag("overridePrimaryServiceBadgeString", "primaryServiceBadgeString", text, max_len=100)
     def unset_primary_service_badge(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overridePrimaryServiceBadgeString = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overridePrimaryServiceBadgeString")
 
     # DATA NETWORK TYPE
     def is_data_network_type_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideDataNetworkType == 1
+        return self._is_flag_overridden("overrideDataNetworkType")
     def get_data_network_type_override(self) -> int:
-        overrides = self.setter.get_overrides()
-        return overrides.values.dataNetworkType
+        return self._get_int("dataNetworkType")
     def set_data_network_type(self, id: int) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideDataNetworkType = 1
-        overrides.values.dataNetworkType = id
-        self.setter.apply_changes(overrides)
+        self._set_flag("overrideDataNetworkType", "dataNetworkType", id)
     def unset_data_network_type(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideDataNetworkType = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideDataNetworkType")
 
     # GSM SIGNAL BARS
     def is_gsm_signal_strength_bars_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideGSMSignalStrengthBars == 1
+        return self._is_flag_overridden("overrideGSMSignalStrengthBars")
     def get_gsm_signal_strength_bars_override(self) -> int:
-        overrides = self.setter.get_overrides()
-        return overrides.values.GSMSignalStrengthBars
+        return self._get_int("GSMSignalStrengthBars")
     def set_gsm_signal_strength_bars(self, id: int) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideItemIsEnabled[StatusBarItem.CellularSignalStrengthStatusBarItem.value] = 1
-        overrides.values.itemIsEnabled[StatusBarItem.CellularSignalStrengthStatusBarItem.value] = 1
-        overrides.overrideGSMSignalStrengthBars = 1
-        overrides.values.GSMSignalStrengthBars = id
-        self.setter.apply_changes(overrides)
+        overrides = self._overrides()
+        idx = StatusBarItem.CellularSignalStrengthStatusBarItem.value
+        overrides.overrideItemIsEnabled[idx] = 1
+        overrides.values.itemIsEnabled[idx] = 1
+        self._set_flag("overrideGSMSignalStrengthBars", "GSMSignalStrengthBars", id)
     def unset_gsm_signal_strength_bars(self) -> None:
-        overrides = self.setter.get_overrides()
+        overrides = self._overrides()
         overrides.overrideItemIsEnabled[StatusBarItem.CellularSignalStrengthStatusBarItem.value] = 0
-        overrides.overrideGSMSignalStrengthBars = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideGSMSignalStrengthBars")
 
 
     ### SECONDARY CARRIER
     # CELLULAR SERVICE
     def is_secondary_cellular_service_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[StatusBarItem.SecondaryCellularServiceStatusBarItem.value] == 1
+        return self.is_item_overridden(StatusBarItem.SecondaryCellularServiceStatusBarItem)
     def get_secondary_cellular_service_override(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.values.itemIsEnabled[StatusBarItem.SecondaryCellularServiceStatusBarItem.value] == 1
+        return self.get_item_override(StatusBarItem.SecondaryCellularServiceStatusBarItem)
     def set_secondary_cellular_service(self, shown: bool) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideItemIsEnabled[StatusBarItem.SecondaryCellularServiceStatusBarItem.value] = 1
-        overrides.values.itemIsEnabled[StatusBarItem.SecondaryCellularServiceStatusBarItem.value] = 1 if shown else 0
+        overrides = self._overrides()
+        idx = StatusBarItem.SecondaryCellularServiceStatusBarItem.value
+        overrides.overrideItemIsEnabled[idx] = 1
+        overrides.values.itemIsEnabled[idx] = 1 if shown else 0
         overrides.overrideSecondaryCellularConfigured = 1
         overrides.values.secondaryCellularConfigured = 1 if shown else 0
         self.setter.apply_changes(overrides)
     def unset_secondary_cellular_service(self) -> None:
-        overrides = self.setter.get_overrides()
+        overrides = self._overrides()
         overrides.overrideItemIsEnabled[StatusBarItem.SecondaryCellularServiceStatusBarItem.value] = 0
         overrides.overrideSecondaryCellularConfigured = 0
         self.setter.apply_changes(overrides)
-            
+
     # SERVICE STRING
     def is_secondary_carrier_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideSecondaryServiceString == 1
+        return self._is_flag_overridden("overrideSecondaryServiceString")
     def get_secondary_carrier_override(self) -> str:
-        overrides = self.setter.get_overrides()
-        return ffi.string(overrides.values.secondaryServiceString).decode()
+        return self._get_str("secondaryServiceString")
     def set_secondary_carrier_override(self, text: str) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideSecondaryServiceString = 1
-        truncated = text[:100]
-        overrides.values.secondaryServiceString = truncated.encode()
-        overrides.values.secondaryServiceCrossfadeString = truncated.encode()
-        self.setter.apply_changes(overrides)
+        overrides = self._overrides()
+        truncated = text[:100].encode()
+        overrides.values.secondaryServiceString = truncated
+        overrides.values.secondaryServiceCrossfadeString = truncated
+        self._set_flag("overrideSecondaryServiceString")
     def unset_secondary_carrier_override(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideSecondaryServiceString = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideSecondaryServiceString")
 
     # SERVICE BADGE
     def is_secondary_service_badge_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideSecondaryServiceBadgeString == 1
+        return self._is_flag_overridden("overrideSecondaryServiceBadgeString")
     def get_secondary_service_badge_override(self) -> str:
-        overrides = self.setter.get_overrides()
-        return ffi.string(overrides.values.secondaryServiceBadgeString).decode()
+        return self._get_str("secondaryServiceBadgeString")
     def set_secondary_service_badge(self, text: str) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideSecondaryServiceBadgeString = 1
-        overrides.values.secondaryServiceBadgeString = text[:100].encode()
-        self.setter.apply_changes(overrides)
+        self._set_flag("overrideSecondaryServiceBadgeString", "secondaryServiceBadgeString", text, max_len=100)
     def unset_secondary_service_badge(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideSecondaryServiceBadgeString = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideSecondaryServiceBadgeString")
 
     # DATA NETWORK TYPE
     def is_secondary_data_network_type_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideSecondaryDataNetworkType == 1
+        return self._is_flag_overridden("overrideSecondaryDataNetworkType")
     def get_secondary_data_network_type_override(self) -> int:
-        overrides = self.setter.get_overrides()
-        return overrides.values.secondaryDataNetworkType
+        return self._get_int("secondaryDataNetworkType")
     def set_secondary_data_network_type(self, id: int) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideSecondaryDataNetworkType = 1
-        overrides.values.secondaryDataNetworkType = id
-        self.setter.apply_changes(overrides)
+        self._set_flag("overrideSecondaryDataNetworkType", "secondaryDataNetworkType", id)
     def unset_secondary_data_network_type(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideSecondaryDataNetworkType = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideSecondaryDataNetworkType")
 
     # GSM SIGNAL BARS
     def is_secondary_gsm_signal_strength_bars_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideSecondaryGSMSignalStrengthBars == 1
+        return self._is_flag_overridden("overrideSecondaryGSMSignalStrengthBars")
     def get_secondary_gsm_signal_strength_bars_override(self) -> int:
-        overrides = self.setter.get_overrides()
-        return overrides.values.secondaryGSMSignalStrengthBars
+        return self._get_int("secondaryGSMSignalStrengthBars")
     def set_secondary_gsm_signal_strength_bars(self, id: int) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideItemIsEnabled[StatusBarItem.SecondaryCellularSignalStrengthStatusBarItem.value] = 1
-        overrides.values.itemIsEnabled[StatusBarItem.SecondaryCellularSignalStrengthStatusBarItem.value] = 1
-        overrides.overrideSecondaryGSMSignalStrengthBars = 1
-        overrides.values.secondaryGSMSignalStrengthBars = id
-        self.setter.apply_changes(overrides)
+        overrides = self._overrides()
+        idx = StatusBarItem.SecondaryCellularSignalStrengthStatusBarItem.value
+        overrides.overrideItemIsEnabled[idx] = 1
+        overrides.values.itemIsEnabled[idx] = 1
+        self._set_flag("overrideSecondaryGSMSignalStrengthBars", "secondaryGSMSignalStrengthBars", id)
     def unset_secondary_gsm_signal_strength_bars(self) -> None:
-        overrides = self.setter.get_overrides()
+        overrides = self._overrides()
         overrides.overrideItemIsEnabled[StatusBarItem.SecondaryCellularSignalStrengthStatusBarItem.value] = 0
-        overrides.overrideSecondaryGSMSignalStrengthBars = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideSecondaryGSMSignalStrengthBars")
 
 
     ### MISC TEXT INPUTS
     # TIME STRING
     def is_time_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideTimeString == 1
+        return self._is_flag_overridden("overrideTimeString")
     def get_time_override(self) -> str:
-        overrides = self.setter.get_overrides()
-        return ffi.string(overrides.values.timeString).decode()
+        return self._get_str("timeString")
     def set_time(self, text: str) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideTimeString = 1
-        overrides.values.timeString = text[:64].encode()
-        self.setter.apply_changes(overrides)
+        self._set_flag("overrideTimeString", "timeString", text, max_len=64)
     def unset_time(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideTimeString = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideTimeString")
 
     # DATE STRING
     def is_date_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideDateString == 1
+        return self._is_flag_overridden("overrideDateString")
     def get_date_override(self) -> str:
-        overrides = self.setter.get_overrides()
-        return ffi.string(overrides.values.dateString).decode()
+        return self._get_str("dateString")
     def set_date(self, text: str) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideDateString = 1
-        overrides.values.dateString = text[:256].encode()
-        self.setter.apply_changes(overrides)
+        self._set_flag("overrideDateString", "dateString", text, max_len=256)
     def unset_date(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideDateString = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideDateString")
 
     # BREADCRUMB STRING
     def is_crumb_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideBreadcrumb == 1
+        return self._is_flag_overridden("overrideBreadcrumb")
     def get_crumb_override(self) -> str:
-        overrides = self.setter.get_overrides()
-        text: str = ffi.string(overrides.values.breadcrumbTitle).decode()
+        text = self._get_str("breadcrumbTitle")
         if len(text) > 1:
             return text[:len(text) - 4]
         return ""
     def set_crumb(self, text: str) -> None:
-        overrides = self.setter.get_overrides()
+        overrides = self._overrides()
         overrides.overrideBreadcrumb = 1
-        new_crumb = ""
-        if text != "":
-            new_crumb: str = text[:254] + " ▶"
+        new_crumb = text[:254] + " ▶" if text != "" else ""
         overrides.values.breadcrumbTitle = new_crumb.encode()
         self.setter.apply_changes(overrides)
     def unset_crumb(self) -> None:
-        overrides = self.setter.get_overrides()
+        overrides = self._overrides()
         overrides.overrideBreadcrumb = 0
         overrides.values.breadcrumbTitle = "".encode()
         self.setter.apply_changes(overrides)
 
     # BATTERY DETAIL STRING
     def is_battery_detail_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideBatteryDetailString == 1
+        return self._is_flag_overridden("overrideBatteryDetailString")
     def get_battery_detail_override(self) -> str:
-        overrides = self.setter.get_overrides()
-        return ffi.string(overrides.values.batteryDetailString).decode()
+        return self._get_str("batteryDetailString")
     def set_battery_detail(self, text: str) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideBatteryDetailString = 1
-        overrides.values.batteryDetailString = text[:150].encode()
-        self.setter.apply_changes(overrides)
+        self._set_flag("overrideBatteryDetailString", "batteryDetailString", text, max_len=150)
     def unset_battery_detail(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideBatteryDetailString = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideBatteryDetailString")
 
 
     ## MISC SLIDER INPUTS
     # BATTERY CAPACITY
     def is_battery_capacity_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideBatteryCapacity == 1
+        return self._is_flag_overridden("overrideBatteryCapacity")
     def get_battery_capacity_override(self) -> int:
-        overrides = self.setter.get_overrides()
-        return overrides.values.batteryCapacity
+        return self._get_int("batteryCapacity")
     def set_battery_capacity(self, id: int) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideBatteryCapacity = 1
-        overrides.values.batteryCapacity = id
-        self.setter.apply_changes(overrides)
+        self._set_flag("overrideBatteryCapacity", "batteryCapacity", id)
     def unset_battery_capacity(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideBatteryCapacity = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideBatteryCapacity")
 
     # WIFI SIGNAL STRENGTH
     def is_wifi_signal_strength_bars_overridden(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideWifiSignalStrengthBars == 1
+        return self._is_flag_overridden("overrideWifiSignalStrengthBars")
     def get_wifi_signal_strength_bars_override(self) -> int:
-        overrides = self.setter.get_overrides()
-        return overrides.values.wifiSignalStrengthBars
+        return self._get_int("wifiSignalStrengthBars")
     def set_wifi_signal_strength_bars(self, id: int) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideWifiSignalStrengthBars = 1
-        overrides.values.wifiSignalStrengthBars = id
-        self.setter.apply_changes(overrides)
+        self._set_flag("overrideWifiSignalStrengthBars", "wifiSignalStrengthBars", id)
     def unset_wifi_signal_strength_bars(self) -> None:
-        overrides = self.setter.get_overrides()
-        overrides.overrideWifiSignalStrengthBars = 0
-        self.setter.apply_changes(overrides)
+        self._unset_flag("overrideWifiSignalStrengthBars")
 
 
     ## RAW SIGNAL STRENGTH TOGGLES
     # WIFI
     def is_raw_wifi_signal_shown(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideDisplayRawWifiSignal == 1
+        return self._is_flag_overridden("overrideDisplayRawWifiSignal")
     def show_raw_wifi_signal(self, shown: bool) -> None:
-        overrides = self.setter.get_overrides()
+        overrides = self._overrides()
+        overrides.overrideDisplayRawWifiSignal = 1 if shown else 0
         if shown:
-            overrides.overrideDisplayRawWifiSignal = 1
             overrides.values.displayRawWifiSignal = 1
-        else:
-            overrides.overrideDisplayRawWifiSignal = 0
         self.setter.apply_changes(overrides)
     # GSM
     def is_raw_gsm_signal_shown(self) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideDisplayRawGSMSignal == 1
+        return self._is_flag_overridden("overrideDisplayRawGSMSignal")
     def show_raw_gsm_signal(self, shown: bool) -> None:
-        overrides = self.setter.get_overrides()
+        overrides = self._overrides()
+        overrides.overrideDisplayRawGSMSignal = 1 if shown else 0
         if shown:
-            overrides.overrideDisplayRawGSMSignal = 1
             overrides.values.displayRawGSMSignal = 1
-        else:
-            overrides.overrideDisplayRawGSMSignal = 0
         self.setter.apply_changes(overrides)
 
     ## RADIO BUTTONS
     def is_item_overridden(self, item: StatusBarItem) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.overrideItemIsEnabled[item.value] == 1
+        return self._overrides().overrideItemIsEnabled[item.value] == 1
     def get_item_override(self, item: StatusBarItem) -> bool:
-        overrides = self.setter.get_overrides()
-        return overrides.values.itemIsEnabled[item.value] == 1
+        return self._overrides().values.itemIsEnabled[item.value] == 1
     def set_item_override(self, item: StatusBarItem, shown: bool) -> None:
-        overrides = self.setter.get_overrides()
+        overrides = self._overrides()
         overrides.overrideItemIsEnabled[item.value] = 1
         overrides.values.itemIsEnabled[item.value] = 1 if shown else 0
         self.setter.apply_changes(overrides)
     def unset_item_override(self, item: StatusBarItem) -> None:
-        overrides = self.setter.get_overrides()
+        overrides = self._overrides()
         overrides.overrideItemIsEnabled[item.value] = 0
         self.setter.apply_changes(overrides)
 
