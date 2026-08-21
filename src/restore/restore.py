@@ -23,6 +23,8 @@ from pymobiledevice3.services.installation_proxy import InstallationProxyService
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 from pymobiledevice3.exceptions import ConnectionTerminatedError, PyMobileDevice3Exception
 
+from src.exceptions.nugget_exception import NuggetException
+
 class FileToRestore:
     def __init__(self,
                  contents: str, restore_path: str, contents_path: str = None, domain: str = "",
@@ -504,9 +506,25 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
                     # the device-side restore daemon will reject the domain
                     # with MBErrorDomain/205 ("Unknown domain name").
                     # This includes system apps like com.apple.PosterBoard.
-                    if apps == None:
-                        async with InstallationProxyService(lockdown=lockdown_client) as ips:
-                            apps = await ips.get_apps(application_type="Any", calculate_sizes=False)
+                    if apps is None:
+                        # A failed lookup here would abort the whole sparse
+                        # restore later — retry hard, then fail loudly.
+                        last_err = None
+                        for attempt in range(1, 4):
+                            try:
+                                async with InstallationProxyService(lockdown=lockdown_client) as ips:
+                                    apps = await ips.get_apps(application_type="Any", calculate_sizes=False)
+                                break
+                            except Exception as e:
+                                last_err = e
+                                log_warn(f"InstallationProxy query failed "
+                                         f"(attempt {attempt}/3): {e}")
+                                await asyncio.sleep(min(2 ** attempt, 8))
+                        if apps is None:
+                            raise NuggetException(
+                                "Could not query installed apps from the device "
+                                f"(needed to register {bundle_id} for the restore). "
+                                f"Last error: {last_err}")
                     try:
                         app_info = apps[bundle_id]
                         active_bundle_ids.append(bundle_id)
@@ -516,13 +534,10 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
                             version=app_info.get("CFBundleVersion", "1.0"),
                             container_content_class="Data/Application"
                         ))
-                    except Exception as e:
-                        print(
-                            f"WARNING: AppDomain bundle '{bundle_id}'"
-                            f" not found in installation proxy"
-                            f" ({type(e).__name__}). AppDomain files"
-                            f" may cause MBErrorDomain/205."
-                        )
+                        log_info(f"Registered AppDomain bundle for restore: {bundle_id}")
+                    except KeyError:
+                        log_warn(f"AppDomain bundle '{bundle_id}' not found in installation proxy; "
+                                 "the device may reject this restore")
                         active_bundle_ids.append(bundle_id)
 
     # create the backup
