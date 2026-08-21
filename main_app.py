@@ -64,9 +64,7 @@ if __name__ == "__main__":
 
     # 3. GUI STARTUP
     print("Starting GoldenNugget...")
-    if "--enable-legacy-support" in sys.argv:
-        print("LEGACY SUPPORT ENABLED: iOS version restrictions are disabled. Use at your own risk!")
-    
+
     if "--test-mode" in sys.argv:
         print("TEST MODE ENABLED: Mock device will be created")
 
