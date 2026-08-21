@@ -1,5 +1,7 @@
 # GoldenNugget Async Operations
 
+> Full codebase documentation: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
 This document describes the background threads, async backup/restore operations, and error handling used in GoldenNugget.
 
 ## Tweak Registry (src/tweaks/registry.py)
