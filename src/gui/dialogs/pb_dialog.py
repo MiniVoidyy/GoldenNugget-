@@ -61,18 +61,18 @@ async def backup_posterboard_database(udid: str, update_label=lambda x: None, up
                     "This version of iOS is not supported by this fork.\n\n"
                     "GoldenNugget only supports iOS 26.2 and newer. "
                     "Please use the original Nugget for iOS 26.1 and earlier.")
-            async with Mobilebackup2Service(service_provider) as backup_client:
-                try:
+            try:
+                async with Mobilebackup2Service(service_provider) as backup_client:
                     await backup_client.backup(full=needs_full, backup_directory=app_data_path, progress_callback=update_progress)
-                except Exception as e:
-                    if _is_device_locked_error(e):
-                        raise NuggetException("Device locked during backup. Please unlock your device, keep it awake (tap screen periodically), and try again.")
-                    if _is_connection_error(e) and attempt < max_retries:
-                        delay = min(2 ** attempt, 15)
-                        update_label(f"Connection lost, retrying in {delay}s... (attempt {attempt}/{max_retries})")
-                        await asyncio.sleep(delay)
-                        continue
-                    raise
+            except Exception as e:
+                if _is_device_locked_error(e):
+                    raise NuggetException("Device locked during backup. Please unlock your device, keep it awake (tap screen periodically), and try again.")
+                if _is_connection_error(e) and attempt < max_retries:
+                    delay = min(2 ** attempt, 15)
+                    update_label(f"Connection lost, retrying in {delay}s... (attempt {attempt}/{max_retries})")
+                    await asyncio.sleep(delay)
+                    continue
+                raise
             break  # Success
         finally:
             await service_provider.close()
