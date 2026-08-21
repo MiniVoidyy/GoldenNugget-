@@ -758,19 +758,22 @@ def clean_backup_for_restore(backup_dir: "str | Path", udid: str,
     conn = sqlite3.connect(str(manifest_db))
     try:
         cur = conn.cursor()
-        cur.execute("SELECT fileID, domain, relativePath FROM Files")
-        for file_id, domain, rel_path in cur:
+        cur.execute("SELECT fileID, domain, relativePath, flags FROM Files")
+        for file_id, domain, rel_path, flags in cur:
             if _keep_protective_entry(domain, rel_path, include_photos):
-                if (device_dir / file_id[:2] / file_id).is_file():
-                    keep_ids.add(file_id)
-                else:
-                    # a row without a payload makes the restore fail with
+                # only regular files carry a <aa>/<fileID> payload; directory
+                # rows (flags=2) MUST survive without one — dropping them
+                # makes the restore agent fail with renameatx ENOENT
+                if flags == 1 and not (device_dir / file_id[:2] / file_id).is_file():
+                    # a file row without a payload makes the restore fail with
                     # MBErrorDomain/205 — drop it and let the device's own
                     # data stand
                     missing_payloads.append(rel_path)
+                else:
+                    keep_ids.add(file_id)
 
         if missing_payloads:
-            log_warn(f"Prune: dropping {len(missing_payloads)} manifest rows with missing payloads "
+            log_warn(f"Prune: dropping {len(missing_payloads)} file rows with missing payloads "
                      f"(e.g. {missing_payloads[:5]})")
 
         cur.execute("CREATE TEMP TABLE nugget_keep (fileID TEXT PRIMARY KEY)")

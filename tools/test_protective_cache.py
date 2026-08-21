@@ -30,17 +30,18 @@ def check(name, cond):
 
 
 def make_manifest(device_dir: Path, rows):
-    """rows: list of (domain, relative_path, payload_bytes or None)."""
+    """rows: list of (domain, relative_path, payload_bytes or None, flags)."""
     conn = sqlite3.connect(str(device_dir / "Manifest.db"))
     conn.execute("CREATE TABLE IF NOT EXISTS Files (fileID TEXT PRIMARY KEY, domain TEXT, relativePath TEXT, flags INTEGER, file BLOB)")
     import hashlib
-    for domain, rel, payload in rows:
+    for domain, rel, payload, *rest in rows:
+        flags = rest[0] if rest else 1
         file_id = hashlib.sha1(f"{domain}-{rel}".encode()).hexdigest()
         if payload is not None:
             pdir = device_dir / file_id[:2]
             pdir.mkdir(parents=True, exist_ok=True)
             (pdir / file_id).write_bytes(payload)
-        conn.execute("INSERT OR REPLACE INTO Files VALUES (?, ?, ?, 1, NULL)", (file_id, domain, rel))
+        conn.execute("INSERT OR REPLACE INTO Files VALUES (?, ?, ?, ?, NULL)", (file_id, domain, rel, flags))
     conn.commit()
     conn.close()
 
@@ -63,6 +64,9 @@ def main():
     photo_payload = b"JPGDATA" * 500
     make_manifest(cache.device_dir, [
         ("HomeDomain", "Library/SpringBoard/IconState.plist", b"<plist>"),
+        ("HomeDomain", "Library/SpringBoard", None, 2),          # directory row — no payload by design
+        ("HomeDomain", "Library/Accounts", None, 2),             # directory row (regression: renameatx ENOENT)
+        ("HomeDomain", "Library/Accounts/Accounts3.sqlite", b"acc"),
         ("CameraRollDomain", "DCIM/100APPLE/IMG.JPG", photo_payload),
         ("AppDomain-com.apple.PosterBoard",
          "Library/Application Support/PRBPosterExtensionDataStore/61/PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3",
@@ -99,6 +103,11 @@ def main():
     conn.close()
     check("sms.db pruned from working copy", "Library/SMS/sms.db" not in rels)
     check("icon state kept", "Library/SpringBoard/IconState.plist" in rels)
+    # directory rows MUST survive: without them the restore agent fails with
+    # renameatx ENOENT when staging files into those directories
+    check("directory row Library/SpringBoard kept", "Library/SpringBoard" in rels)
+    check("directory row Library/Accounts kept", "Library/Accounts" in rels)
+    check("Accounts3.sqlite kept", "Library/Accounts/Accounts3.sqlite" in rels)
     # the raw PB DB must NOT be restored in Phase 3 (it would clobber the
     # tweaked DB from Phase 2) — it is renewed separately on every apply
     check("posterboard db pruned from working copy",
