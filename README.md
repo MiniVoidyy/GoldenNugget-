@@ -30,7 +30,7 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - See documentation on the structure of batter files in [documentation.md](documentation.md)
 - psysbackup: backup system plist
   - Required to make "reset tweaks" function work without damaging system.
-- Status Bar (patched on iOS 27)
+- Status Bar (disabled on iOS 27+, no write permissions for the Speakeasy feature flag)
   - Change carrier name
   - Change secondary carrier name
   - Enable/Disable the primary or secondary carriers
@@ -52,10 +52,10 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - Show Supervision Text on Lock Screen
   - Show Dynamic Island in Screenshots
   - Enable AirPlay support for Stage Manager
-  - Show Red/Green Authentication Line on Lock Screen (See [this issue](https://github.com/leminlimez/Nugget/issues/656) for what it looks like)miscellaneous
+  - Show Red/Green Authentication Line on Lock Screen (See [this issue](https://github.com/leminlimez/Nugget/issues/656) for what it looks like)
   - Disable Floating Tab Bar on iPads
 - Internal Options
-  - Enabling Key Flick (iPad-style keyboard) on iPhones (iOS 26.0-)
+  - ~~Enabling Key Flick (iPad-style keyboard) on iPhones~~ (removed — unsupported on iOS 26.2+)
   - Build Version in Status Bar
   - Force Right to Left
   - Show Hidden Icons on Home Screen
@@ -139,7 +139,7 @@ Want to see your name here? Open [Pull Request](https://github.com/awesomenull-d
 
   - [pymobiledevice3][pymobiledevice3GitHub]
   - [PySide6][PySide6Doc]
-  - Python 3.9 or newer
+  - Python 3.10 or newer
 </details>
 
 ## Running the Python Program
@@ -177,7 +177,7 @@ pyside6-rcc src/qt/resources.qrc -o src/qt/resources_rc.py
 
 To create and compile languages, you can use the following commands:
 ```py
-pyside6-lupdate src/gui/main_window.py src/gui/pages/page.py src/gui/pages/reset_dialog.py src/gui/pages/main/*.py src/gui/pages/tools/*.py src/gui/dialogs.py src/qt/mainwindow.ui src/devicemanagement/device_manager.py src/exceptions/*.py src/tweaks/*.py src/tweaks/posterboard/*.py src/tweaks/posterboard/template_options/*.py src/controllers/*.py -ts src/qt/translations/Nugget_{language code}.ts # generate/update the language file
+pyside6-lupdate src/gui/main_window.py src/gui/pages/page.py src/gui/pages/pages_list.py src/gui/pages/main/*.py src/gui/pages/tools/*.py src/gui/dialogs/*.py src/gui/ios/*.py src/qt/mainwindow.ui src/devicemanagement/device_manager.py src/exceptions/*.py src/tweaks/*.py src/tweaks/posterboard/*.py src/tweaks/posterboard/template_options/*.py src/tweaks/status_bar/*.py src/controllers/*.py -ts src/qt/translations/Nugget_{language code}.ts # generate/update the language file
 pyside6-lrelease src/qt/translations/Nugget_{language code}.ts -qm src/qt/translations/Nugget_{language code}.qm # compile to binary
 ```
 

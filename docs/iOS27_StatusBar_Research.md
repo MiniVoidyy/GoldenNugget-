@@ -1,6 +1,6 @@
 # iOS 27 Status Bar Tweak Research Document
 
-**Target:** iOS 27.0 (24A5408d) on iPhone 15,4 (D37AP)  
+**Target:** iOS 27.0 (24A5408d) on iPhone 15  
 **Goal:** Display custom carrier text "awesomenull" in status bar  
 **Period:** ~13 runs across multiple sessions  
 **Status:** **BLOCKED** - Requires exploit/jailbreak to proceed
@@ -23,7 +23,7 @@ The iOS 27 status bar runs on **SystemStatusUI** (new architecture). The legacy 
 
 | Property | Value |
 |---|---|
-| Device | iPhone 15,4 (D37AP) - iPhone SE 3rd gen |
+| Device | iPhone 15 |
 | iOS | 27.0 (24A5408d) |
 | UDID | `00008120-0006155436F0E01E` |
 | Architecture | arm64e |

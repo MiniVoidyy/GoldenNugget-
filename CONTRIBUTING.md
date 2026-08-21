@@ -28,7 +28,7 @@ When submitting bug fixes (`[FIX]`), please ensure that:
 We welcome the following types of tweaks:
 1. Porting old tweaks to newer iOS versions.
 2. New plist-based tweaks (e.g., EasySpeak workarounds).
-3. New exploit-based tweaks (e.g., BookRestore / SparseRestore).
+3. New exploit-based tweaks (e.g., SparseRestore).
 
 ---
 
