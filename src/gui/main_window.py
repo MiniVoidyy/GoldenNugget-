@@ -372,7 +372,6 @@ class MainWindow(QtWidgets.QMainWindow):
             # wallpapers are always applied as configurations (iOS 26+ data
             # store layout); the descriptors method is gone, so hide the toggle
             self.ui.pbApplyMethods.setVisible(False)
-            tweaks[TweakID.PosterBoard].use_configs = True
 
             # show the PB if initial load is true
             if self.initial_load:

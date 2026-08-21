@@ -29,7 +29,7 @@ class PosterboardTweak(Tweak):
         self.loop_video = True
         self.reverse_video = False
         self.use_foreground = False
-        self.use_configs = False
+        self.use_configs = True  # descriptors apply method is gone (broken on iOS 26+)
         self.calculationMode = 'linear'
         self.bundle_id = "com.apple.PosterBoard"
         self.resetModes = []
@@ -133,15 +133,14 @@ class PosterboardTweak(Tweak):
                         folder_name = str(uuid.uuid4()).upper()
                         curr_randomized_id = randint(9999, 99999)
                     # add it to the configuration
-                    if self.use_configs:
-                        ext = restore_path.split('/')[6]
-                        self.config_manager.add_config(folder_name, ext)
+                    ext = restore_path.split('/')[6]
+                    self.config_manager.add_config(folder_name, ext)
                 # if file then add it, otherwise recursively call again
                 fullpath = os.path.join(curr_path, folder)
                 if os.path.isfile(fullpath):
                     try:
                         # if converting to config and it is a file to be modified, then update it (don't add it here and add them later)
-                        if self.use_configs and self.config_manager.file_needs_updated(folder):
+                        if self.config_manager.file_needs_updated(folder):
                             continue
                         # update plist ids if needed
                         new_contents = None
@@ -160,7 +159,7 @@ class PosterboardTweak(Tweak):
                         print(f"Failed to open file: {folder}") # TODO: Add QDebug equivalent
                 else:
                     # add config files if needed
-                    if self.use_configs and curr_path.endswith("versions") and "descriptor" in curr_path:
+                    if curr_path.endswith("versions") and "descriptor" in curr_path:
                         self.config_manager.cache_config_files()
                         for config_file in self.config_manager.config_files:
                             files_to_restore.append(FileToRestore(
@@ -184,10 +183,7 @@ class PosterboardTweak(Tweak):
                         ext = "com.apple.MercuryPoster"
                     else:
                         ext = "com.apple.WallpaperKit.CollectionsPoster"
-                    if self.use_configs:
-                        wpfolder = "configurations"
-                    else:
-                        wpfolder = "descriptors"
+                    wpfolder = "configurations"
                     self.recursive_add(
                         files_to_restore,
                         os.path.join(curr_path, folder),
@@ -306,17 +302,15 @@ class PosterboardTweak(Tweak):
                 template.extract(output_dir=output_dir)
         # add the files
         update_label(QCoreApplication.tr("Adding tendies..."))
-        if self.use_configs:
-            self.config_manager.start_staging()
+        self.config_manager.start_staging()
         self.recursive_add(files_to_restore, curr_path=output_dir)
-        if self.use_configs:
-            staged_db_path = self.config_manager.update_sqlite()
-            files_to_restore.append(FileToRestore(
-                contents=None,
-                contents_path=staged_db_path,
-                restore_path=f"/Library/Application Support/PRBPosterExtensionDataStore/{self.structure_version}/PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3",
-                domain=f"AppDomain-{self.bundle_id}"
-            ))
+        staged_db_path = self.config_manager.update_sqlite()
+        files_to_restore.append(FileToRestore(
+            contents=None,
+            contents_path=staged_db_path,
+            restore_path=f"/Library/Application Support/PRBPosterExtensionDataStore/{self.structure_version}/PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3",
+            domain=f"AppDomain-{self.bundle_id}"
+        ))
         # add the force refresh
         if force_pb_refresh:
             plist = {

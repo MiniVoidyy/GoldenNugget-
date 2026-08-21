@@ -1,5 +1,5 @@
 from PySide6.QtCore import QCoreApplication
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel, QMessageBox
 
 from src.gui.ios.components import IOSNavBar, IOSSectionHeader, IOSSwitch
 from src.tweaks.tweaks import tweaks, TweakID
@@ -128,6 +128,24 @@ class IOSDaemonsPage(QWidget):
         self.daemons_tweak.set_multiple_values(daemon.value, value=checked)
         if checked:
             self.master_switch.setChecked(True)
+            if daemon is Daemon.Location:
+                self._warn_location_daemon()
+
+    def _warn_location_daemon(self):
+        """Location Services daemon keeps PosterBoard alive on iPhone 14."""
+        from src.devicemanagement.data_singleton import DataSingleton
+        current = DataSingleton().current_device
+        model = current.model if current is not None else ""
+        if not model.startswith("iPhone14,"):
+            return
+        QMessageBox.warning(
+            self,
+            QCoreApplication.translate("Nugget", "Wallpaper Risk on iPhone 14"),
+            QCoreApplication.translate(
+                "Nugget",
+                "Disabling Location Services has been reported to break wallpapers "
+                "(PosterBoard) on iPhone 14. If your wallpaper disappears after "
+                "applying, re-enable this daemon and apply again."))
 
     def _update_daemons_enabled(self):
         enabled = self.daemons_tweak.enabled
