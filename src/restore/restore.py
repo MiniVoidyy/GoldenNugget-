@@ -13,6 +13,7 @@ from .protective import (
     inject_file_into_backup,
     log_error,
     log_info,
+    make_protective_working_copy,
     perform_protective_backup,
 )
 from pymobiledevice3.lockdown import LockdownClient, create_using_usbmux
@@ -301,44 +302,60 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
 
 async def _restore_ios27(back: backup.Backup, reboot: bool,
                           lockdown_client: LockdownClient, progress_callback,
-                          backup_password: str = ""):
+                          backup_password: str = "",
+                          prepared_backup_root: str = None):
     """iOS 27+ three-phase restore: backup → tweak → reboot → restore.
 
     Phase 1 (0-40%):  Selective backup of photos, Apple ID, and user
-                      settings. Non-protective data is discarded mid-stream,
+                      settings. Non-protective data is drained mid-stream,
                       so no multi-GB full backup ever hits the disk.
                       (KeychainDomain is skipped — enabling backup
                       encryption is slow and not needed for tweaks.)
+                      With ``prepared_backup_root`` the backup already
+                      happened earlier in the apply flow (persistent cache +
+                      incremental refresh), so this phase only builds the
+                      pruned working copy.
     Phase 2 (40-60%): Apply tweaks via sparse restore → reboot, which
                       triggers the iOS 27 "safe state recovery" wipe.
     Phase 3 (60-100%): Reconnect and restore the pruned Phase 1 backup so
                       user data survives the wipe.
     """
     udid = lockdown_client.udid
-    protective_dir = tempfile.mkdtemp(prefix="nugget_protective_")
-    backup_root = os.path.join(protective_dir, "device_backup")
-    os.makedirs(backup_root, exist_ok=True)
+    started = time.monotonic()
+    using_cache = prepared_backup_root is not None
+    protective_dir = None
+    if using_cache:
+        backup_root = await asyncio.to_thread(
+            make_protective_working_copy, prepared_backup_root, udid)
+        protective_dir = os.path.dirname(backup_root)
+    else:
+        protective_dir = tempfile.mkdtemp(prefix="nugget_protective_")
+        backup_root = os.path.join(protective_dir, "device_backup")
+        os.makedirs(backup_root, exist_ok=True)
     backup_complete = False
     try:
         log_info(f"Starting iOS 27 restore for device {udid}")
         log_info(f"Protective backup directory: {protective_dir}")
-        
+
         # === Phase 1: selective protective backup (0-40%) ===
         progress_callback(0)
-        log_info("Phase 1: Starting protective backup (photos, Apple ID, settings, home screen)")
-        await perform_protective_backup(
-            lockdown_client, backup_root,
-            progress_callback=_scaled_callback(progress_callback, 0, _PHASE_BACKUP_END),
-            include_photos=True,
-        )
+        if using_cache:
+            log_info("Phase 1: Using prepared protective backup (cache hit)")
+        else:
+            log_info("Phase 1: Starting protective backup (photos, Apple ID, settings, home screen)")
+            await perform_protective_backup(
+                lockdown_client, backup_root,
+                progress_callback=_scaled_callback(progress_callback, 0, _PHASE_BACKUP_END),
+                include_photos=True,
+            )
         backup_complete = True
-        log_info("Phase 1: Protective backup completed")
 
         # Prune Manifest.db + orphan payloads in a worker thread
         removed_rows, removed_files = await asyncio.to_thread(
             clean_backup_for_restore, backup_root, udid
         )
-        log_info(f"Phase 1: Pruned backup: -{removed_rows} manifest rows, -{removed_files} payload files")
+        log_info(f"Phase 1: Pruned backup: -{removed_rows} manifest rows, -{removed_files} payload files "
+                 f"({time.monotonic() - started:.1f}s into the run)")
 
         # Re-inject the HomeDomain tweak files into the pruned backup
         for file in back.files:
@@ -397,25 +414,31 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                 pass
     except Exception as e:
         if backup_complete:
-            kept = os.path.join(protective_dir, "device_backup")
+            kept = backup_root if not using_cache else prepared_backup_root
             log_error(f"Restore failed; protective backup kept at: {kept}")
             try:
                 e.add_note(f"Protective backup kept at: {kept}")
             except AttributeError:
                 pass
+            if using_cache:
+                # the master stays for debugging; drop only the pruned working copy
+                shutil.rmtree(protective_dir, ignore_errors=True)
             raise
         log_error(f"Restore failed before backup completed: {e}")
         shutil.rmtree(protective_dir, ignore_errors=True)
         raise
 
-    kept = os.path.join(protective_dir, "device_backup")
-    log_info(f"Protective backup kept at: {kept}")
-    log_info("iOS 27 restore completed successfully")
+    if using_cache:
+        # working copy was fully restored; the master cache stays for next apply
+        shutil.rmtree(protective_dir, ignore_errors=True)
+    else:
+        log_info(f"Protective backup kept at: {backup_root}")
+    log_info(f"iOS 27 restore completed successfully in {time.monotonic() - started:.1f}s")
     progress_callback(100)
 
 
 # files is a list of FileToRestore objects
-async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdown_client: LockdownClient = None, progress_callback = lambda x: None, backup_password: str = ""):
+async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdown_client: LockdownClient = None, progress_callback = lambda x: None, backup_password: str = "", prepared_backup_root: str = None):
     # create the files to be backed up
     files_list = [
     ]
@@ -468,4 +491,6 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
     back = backup.Backup(files=files_list, apps=apps_list)
 
     # iOS 26.2+ (iOS 27 era) uses three-phase protective backup + restore
-    await _restore_ios27(back, reboot, lockdown_client, progress_callback, backup_password=backup_password)
+    await _restore_ios27(back, reboot, lockdown_client, progress_callback,
+                         backup_password=backup_password,
+                         prepared_backup_root=prepared_backup_root)
