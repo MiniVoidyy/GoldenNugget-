@@ -78,6 +78,7 @@ def check_disk_space(path: str = None, min_free_bytes: int = None) -> None:
     import tempfile
     if path is None:
         path = tempfile.gettempdir()
+    os.makedirs(path, exist_ok=True)  # disk_usage requires an existing path
     if min_free_bytes is None:
         min_free_bytes = _min_free_disk_bytes()
     usage = shutil.disk_usage(path)
@@ -419,12 +420,14 @@ async def perform_protective_backup(
 
     is_encrypted = False
 
+    # the cache master path may not exist yet; disk_usage needs a real path
+    Path(backup_root).mkdir(parents=True, exist_ok=True)
     if not incremental_ok:
         # A full (re)upload needs real disk headroom; an incremental refresh
         # writes only the delta, so the floor check would be pure overhead.
         await check_disk_space_for_backup(lockdown_client, path=backup_root)
         shutil.rmtree(backup_root, ignore_errors=True)
-    Path(backup_root).mkdir(parents=True, exist_ok=True)
+        Path(backup_root).mkdir(parents=True, exist_ok=True)
 
     max_retries = 3
     for attempt in range(1, max_retries + 1):
