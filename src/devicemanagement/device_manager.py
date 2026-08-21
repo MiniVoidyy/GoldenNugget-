@@ -639,10 +639,16 @@ class DeviceManager:
                 log_warn("PosterBoard DB missing from protective backup — falling back to a separate backup")
                 return PreparedBackup(root=master_root, manifest_password=manifest_password), False
             pb = tweaks[TweakID.PosterBoard]
-            if not pb.config_manager.update_database_file(db_path, udid):
-                raise NuggetException("The PosterBoard database is not of the correct format!")
-            pb.config_manager.update_for_saved_database(udid)
-            update_label(QCoreApplication.tr("PosterBoard database backed up successfully."))
+            try:
+                if not pb.config_manager.update_database_file(db_path, udid):
+                    raise NuggetException("The PosterBoard database is not of the correct format!")
+                pb.config_manager.update_for_saved_database(udid)
+                update_label(QCoreApplication.tr("PosterBoard database backed up successfully."))
+            except NuggetException as e:
+                # a bad DB must not kill the whole apply — the legacy separate
+                # backup path still gets a chance
+                log_warn(f"Cached PosterBoard DB unusable ({e}) — falling back to a separate backup")
+                return PreparedBackup(root=master_root, manifest_password=manifest_password), False
         return PreparedBackup(root=master_root, manifest_password=manifest_password), True
 
     async def _backup_posterboard_database(self, update_label=lambda x: None, force: bool = False):

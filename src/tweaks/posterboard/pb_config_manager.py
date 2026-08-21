@@ -12,20 +12,44 @@ from src.restore.protective import log_warn
 from .pb_config_item import PBConfigItem
 
 
-def _validate_posterboard_db(db_path: str) -> bool:
-    """Check if a file is a valid PosterBoard SQLite database with required tables."""
+def _list_tables(db_path: str) -> list[str]:
+    try:
+        conn = sqlite3.connect(db_path)
+        tables = [r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        conn.close()
+        return tables
+    except sqlite3.DatabaseError:
+        return []
+
+
+def _validate_posterboard_db(db_path: str, strict: bool = True) -> bool:
+    """Check if a file is a valid PosterBoard SQLite database.
+
+    strict=True requires the classic table set (pre-db5 schema).
+    strict=False accepts any healthy database that carries poster-ish
+    tables — the schema may change between iOS releases (db5+).
+    """
     if not path.exists(db_path) or path.getsize(db_path) < 100:
         return False
     try:
         conn = sqlite3.connect(db_path)
         # First check it's a valid SQLite database
         conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
-        # Then check it has the required PosterBoard tables
         cursor = conn.cursor()
-        tables_to_check = ["poster", "posterAttributes", "posterRoleMembership", "sqlite_sequence"]
-        for tab in tables_to_check:
-            cursor.execute(f"PRAGMA table_info({tab})")
-            if cursor.fetchone() is None:
+        if strict:
+            tables_to_check = ["poster", "posterAttributes", "posterRoleMembership", "sqlite_sequence"]
+            for tab in tables_to_check:
+                cursor.execute(f"PRAGMA table_info({tab})")
+                if cursor.fetchone() is None:
+                    log_warn(f"PosterBoard DB validation: missing table '{tab}' "
+                             f"(tables present: {_list_tables(db_path)})")
+                    conn.close()
+                    return False
+        else:
+            tables = [t.lower() for t in _list_tables(db_path)]
+            if not any("poster" in t for t in tables):
+                log_warn(f"PosterBoard DB validation: no poster-ish tables (present: {tables})")
                 conn.close()
                 return False
         # Check database integrity
@@ -149,7 +173,9 @@ class PBConfigManager:
                 "and try again."
             )
 
-        if not _validate_posterboard_db(new_db):
+        if not (_validate_posterboard_db(new_db) or _validate_posterboard_db(new_db, strict=False)):
+            tables = _list_tables(new_db)
+            log_warn(f"PosterBoard DB rejected; sqlite_master contains: {tables}")
             raise NuggetException(
                 "The PosterBoard database from the backup is corrupted or invalid. "
                 "This can happen if the backup was interrupted. "
