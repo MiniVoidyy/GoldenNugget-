@@ -1,3 +1,4 @@
+import os
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
@@ -21,6 +22,15 @@ async def perform_restore(backup: backup.Backup, reboot: bool = False, lockdown_
     try:
         with TemporaryDirectory() as backup_dir:
             backup.write_to_directory(Path(backup_dir))
+
+            # GOLDENNUGGET_KEEP_SPARSE=1 keeps a copy of exactly what was sent
+            # to the device — invaluable when the restore is rejected.
+            if os.environ.get("GOLDENNUGGET_KEEP_SPARSE") == "1":
+                import shutil
+                keep = Path(os.environ.get("GOLDENNUGGET_LOG_FILE", "/tmp/gn_sparse_debug")).parent / "gn_sparse_debug"
+                shutil.rmtree(keep, ignore_errors=True)
+                shutil.copytree(backup_dir, keep)
+                print(f"[KEEP_SPARSE] sparse backup copy kept at: {keep}")
 
             if own_lockdown:
                 lockdown_client = await create_using_usbmux()

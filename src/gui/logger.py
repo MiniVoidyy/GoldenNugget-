@@ -5,7 +5,8 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
-def setup_logging(log_file: str = None, level: int = logging.INFO) -> logging.Logger:
+def setup_logging(log_file: str = None, level: int = logging.INFO,
+                  capture_pymobiledevice3: bool = False) -> logging.Logger:
     """Configure application-wide logging."""
     logger = logging.getLogger("GoldenNugget")
     logger.setLevel(level)
@@ -24,6 +25,15 @@ def setup_logging(log_file: str = None, level: int = logging.INFO) -> logging.Lo
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
 
+    # pymobiledevice3 logs every restore/backup step — without this they are
+    # lost, which makes device-side rejections impossible to diagnose.
+    if capture_pymobiledevice3:
+        pm3 = logging.getLogger("pymobiledevice3")
+        pm3.setLevel(logging.DEBUG)
+        pm3.propagate = False
+        pm3.handlers.clear()
+        pm3.addHandler(console_handler)
+
     # File handler (if log_file specified)
     if log_file:
         try:
@@ -39,6 +49,9 @@ def setup_logging(log_file: str = None, level: int = logging.INFO) -> logging.Lo
             )
             file_handler.setFormatter(file_formatter)
             logger.addHandler(file_handler)
+            if capture_pymobiledevice3:
+                pm3 = logging.getLogger("pymobiledevice3")
+                pm3.addHandler(file_handler)
         except Exception:
             pass  # Fail silently if file logging fails
 

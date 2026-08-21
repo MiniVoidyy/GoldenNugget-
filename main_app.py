@@ -71,7 +71,7 @@ if __name__ == "__main__":
     # Setup logging
     log_file = os.environ.get("GOLDENNUGGET_LOG_FILE")
     if "--debug" in sys.argv:
-        setup_logging(log_file, logging.DEBUG)
+        setup_logging(log_file, logging.DEBUG, capture_pymobiledevice3=True)
     else:
         setup_logging(log_file)
 
