@@ -16,6 +16,7 @@ from .protective import (
     log_info,
     make_protective_working_copy,
     perform_protective_backup,
+    verify_backup_payloads,
 )
 from pymobiledevice3.lockdown import LockdownClient, create_using_usbmux
 from pymobiledevice3.services.installation_proxy import InstallationProxyService
@@ -386,6 +387,14 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                     mode=_FileMode.S_IFREG | 0o644,
                     owner=file.owner, group=file.group)
                 log_info(f"Injected {file.domain}/{file.path} into protective backup: {ok}")
+
+        # Last line of defence against MBErrorDomain/205: the device requests
+        # every regular-file row's payload — a single missing one aborts the
+        # whole Phase 3 restore.
+        missing_payloads = await asyncio.to_thread(verify_backup_payloads, backup_root, udid)
+        if missing_payloads:
+            log_error(f"{len(missing_payloads)} manifest rows lack payloads "
+                      f"(e.g. {missing_payloads[:5]}) — Phase 3 will likely fail with MBErrorDomain/205")
 
         progress_callback(_PHASE_BACKUP_END)
 
