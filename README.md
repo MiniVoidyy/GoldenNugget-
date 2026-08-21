@@ -115,6 +115,10 @@ Want to see your name here? Open [Pull Request](https://github.com/awesomenull-d
  </picture>
 </a>
 
+> [!NOTE]
+> ## Mobilegestalt
+> Don't even ask me for it. It will be NEVER realized again. 
+
 ## Requirements:
 <details>
 <summary>Windows</summary>
