@@ -185,6 +185,12 @@ _HOME_DOMAIN_TWEAK_PATHS = (
     "Library/FeatureFlags/Domain/SpringBoard.plist",
 )
 
+# HomeDomain tweak DIRECTORIES: every file under these prefixes is injected
+# (Passcode Themes write one image per icon, so paths are per-theme dynamic).
+_HOME_DOMAIN_TWEAK_PREFIXES = (
+    "Library/Caches/TelephonyUI",  # Passcode Themes images
+)
+
 # SystemPreferencesDomain tweak files, re-injected for the same reason as the
 # HomeDomain ones: the iOS 27 wipe clears whatever the sparse restore staged
 # unless the protective backup carries it. /var/preferences is outside the
@@ -362,16 +368,17 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
 
         # Re-inject the HomeDomain tweak files into the pruned backup
         for file in back.files:
-            if (isinstance(file, backup.ConcreteFile)
-                    and file.domain == "HomeDomain"
-                    and file.path in _HOME_DOMAIN_TWEAK_PATHS):
+            if not isinstance(file, backup.ConcreteFile):
+                continue
+            if (file.domain == "HomeDomain"
+                    and (file.path in _HOME_DOMAIN_TWEAK_PATHS
+                         or file.path.startswith(_HOME_DOMAIN_TWEAK_PREFIXES))):
                 inject_file_into_backup(
                     backup_root, udid, file.domain, file.path,
                     file.read_contents(),
                     mode=_FileMode.S_IFREG | 0o644,
                     owner=file.owner, group=file.group)
-            elif (isinstance(file, backup.ConcreteFile)
-                    and file.domain == "SystemPreferencesDomain"
+            elif (file.domain == "SystemPreferencesDomain"
                     and file.path in _SYSTEM_PREFERENCES_TWEAK_PATHS):
                 ok = inject_file_into_backup(
                     backup_root, udid, file.domain, file.path,
@@ -448,7 +455,7 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
     apps_list = []
     active_bundle_ids = []
     apps = None
-    sorted_files = sorted(merge_duplicates(files), key=lambda x: (x.domain, x.restore_path), reverse=False)
+    sorted_files = sorted(merge_duplicates(files), key=lambda x: (x.domain or "", x.restore_path or ""), reverse=False)
     # add the file paths
     last_domain = ""
     last_path = ""
