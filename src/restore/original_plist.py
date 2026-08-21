@@ -22,7 +22,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional
 
-from pymobiledevice3.lockdown import create_using_usbmux
+from src.devicemanagement.session import lockdown_session
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 
 from src.exceptions.nugget_exception import NuggetException
@@ -160,59 +160,55 @@ async def psysbackup(
     update_label("Backing up device to capture original plists...")
     max_retries = 3
     for attempt in range(1, max_retries + 1):
-        ld = await create_using_usbmux(serial=udid)
         try:
-            if attempt == 1:
-                await check_disk_space_for_backup(ld)
-            # Check if backup encryption is enabled on device
-            is_encrypted = False
-            try:
-                async with Mobilebackup2Service(ld) as backup_client:
-                    is_encrypted = await backup_client.get_will_encrypt()
-            except Exception:
-                pass
+            async with lockdown_session(udid) as ld:
+                if attempt == 1:
+                    await check_disk_space_for_backup(ld)
+                # Check if backup encryption is enabled on device
+                is_encrypted = False
+                try:
+                    async with Mobilebackup2Service(ld) as backup_client:
+                        is_encrypted = await backup_client.get_will_encrypt()
+                except Exception:
+                    pass
 
-            if is_encrypted:
-                if backup_password:
-                    update_label("Backup encryption enabled — using provided password to decrypt manifest...")
-                    print("[psysbackup] Backup encryption enabled, using provided password to decrypt manifest")
-                else:
-                    # Can't read encrypted manifest without password - skip snapshot
-                    update_label("Backup encryption enabled — skipping pre-apply snapshot (auto-revert unavailable).")
-                    print("[psysbackup] Backup encryption enabled on device, skipping pre-apply snapshot (cannot read encrypted manifest without password)")
-                    return {}
+                if is_encrypted:
+                    if backup_password:
+                        update_label("Backup encryption enabled — using provided password to decrypt manifest...")
+                        print("[psysbackup] Backup encryption enabled, using provided password to decrypt manifest")
+                    else:
+                        # Can't read encrypted manifest without password - skip snapshot
+                        update_label("Backup encryption enabled — skipping pre-apply snapshot (auto-revert unavailable).")
+                        print("[psysbackup] Backup encryption enabled on device, skipping pre-apply snapshot (cannot read encrypted manifest without password)")
+                        return {}
 
-            with TemporaryDirectory() as tmp_dir:
-                async with Mobilebackup2Service(ld) as backup_client:
-                    try:
-                        await backup_client.backup(
-                            full=True,
-                            backup_directory=tmp_dir,
-                            progress_callback=update_progress,
-                            password=backup_password,
-                        )
-                    except Exception as e:
-                        if _is_device_locked_error(e):
-                            update_label("Device locked during backup. Please unlock your device and keep it awake (tap screen periodically), then click Retry.")
-                            raise NuggetException("Device locked during backup. Please unlock your device, keep it awake, and try again.")
-                        if _is_connection_error(e) and attempt < max_retries:
-                            delay = min(2 ** attempt, 15)
-                            update_label(f"Connection lost, retrying in {delay}s... (attempt {attempt}/{max_retries})")
-                            await asyncio.sleep(delay)
-                            continue
-                        raise
-                return _read_originals(Path(tmp_dir) / udid, paths)
+                with TemporaryDirectory() as tmp_dir:
+                    async with Mobilebackup2Service(ld) as backup_client:
+                        try:
+                            await backup_client.backup(
+                                full=True,
+                                backup_directory=tmp_dir,
+                                progress_callback=update_progress,
+                                password=backup_password,
+                            )
+                        except Exception as e:
+                            if _is_device_locked_error(e):
+                                update_label("Device locked during backup. Please unlock your device and keep it awake (tap screen periodically), then click Retry.")
+                                raise NuggetException("Device locked during backup. Please unlock your device, keep it awake, and try again.")
+                            if _is_connection_error(e) and attempt < max_retries:
+                                delay = min(2 ** attempt, 15)
+                                update_label(f"Connection lost, retrying in {delay}s... (attempt {attempt}/{max_retries})")
+                                await asyncio.sleep(delay)
+                                continue
+                            raise
+                    return _read_originals(Path(tmp_dir) / udid, paths)
         except NuggetException:
             raise
         except Exception as e:
             if _is_connection_error(e) and attempt < max_retries:
                 continue
             raise
-        finally:
-            try:
-                await ld.close()
-            except Exception:
-                pass
+        # lockdown_session closes the connection safely on every path
 
 
 def _validate_sqlite_db(db_path: Path) -> bool:

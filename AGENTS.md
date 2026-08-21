@@ -14,8 +14,9 @@ plist location, key, default value, UI kind (switch/text/number).
 - Titles are wrapped in `QCoreApplication.translate("Nugget", ...)` at
   definition time; keep `src/tweaks/registry.py` in the pyside6-lupdate file
   list so new strings reach the translators.
-- Device compatibility (min iOS version, iPad/iPhone-only) stays in
-  `src/gui/ios/compat.py`.
+- Device compatibility (min iOS version, iPad/iPhone-only) is part of the
+  spec (`min_version` / `iphone_only` / `ipad_only`);
+  `src/gui/ios/compat.py` only evaluates it.
 
 ## Lockdown Sessions (src/devicemanagement/session.py)
 
