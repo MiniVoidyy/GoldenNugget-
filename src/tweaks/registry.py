@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Optional
 
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtCore import QT_TRANSLATE_NOOP
 
 from .basic_plist_locations import FileLocation
 from .tweak_names import TweakID
@@ -43,8 +43,11 @@ class TweakSpec:
 
 def _t(id_: TweakID, section: Section, title: str, location: FileLocation,
        key: str, **kwargs) -> TweakSpec:
+    # QT_TRANSLATE_NOOP marks the title for pyside6-lupdate; the actual
+    # translation happens at render time (translators are not installed yet
+    # when this module is imported).
     return TweakSpec(id=id_, section=section,
-                     title=QCoreApplication.translate("Nugget", title),
+                     title=QT_TRANSLATE_NOOP("Nugget", title),
                      location=location, key=key, **kwargs)
 
 

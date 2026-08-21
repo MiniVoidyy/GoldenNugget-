@@ -251,12 +251,16 @@ class IOSTweaksPage(QWidget):
             card_layout.addWidget(row)
             content_layout.addWidget(card)
 
-        # Render every section straight from the registry
+        # Render every section straight from the registry. Titles are stored
+        # as QT_TRANSLATE_NOOP markers and translated here, at render time.
+        def tr_title(spec) -> str:
+            return QCoreApplication.translate("Nugget", spec.title)
+
         renderers = {
-            Kind.SWITCH: lambda spec: make_switch(spec.id, spec.title),
-            Kind.TEXT: lambda spec: make_text_input(spec.id, spec.title),
+            Kind.SWITCH: lambda spec: make_switch(spec.id, tr_title(spec)),
+            Kind.TEXT: lambda spec: make_text_input(spec.id, tr_title(spec)),
             Kind.NUMBER: lambda spec: make_number_input(
-                spec.id, spec.title, spec.min_value, spec.max_value),
+                spec.id, tr_title(spec), spec.min_value, spec.max_value),
         }
         for section in Section:
             content_layout.addWidget(IOSSectionHeader(
