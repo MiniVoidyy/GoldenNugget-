@@ -85,7 +85,6 @@ def check_disk_space(path: str = None, min_free_bytes: int = None) -> None:
                 "Free up space on your computer (backups are written to {2}) and try again.",
             ).format(f"{free_gb:.1f}", f"{required_gb:.1f}", path)
         )
-    return usage
 
 
 async def _get_device_used_storage(lockdown_client) -> Optional[int]:
@@ -567,7 +566,7 @@ def clean_backup_for_restore(backup_dir: "str | Path", udid: str,
         cur.executemany("INSERT INTO nugget_keep (fileID) VALUES (?)",
                         ((fid,) for fid in keep_ids))
         cur.execute("DELETE FROM Files WHERE fileID NOT IN (SELECT fileID FROM nugget_keep)")
-        removed_rows = cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+        removed_rows = max(cur.rowcount, 0)
         conn.commit()
     finally:
         conn.close()
@@ -892,4 +891,3 @@ def inject_file_into_backup(backup_dir: "str | Path", udid: str, domain: str,
         return True
     finally:
         conn.close()
-    return True

@@ -213,7 +213,6 @@ async def psysbackup(
                 await ld.close()
             except Exception:
                 pass
-        return {}  # unreachable safety net
 
 
 def _validate_sqlite_db(db_path: Path) -> bool:

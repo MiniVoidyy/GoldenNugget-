@@ -24,10 +24,6 @@ class TemplatePreviewCard(QLabel):
         self._preview_name = preview_name
         self.setPixmap(pixmap.scaled(190, 190, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
-    def mousePressEvent(self, event):
-        # Could open full-size preview dialog here
-        pass
-
 
 class IOSPosterboardPage(QWidget):
     def __init__(self, window, parent=None):
