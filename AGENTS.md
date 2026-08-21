@@ -52,9 +52,19 @@ backup in `<temp>/goldennugget_protective_cache/master/<udid>`:
   Manifest.db and a hardlink would corrupt the master).
 - Invalidated by UDID/iOS-version change; a PC reboot wipes it naturally.
 - PosterBoard DB: kept mid-stream into the master when wallpapers are applied
-  (`include_posterboard`) and extracted after the refresh
+  (`include_posterboard`; container included via a stock-format factory-info
+  entry — verified working on iOS 27 db5) and extracted after the refresh
   (`extract_posterboard_db`); pruned from the restore copy so Phase 3 never
-  clobbers the tweaked DB from Phase 2.
+  clobbers the tweaked DB from Phase 2. The DB is resolved by FILE NAME —
+  the store dir's structure version (61, 62, ...) varies between iOS
+  releases. The on-device DB runs in WAL mode: `-wal`/`-shm` siblings are
+  extracted too and checkpointed into one consolidated database. If
+  anything in this chain fails, the apply degrades to the legacy separate
+  `_backup_posterboard_database` instead of aborting.
+- Prune self-heal: kept rows must have payloads when flags=1 (a missing one
+  aborts Phase 3 with MBErrorDomain/205); directory rows (flags=2) are kept
+  unconditionally — dropping them causes renameatx ENOENT during restore.
+  `verify_backup_payloads()` logs leftovers before Phase 3.
 - Encrypted backups: supported when the user provides the backup password
   (prompted in `_prepare_protective_backup`; reused later for the Phase 3
   restore). The manifest is decrypted only locally on the pruned working
