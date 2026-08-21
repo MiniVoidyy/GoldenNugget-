@@ -294,7 +294,9 @@ def is_protective_device_file(device_name: str, include_photos: bool = True,
     for prefix in APPLE_ID_PATH_PREFIXES + SPRINGBOARD_PATH_PREFIXES + CONTROL_CENTER_PATH_PREFIXES:
         if _path_match(device_name, f"HomeDomain/{prefix}") or _path_match(device_name, prefix):
             return True
-    if include_posterboard and _path_match(device_name, f"{POSTERBOARD_DB_DOMAIN}/{POSTERBOARD_DB_PATH}"):
+    if include_posterboard and (
+            _path_match(device_name, f"{POSTERBOARD_DB_DOMAIN}/{POSTERBOARD_DB_PATH}")
+            or _path_match(device_name, POSTERBOARD_DB_PATH)):
         return True
     return False
 
@@ -360,28 +362,34 @@ class ProtectiveBackupService(Mobilebackup2Service):
     async def _add_posterboard_container(self, info: dict):
         """List only the PosterBoard container so its sqlite DB rides this backup.
 
-        The entry format backupd expects for a single container is not
-        documented; this mirrors the fields the stock factory info carries.
-        If the DB still ends up missing from the manifest, the apply flow
-        falls back to the legacy separate PosterBoard backup.
+        The entry mirrors what the stock factory info carries for an app
+        (ApplicationSINF / iTunesMetadata / PlaceholderIcon / Container) —
+        that format provably yields the PosterBoard DB in full backups.
         """
         try:
             from pymobiledevice3.services.installation_proxy import InstallationProxyService
+            from pymobiledevice3.services.springboard import SpringBoardServicesService
+            bundle_id = POSTERBOARD_DB_DOMAIN.removeprefix("AppDomain-")
             async with InstallationProxyService(lockdown=self.lockdown) as ip:
                 apps = await ip.get_apps(application_type="Any", calculate_sizes=False)
-            bundle_id = POSTERBOARD_DB_DOMAIN.removeprefix("AppDomain-")
             app_info = apps.get(bundle_id)
             if app_info is None:
                 log_warn("PosterBoard app not found via installation proxy; skipping container inclusion")
                 return
-            info["Installed Applications"] = [bundle_id]
-            info["Applications"] = {
-                bundle_id: {
-                    "Container": app_info["Container"],
-                    "CFBundleIdentifier": bundle_id,
-                    "CFBundleVersion": app_info.get("CFBundleVersion", "1.0"),
-                }
+            entry = {
+                "Container": app_info["Container"],
+                "CFBundleIdentifier": bundle_id,
+                "CFBundleVersion": app_info.get("CFBundleVersion", "1.0"),
+                "ApplicationSINF": app_info.get("ApplicationSINF", b""),
+                "iTunesMetadata": app_info.get("iTunesMetadata", {}),
             }
+            try:
+                async with SpringBoardServicesService(self.lockdown) as sbs:
+                    entry["PlaceholderIcon"] = await sbs.get_icon_pngdata(bundle_id)
+            except Exception:
+                entry["PlaceholderIcon"] = b""
+            info["Installed Applications"] = [bundle_id]
+            info["Applications"] = {bundle_id: entry}
             log_info(f"PosterBoard container included in protective backup: {app_info['Container']}")
         except Exception as e:
             log_warn(f"PosterBoard container inclusion failed: {e}")
@@ -636,6 +644,14 @@ def extract_posterboard_db(backup_root: str, udid: str, dest_path: str) -> Optio
         return None
     conn = sqlite3.connect(str(manifest_db))
     try:
+        pb_rows = conn.execute(
+            "SELECT relativePath FROM Files WHERE domain = ? ORDER BY relativePath",
+            (POSTERBOARD_DB_DOMAIN,),
+        ).fetchall()
+        if not pb_rows:
+            log_warn("Master manifest has NO PosterBoard rows — the device did not back up the container")
+        else:
+            log_info(f"Master manifest has {len(pb_rows)} PosterBoard rows, e.g. {[r[0] for r in pb_rows[:3]]}")
         row = conn.execute(
             "SELECT fileID FROM Files WHERE domain = ? AND relativePath = ?",
             (POSTERBOARD_DB_DOMAIN, POSTERBOARD_DB_PATH),
