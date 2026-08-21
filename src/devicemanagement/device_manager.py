@@ -248,7 +248,7 @@ class DeviceManager:
             self.current_device_index = 0
         else:
             self.data_singleton.current_device = self.devices[index]
-            if not self.devices[index].is_supported_by_fork():
+            if not is_supported_by_fork(self.devices[index].version):
                 # hard-block old versions (< 26.2): the device is listed so the
                 # user sees it, but every action is refused.
                 self.data_singleton.device_available = False
