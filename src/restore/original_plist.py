@@ -154,17 +154,8 @@ async def psysbackup(
     If backup_password is provided and the device has encryption enabled,
     it will be used to decrypt the backup manifest.
     """
-    def _is_device_locked_error(exc: Exception) -> bool:
-        msg = str(exc)
-        return "ErrorCode" in msg and ("208" in msg or "Device locked" in msg or "MBErrorDomain" in msg)
-
-    def _is_connection_error(exc: Exception) -> bool:
-        msg = str(exc).lower()
-        return isinstance(exc, (
-            ConnectionError,
-            OSError,
-            asyncio.TimeoutError,
-        )) or "connection" in msg or "incomplete" in msg or "terminated" in msg
+    from src.exceptions.device_errors import is_device_locked_error as _is_device_locked_error
+    from src.exceptions.device_errors import is_connection_error as _is_connection_error
 
     update_label("Backing up device to capture original plists...")
     max_retries = 3
