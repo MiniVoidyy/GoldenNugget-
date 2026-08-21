@@ -425,26 +425,39 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
             progress_callback(_scaled_callback(
                 progress_callback, _PHASE_BACKUP_END, _PHASE_TWEAK_END)(value))
 
-        try:
-            await perform_restore(
-                backup=back, reboot=True,
-                lockdown_client=lockdown_client,
-                progress_callback=_tracking_callback,
-            )
-            log_info(f"Phase 2: sparse restore completed cleanly "
-                     f"({sparse_progress['calls']} progress events)")
-        except (ConnectionTerminatedError, ssl.SSLEOFError,
-                ConnectionAbortedError, ConnectionResetError):
-            # A connection drop usually means the device rebooted right after
-            # applying — but an early drop (no progress at all) means the
-            # restore was rejected and NO security recovery will happen.
-            if sparse_progress["last"] is None:
-                log_error("Phase 2: connection dropped with ZERO restore progress — "
-                          "the sparse restore was likely REJECTED. Security state "
-                          "recovery will not trigger; tweaks are NOT applied.")
-            else:
-                log_info(f"Phase 2: Device rebooted during sparse restore "
-                         f"(expected; last progress {sparse_progress['last']:.1f}%)")
+        # The cache session finishes right before Phase 2 starts; on some
+        # devices backupd needs a moment before accepting another mobilebackup2
+        # client — a drop at 0% is that wedge, not a rejection. Cool down and
+        # retry once on a fresh connection.
+        max_sparse_attempts = 2
+        for sparse_attempt in range(max_sparse_attempts):
+            sparse_progress["last"] = None
+            sparse_progress["calls"] = 0
+            try:
+                await perform_restore(
+                    backup=back, reboot=True,
+                    lockdown_client=lockdown_client if sparse_attempt == 0 else None,
+                    progress_callback=_tracking_callback)
+                log_info(f"Phase 2: sparse restore completed cleanly "
+                         f"({sparse_progress['calls']} progress events)")
+                break
+            except (ConnectionTerminatedError, ssl.SSLEOFError,
+                    ConnectionAbortedError, ConnectionResetError):
+                if sparse_progress["last"] is None and sparse_attempt + 1 < max_sparse_attempts:
+                    log_warn("Phase 2: connection dropped at 0% right after the cache "
+                             "session — cooling down 25s and retrying once on a "
+                             "fresh connection")
+                    await asyncio.sleep(25)
+                    continue
+                if sparse_progress["last"] is None:
+                    log_error("Phase 2: connection dropped with ZERO restore progress "
+                              "on every attempt — the sparse restore was likely "
+                              "REJECTED. Security state recovery will not trigger; "
+                              "tweaks are NOT applied.")
+                else:
+                    log_info(f"Phase 2: Device rebooted during sparse restore "
+                             f"(expected; last progress {sparse_progress['last']:.1f}%)")
+                break
         progress_callback(_PHASE_TWEAK_END)
 
         # === Phase 3: reconnect + restore protective backup (60-100%) ===
