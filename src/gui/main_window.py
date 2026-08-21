@@ -265,7 +265,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.internalOptionsPageBtn.show()
             self.ui.daemonsPageBtn.show()
             self.ui.templatesPageBtn.show()
-            self.ui.passcodePageBtn.hide()
+            # passcode themes: legacy Nugget feature, being tested on iOS 27
+            self.ui.passcodePageBtn.show()
             self.ui.posterboardPageBtn.show()
             self.ui.tweaksPageBtn.show()
             
