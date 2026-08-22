@@ -38,7 +38,8 @@ class TweakSpec:
     kind: Kind = Kind.SWITCH
     min_value: int = 0         # NUMBER kind only
     max_value: int = 999       # NUMBER kind only
-    min_version: Optional[str] = None  # minimum iOS version for the tweak to make sense
+    min_version: Optional[str] = None
+    max_version: Optional[str] = None
     iphone_only: bool = False
     ipad_only: bool = False
     factory: Optional[Callable[[], object]] = None  # overrides BasicPlistTweak
@@ -73,7 +74,7 @@ GP = FileLocation.globalPreferences
 
 SPECS: tuple[TweakSpec, ...] = (
     # --- Liquid Glass ---
-    _t(TweakID.ForceSolariumFallback, Section.LIQUID_GLASS, "Force Solarium Fallback", GP, "SolariumForceFallback", min_version="26.0"),
+    _t(TweakID.ForceSolariumFallback, Section.LIQUID_GLASS, "Force Solarium Fallback", GP, "SolariumForceFallback", min_version="26.0", max_version="26.99"),
     _t(TweakID.IgnoreSolariumLinkedOnCheck, Section.LIQUID_GLASS, "Ignore Solarium Linked-On Check", GP, "com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck", min_version="26.0"),
     _t(TweakID.ForceSolariumIntelligence, Section.LIQUID_GLASS, "Force Solarium Intelligence", GP, "SolariumForceIntelligence", min_version="27.0"),
     _t(TweakID.ForceEnhancedSpeculars, Section.LIQUID_GLASS, "Force Enhanced Speculars", GP, "SolariumForceEnhancedSpeculars", min_version="27.0"),

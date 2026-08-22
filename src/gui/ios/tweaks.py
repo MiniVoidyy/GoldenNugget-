@@ -191,14 +191,18 @@ class IOSTweaksPage(QWidget):
         def is_compatible(tweak_id: TweakID) -> bool:
             return is_tweak_compatible(tweak_id, device_ver, is_iphone)
 
+        self.force_solarium_fallback_card = None
+
         # Helper to create a switch row for boolean tweaks
         def make_switch(tweak_id: TweakID, title: str):
             if tweak_id not in tweaks:
                 return
-            if not is_compatible(tweak_id):
-                return
             tweak = tweaks[tweak_id]
             card = IOSCard()
+            if tweak_id == TweakID.ForceSolariumFallback:
+                self.force_solarium_fallback_card = card
+            if not is_compatible(tweak_id):
+                card.hide()
             row_layout = QHBoxLayout(card)
             row_layout.setContentsMargins(0, 0, 0, 0)
             row_layout.setSpacing(12)
@@ -269,6 +273,10 @@ class IOSTweaksPage(QWidget):
                 renderers[spec.kind](spec)
 
         content_layout.addStretch()
+
+    def set_force_solarium_fallback_visible(self, visible: bool):
+        if self.force_solarium_fallback_card is not None:
+            self.force_solarium_fallback_card.setVisible(visible)
 
     def _show_text_input_dialog(self, tweak_id: TweakID, title: str, current: str, row: IOSSettingsRow):
         dialog = TextInputDialog(title, current, self)

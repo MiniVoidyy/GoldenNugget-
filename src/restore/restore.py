@@ -21,7 +21,7 @@ from .protective import (
 from pymobiledevice3.lockdown import LockdownClient, create_using_usbmux
 from pymobiledevice3.services.installation_proxy import InstallationProxyService
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
-from pymobiledevice3.exceptions import ConnectionTerminatedError, PyMobileDevice3Exception
+from pymobiledevice3.exceptions import ConnectionTerminatedError, PyMobileDevice3Exception, DeviceNotFoundError, PasswordRequiredError, NotPairedError, ConnectionFailedError
 
 from src.exceptions.nugget_exception import NuggetException
 
@@ -284,7 +284,7 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
 
     The progress_callback is already pre-scaled by the caller.
     """
-    max_retries = 12
+    max_retries = 18
     for attempt in range(1, max_retries + 1):
         try:
             async with Mobilebackup2Service(lc) as mb:
@@ -298,7 +298,8 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
                 )
             return
         except (PyMobileDevice3Exception, ConnectionTerminatedError,
-                ssl.SSLError, OSError) as e:
+                ssl.SSLError, OSError, DeviceNotFoundError, PasswordRequiredError, 
+                NotPairedError, ConnectionFailedError) as e:
             if attempt >= max_retries or not _is_transient_restore_error(e):
                 raise
             progress_callback(

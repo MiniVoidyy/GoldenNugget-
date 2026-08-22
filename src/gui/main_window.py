@@ -324,8 +324,14 @@ class MainWindow(QtWidgets.QMainWindow):
             # safe-state-recovery wipe, so the whole feature is hidden on iOS 27+.
             if device_ver >= Version("27.0"):
                 self.ui.statusBarPageBtn.hide()
+                self.ui.forceSolariumFallbackContent.hide()
+                if hasattr(self, "ios_tweaks"):
+                    self.ios_tweaks.set_force_solarium_fallback_visible(False)
             else:
                 self.ui.statusBarPageBtn.show()
+                self.ui.forceSolariumFallbackContent.show()
+                if hasattr(self, "ios_tweaks"):
+                    self.ios_tweaks.set_force_solarium_fallback_visible(True)
             # mirror the Status Bar gating in the iOS UI
             if hasattr(self, "ios_home"):
                 self.ios_home.set_statusbar_visible(device_ver < Version("27.0"))
