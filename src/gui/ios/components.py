@@ -138,26 +138,23 @@ class IOSSwitch(QPushButton):
         self.setChecked(checked)
         self.setFixedSize(51, 31)
         self.setCursor(Qt.PointingHandCursor)
-        self._update_style()
+        self._knob = QLabel(self)
+        self._knob.setFixedSize(27, 27)
+        self._knob.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._knob.setStyleSheet("background-color: #FFFFFF; border-radius: 13px; border: none;")
         self.toggled.connect(self._update_style)
+        self._update_style()
 
     def _update_style(self):
-        if self.isChecked():
-            self.setStyleSheet("""
-                QPushButton {
-                    background-color: #30D158;
-                    border-radius: 15px;
-                    border: none;
-                }
-            """)
-        else:
-            self.setStyleSheet("""
-                QPushButton {
-                    background-color: #3A3A3C;
-                    border-radius: 15px;
-                    border: none;
-                }
-            """)
+        checked = self.isChecked()
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {'#30D158' if checked else '#3A3A3C'};
+                border-radius: 15px;
+                border: none;
+            }}
+        """)
+        self._knob.move(22 if checked else 2, 2)
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
