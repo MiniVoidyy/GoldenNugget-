@@ -22,7 +22,13 @@ def is_tweak_compatible(tweak_id, device_version: str, is_iphone: bool) -> bool:
             if Version(device_version) < Version(spec.min_version):
                 return False
         except Exception:
-            pass  # unparsable version -> don't gate on it
+            pass
+    if device_version and spec.max_version:
+        try:
+            if Version(device_version) > Version(spec.max_version):
+                return False
+        except Exception:
+            pass
     if spec.ipad_only and is_iphone:
         return False
     if spec.iphone_only and not is_iphone:
