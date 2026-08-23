@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.gui.ios.components import (
-    IOSNavBar, IOSSectionHeader, IOSSwitch, IOSSettingsRow
+    IOSSectionHeader, IOSSwitch, IOSSettingsRow
 )
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.status_bar.status_setter import StatusBarItem
@@ -123,8 +123,6 @@ class IOSStatusBarPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        nav = IOSNavBar(QCoreApplication.translate("Nugget", "Status Bar"), )
-        layout.addWidget(nav)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)

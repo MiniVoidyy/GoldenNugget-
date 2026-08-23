@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QPixmap, QIcon
 
-from src.gui.ios.components import IOSNavBar, IOSCard, IOSPrimaryButton
+from src.gui.ios.components import IOSCard, IOSPrimaryButton
 from src.tweaks.tweaks import tweaks, TweakID
 
 
@@ -35,12 +35,7 @@ class IOSPosterboardPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Nav bar with add tendies button
-        nav = IOSNavBar(
-            QCoreApplication.translate("Nugget", "PosterBoard"),
-            right_action=(QCoreApplication.translate("Nugget", "+ Add Tendies"), self.show_add_tendies_dialog)
-        )
-        layout.addWidget(nav)
+        # the "+ Add Tendies" action lives in the shared header (main window)
 
         # Reset PosterBoard card — emergency exit for a misbehaving or
         # malformed PosterBoard database (see regression found in 8.3).

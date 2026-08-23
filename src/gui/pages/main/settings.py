@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QToolButton, QVBoxLayout, QWidget,
 )
 
+from src.gui.ios.theme_manager import ThemeManager
 from src.controllers.video_handler import set_ignore_frame_limit
 from src.controllers.preset_manager import PresetManager
 from src.gui.dialogs import AboutProgramDialog
@@ -257,9 +258,29 @@ class SettingsPage(Page):
 
         self.aboutBtn.clicked.connect(self.on_aboutBtn_clicked)
 
+        # iOS-style interface toggle
+        if hasattr(self.ui, 'themeToggleChk'):
+            self.ui.themeToggleChk.toggled.connect(self.on_themeToggleChk_toggled)
+        else:
+            self.ui.themeToggleChk = QCheckBox(self.ui.settingsPageContent)
+            self.ui.themeToggleChk.setObjectName("themeToggleChk")
+            self.ui.themeToggleChk.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.ui.themeToggleChk.setText(QCoreApplication.tr("iOS-style Interface (new UI)"))
+            theme_on = self.window.theme_manager.current_theme == ThemeManager.IOS
+            self.ui.themeToggleChk.setChecked(theme_on)
+            self.ui.themeToggleChk.toggled.connect(self.on_themeToggleChk_toggled)
+            layout.addWidget(self.ui.themeToggleChk)
+
         self.load_available_languages()
         self.ui.langDrp.activated.connect(self.on_langDrp_activated)
         self.refresh_presets()
+
+    def on_themeToggleChk_toggled(self, checked: bool):
+        if checked:
+            self.window.theme_manager.switch_to(ThemeManager.IOS)
+        else:
+            self.window.theme_manager.switch_to(ThemeManager.CLASSIC)
+        self.window.apply_theme(self.window.theme_manager.current_theme)
 
     def load_available_languages(self):
         for language in available_languages.keys():

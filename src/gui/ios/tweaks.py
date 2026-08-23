@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.gui.ios.components import (
-    IOSNavBar, IOSSectionHeader, IOSCard, IOSSettingsRow,
+    IOSSectionHeader, IOSCard, IOSSettingsRow,
     IOSSwitch
 )
 from src.gui.ios.compat import is_tweak_compatible
@@ -161,8 +161,6 @@ class IOSTweaksPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        nav = IOSNavBar(QCoreApplication.translate("Nugget", "tweaks"), )
-        layout.addWidget(nav)
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
