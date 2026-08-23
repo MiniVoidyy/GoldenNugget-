@@ -123,7 +123,7 @@ class IOSStatusBarPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        nav = IOSNavBar(QCoreApplication.translate("Nugget", "Status Bar"), window=self.window)
+        nav = IOSNavBar(QCoreApplication.translate("Nugget", "Status Bar"), )
         layout.addWidget(nav)
 
         scroll = QScrollArea()

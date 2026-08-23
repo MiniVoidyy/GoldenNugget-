@@ -27,7 +27,7 @@ class IOSSettingsPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        nav = IOSNavBar(QCoreApplication.translate("Nugget", "    Settings").strip(), window=self.window)
+        nav = IOSNavBar(QCoreApplication.translate("Nugget", "    Settings").strip(), )
         layout.addWidget(nav)
 
         scroll = QScrollArea()
@@ -651,7 +651,7 @@ class IOSSettingsPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        nav = IOSNavBar(QCoreApplication.translate("Nugget", "    Settings").strip(), window=self.window)
+        nav = IOSNavBar(QCoreApplication.translate("Nugget", "    Settings").strip(), )
         layout.addWidget(nav)
 
         scroll = QScrollArea()

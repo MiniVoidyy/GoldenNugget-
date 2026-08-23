@@ -161,7 +161,7 @@ class IOSTweaksPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        nav = IOSNavBar(QCoreApplication.translate("Nugget", "tweaks"), window=self.window)
+        nav = IOSNavBar(QCoreApplication.translate("Nugget", "tweaks"), )
         layout.addWidget(nav)
 
         scroll = QScrollArea(self)
