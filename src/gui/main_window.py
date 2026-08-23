@@ -137,17 +137,23 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.centralwidget.setParent(self._classic_parking)
         self.ui.homePage.setParent(None)
         self.ui.sidebar.setParent(None)
+        # the top device bar (phone icon + picker) comes back too
+        self.ui.deviceBar.setParent(None)
         self.content_stack = QtWidgets.QStackedWidget(self)
         self.content_stack.addWidget(self.ui.homePage)   # 0 = classic home
         self.content_stack.addWidget(ios_root)           # 1 = iOS pages
         shell = QtWidgets.QWidget(self)
         shell.setProperty("cls", "central")  # picks up the global #1e1e1e background
-        shell_layout = QtWidgets.QHBoxLayout(shell)
-        shell_layout.setContentsMargins(12, 12, 12, 12)
+        shell_layout = QtWidgets.QVBoxLayout(shell)
+        shell_layout.setContentsMargins(0, 0, 0, 0)
         shell_layout.setSpacing(0)
-        self.shell_layout = shell_layout
-        shell_layout.addWidget(self.ui.sidebar)
-        shell_layout.addWidget(self.content_stack)
+        shell_layout.addWidget(self.ui.deviceBar)
+        body_row = QtWidgets.QHBoxLayout()
+        body_row.setContentsMargins(0, 0, 0, 0)
+        body_row.setSpacing(0)
+        body_row.addWidget(self.ui.sidebar)
+        body_row.addWidget(self.content_stack, 1)
+        shell_layout.addLayout(body_row)
         self.setCentralWidget(shell)
         self.apply_theme(self.theme_manager.current_theme)
 
@@ -531,6 +537,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.theme_manager.save_theme(theme)
         is_ios = theme == ThemeManager.IOS
         self.ui.sidebar.setVisible(not is_ios)
+        self.ui.deviceBar.setVisible(not is_ios)
         if is_ios:
             # entering the new UI: land on its home unless already inside it
             if self.content_stack.currentIndex() != 1:
@@ -538,14 +545,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.ios_pages.setCurrentIndex(0)
             self._update_shared_nav(self.ios_pages.currentIndex())
         else:
-            # leaving the new UI: keep the current action page, the sidebar
-            # simply comes back next to it
-            self._update_shared_nav(self.ios_pages.currentIndex())
+            # classic UI never shows the shared header
+            self.ios_nav.setVisible(False)
             if self.ios_pages.currentIndex() == 0:
                 # the iOS home has no meaning inside the classic shell
                 self.show_home()
 
     def _update_shared_nav(self, index: int):
+        if self.theme_manager.current_theme == ThemeManager.CLASSIC:
+            self.ios_nav.setVisible(False)
+            return
         # the iOS home page is full-screen — no header at all
         self.ios_nav.setVisible(index != 0)
         if index == 0:
@@ -559,6 +568,23 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ios_nav.set_right_action(right[0], right[1])
         else:
             self.ios_nav.clear_right_action()
+
+    def _sync_sidebar_selection(self):
+        """Move the checked highlight of the sidebar to the active view."""
+        btns = (self.ui.homePageBtn, self.ui.tweaksPageBtn,
+                self.ui.posterboardPageBtn, self.ui.daemonsPageBtn,
+                self.ui.settingsPageBtn, self.ui.statusBarPageBtn)
+        idx = None
+        if self.theme_manager.current_theme == ThemeManager.CLASSIC:
+            if self.content_stack.currentIndex() == 0:
+                idx = 0
+        else:
+            idx = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: -1}.get(
+                self.ios_pages.currentIndex())
+        target = {None: btns[0], 0: btns[0], 1: btns[1], 2: btns[2],
+                  3: btns[3], 4: btns[4], -1: btns[5]}.get(idx)
+        for b in btns:
+            b.setChecked(b is target)
 
     def show_home(self):
         """Open the home page of the ACTIVE UI mode."""
@@ -604,6 +630,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 return False
             # classic shell: action pages back out straight to classic home
             self.content_stack.setCurrentIndex(0)
+            self._sync_sidebar_selection()
             return True
         return False
 
