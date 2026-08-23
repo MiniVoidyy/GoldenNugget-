@@ -62,7 +62,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.springboardOptionsPageBtn.hide()
         self.ui.internalOptionsPageBtn.hide()
         self.ui.daemonsPageBtn.hide()
-        self.ui.templatesPageBtn.hide()
         self.ui.passcodePageBtn.hide()
         self.ui.tweaksPageBtn.hide()
         self.ui.applyPageBtn.hide()
@@ -209,7 +208,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.liquidGlassPageBtn.clicked.connect(self.on_liquidGlassPageBtn_clicked)
         self.ui.daemonsPageBtn.clicked.connect(self.on_daemonsPageBtn_clicked)
         self.ui.posterboardPageBtn.clicked.connect(self.on_posterboardPageBtn_clicked)
-        self.ui.templatesPageBtn.clicked.connect(self.on_templatesPageBtn_clicked)
         self.ui.tweaksPageBtn.clicked.connect(self.on_tweaksPageBtn_clicked)
         self.ui.applyPageBtn.clicked.connect(self.on_applyPageBtn_clicked)
         self.ui.settingsPageBtn.clicked.connect(self.on_settingsPageBtn_clicked)
@@ -288,7 +286,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.springboardOptionsPageBtn.hide()
             self.ui.internalOptionsPageBtn.hide()
             self.ui.daemonsPageBtn.hide()
-            self.ui.templatesPageBtn.hide()
             self.ui.passcodePageBtn.hide()
             self.ui.posterboardPageBtn.hide()
             self.ui.tweaksPageBtn.hide()
@@ -315,7 +312,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.springboardOptionsPageBtn.show()
             self.ui.internalOptionsPageBtn.show()
             self.ui.daemonsPageBtn.show()
-            self.ui.templatesPageBtn.show()
             self.ui.passcodePageBtn.hide()
             self.ui.posterboardPageBtn.show()
             self.ui.tweaksPageBtn.show()
@@ -656,9 +652,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_posterboardPageBtn_clicked(self):
         self.show_ios_page(2)
 
-    def on_templatesPageBtn_clicked(self):
-        self.show_ios_page(2)
-
     def on_tweaksPageBtn_clicked(self):
         self.show_ios_page(1)
 
@@ -743,7 +736,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.springboardOptionsPageBtn.hide()
             self.ui.internalOptionsPageBtn.hide()
             self.ui.daemonsPageBtn.hide()
-            self.ui.templatesPageBtn.hide()
             self.ui.passcodePageBtn.hide()
             self.ui.posterboardPageBtn.hide()
             self.ui.tweaksPageBtn.hide()
@@ -770,7 +762,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.springboardOptionsPageBtn.show()
             self.ui.internalOptionsPageBtn.show()
             self.ui.daemonsPageBtn.show()
-            self.ui.templatesPageBtn.show()
             self.ui.passcodePageBtn.hide()
             self.ui.posterboardPageBtn.show()
             self.ui.tweaksPageBtn.show()
