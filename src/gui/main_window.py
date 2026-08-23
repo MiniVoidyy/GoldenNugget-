@@ -522,22 +522,28 @@ class MainWindow(QtWidgets.QMainWindow):
     
     ## SIDE BAR FUNCTIONS
     def apply_theme(self, theme: int):
-        """Apply the UI mode.
+        """Apply the UI mode WITHOUT navigating away.
 
         CLASSIC: sidebar + classic home; iOS-style pages open as actions.
-        IOS: full-screen iOS UI starting at its own home page, with the
-        shared header providing back navigation.
+        IOS: full-screen iOS UI with the shared header providing back
+        navigation. Only the chrome changes — the current page stays put.
         """
         self.theme_manager.save_theme(theme)
         is_ios = theme == ThemeManager.IOS
         self.ui.sidebar.setVisible(not is_ios)
         if is_ios:
-            self.content_stack.setCurrentIndex(1)
-            self.ios_pages.setCurrentIndex(0)
-            self._update_shared_nav(0)
+            # entering the new UI: land on its home unless already inside it
+            if self.content_stack.currentIndex() != 1:
+                self.content_stack.setCurrentIndex(1)
+                self.ios_pages.setCurrentIndex(0)
+            self._update_shared_nav(self.ios_pages.currentIndex())
         else:
-            self.content_stack.setCurrentIndex(0)
-            self.ui.homePageBtn.setChecked(True)
+            # leaving the new UI: keep the current action page, the sidebar
+            # simply comes back next to it
+            self._update_shared_nav(self.ios_pages.currentIndex())
+            if self.ios_pages.currentIndex() == 0:
+                # the iOS home has no meaning inside the classic shell
+                self.show_home()
 
     def _update_shared_nav(self, index: int):
         # the iOS home page is full-screen — no header at all
