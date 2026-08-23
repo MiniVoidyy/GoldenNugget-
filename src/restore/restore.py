@@ -226,15 +226,23 @@ async def _wait_for_device(udid: str, progress_callback,
 
     Polls usbmux with capped exponential backoff. Fully async — the caller's
     event loop (and the GUI) stays responsive for the whole wait.
+
+    The pairing record SURVIVES the wipe (verified: SideStore keeps working),
+    so the connect runs WITHOUT autopair — forcing a re-pair crashes with
+    MissingValueError while the device is still finishing recovery and has
+    no DevicePublicKey to give. If the host turns out to be unpaired after
+    a short grace period, one autopair fallback is attempted.
     """
     from pymobiledevice3.exceptions import (
         DeviceNotFoundError, PasswordRequiredError, NotPairedError,
-        ConnectionFailedError, ConnectionTerminatedError,
+        ConnectionFailedError, ConnectionTerminatedError, LockdownError,
+        MissingValueError,
     )
     start = time.monotonic()
     deadline = start + timeout
     delay = 5.0
     last_error = None
+    autopair_tried = False
     while True:
         elapsed = int(time.monotonic() - start)
         progress_callback(
@@ -242,11 +250,23 @@ async def _wait_for_device(udid: str, progress_callback,
             f"({elapsed // 60}:{elapsed % 60:02d} elapsed)..."
         )
         try:
-            return await create_using_usbmux(serial=udid, autopair=True)
-        except (DeviceNotFoundError, PasswordRequiredError, NotPairedError,
+            return await create_using_usbmux(serial=udid, autopair=False)
+        except NotPairedError as e:
+            # pairing genuinely lost — try a full re-pair once, after giving
+            # the device time to finish recovery
+            last_error = e
+            if not autopair_tried and time.monotonic() - start >= 30:
+                autopair_tried = True
+                try:
+                    return await create_using_usbmux(serial=udid, autopair=True)
+                except (MissingValueError, LockdownError) as e2:
+                    last_error = e2
+        except (DeviceNotFoundError, PasswordRequiredError,
                 ConnectionFailedError, ConnectionTerminatedError,
-                ConnectionError, OSError,
-                asyncio.TimeoutError) as e:
+                ConnectionError, OSError, asyncio.TimeoutError,
+                LockdownError) as e:
+            # LockdownError covers MissingValueError and every other
+            # lockdown-level complaint the recovering device may emit
             last_error = e
         if time.monotonic() + delay > deadline:
             break
