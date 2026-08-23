@@ -1,6 +1,7 @@
 from PySide6.QtCore import Qt, QCoreApplication, Signal as pyqtSignal
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QLabel, QPushButton, QFrame,
+    QSizePolicy,
 )
 
 
@@ -32,20 +33,28 @@ class IOSNavBar(QWidget):
 
     One shared instance lives in the main window and is reconfigured per
     page (title / back visibility / right action) instead of every page
-    building its own.
+    building its own. Safe to reconfigure any number of times — the layout
+    structure is built once and only contents/visibility change.
     """
-    def __init__(self, title: str, on_back=None, right_action=None, window=None, parent=None):
+    def __init__(self, title: str = "", on_back=None, right_action=None,
+                 window=None, parent=None):
         super().__init__(parent)
         self.setObjectName("iosNavBar")
         self.setFixedHeight(56)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding,
+                           QSizePolicy.Policy.Fixed)
         self.setStyleSheet("background-color: #1C1C1E; border-bottom: 1px solid #3A3A3C;")
-        self.window = window
         self._on_back = on_back or (window._go_back if hasattr(window, "_go_back") else None)
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 8, 16, 8)
+        layout.setSpacing(0)
 
-        # back button is always created; visibility is controlled by the
-        # owner via set_back_visible()
+        # left padding keeps the title centered when the back button hides
+        self._left_pad = QWidget(self)
+        self._left_pad.setFixedWidth(90)
+        layout.addWidget(self._left_pad)
+
         self.back_btn = QPushButton(QCoreApplication.translate("Nugget", "←  Back"), self)
         self.back_btn.setCursor(Qt.PointingHandCursor)
         self.back_btn.setStyleSheet("""
@@ -67,25 +76,25 @@ class IOSNavBar(QWidget):
         self.title_lbl.setStyleSheet("font-size: 17px; font-weight: 600; color: #FFFFFF;")
         layout.addWidget(self.title_lbl, 1)
 
-        self._right_widget = None
-        if right_action:
-            label_text, callback = right_action
-            self.set_right_action(label_text, callback)
-        else:
-            layout.addSpacing(60)
+        # persistent right slot; contents are swapped per page
+        self._right_box = QWidget(self)
+        self._right_layout = QHBoxLayout(self._right_box)
+        self._right_layout.setContentsMargins(0, 0, 0, 0)
+        self._right_layout.setSpacing(0)
+        layout.addWidget(self._right_box)
+        self._right_btn = None
+        self._left_pad.setVisible(False)
 
     def set_title(self, title: str):
         self.title_lbl.setText(title)
 
     def set_back_visible(self, visible: bool):
         self.back_btn.setVisible(visible)
+        # pad only when there is no button, so the title stays centered
+        self._left_pad.setVisible(not visible)
 
     def set_right_action(self, label_text: str, callback):
-        layout = self.layout()
-        if self._right_widget is not None:
-            layout.removeWidget(self._right_widget)
-            self._right_widget.deleteLater()
-            self._right_widget = None
+        self._clear_right()
         btn = QPushButton(label_text, self)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setStyleSheet("""
@@ -100,18 +109,20 @@ class IOSNavBar(QWidget):
             QPushButton:hover { color: #0066CC; }
         """)
         btn.clicked.connect(callback)
-        layout.addWidget(btn)
-        self._right_widget = btn
+        self._right_layout.addWidget(btn)
+        self._right_btn = btn
 
     def clear_right_action(self):
-        layout = self.layout()
-        if self._right_widget is not None:
-            layout.removeWidget(self._right_widget)
-            self._right_widget.deleteLater()
-            self._right_widget = None
-            layout.addSpacing(60)
-        else:
-            layout.addSpacing(60)
+        self._clear_right()
+
+    def _clear_right(self):
+        if self._right_btn is not None:
+            self._right_layout.removeWidget(self._right_btn)
+            # detach immediately: deleteLater alone may outlive the caller's
+            # processEvents pass, leaving a phantom button on screen
+            self._right_btn.setParent(None)
+            self._right_btn.deleteLater()
+            self._right_btn = None
 
     def _handle_back(self):
         if self._on_back:
