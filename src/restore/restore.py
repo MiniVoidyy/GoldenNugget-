@@ -13,6 +13,7 @@ from .protective import (
     clean_backup_for_restore,
     inject_file_into_backup,
     log_error,
+    log_warn,
     log_info,
     make_protective_working_copy,
     perform_protective_backup,
