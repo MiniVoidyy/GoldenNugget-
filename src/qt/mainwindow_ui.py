@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (QAbstractScrollArea, QApplication, QCheckBox, QCo
     QMainWindow, QProgressBar, QRadioButton, QScrollArea,
     QSizePolicy, QSlider, QSpacerItem, QStackedWidget,
     QToolButton, QVBoxLayout, QWidget)
-import resources_rc
+from . import resources_rc
 
 class Ui_Nugget(object):
     def setupUi(self, Nugget):
@@ -392,31 +392,15 @@ class Ui_Nugget(object):
 
         self.verticalLayout.addWidget(self.statusBarPageBtn)
 
-        self.templatesPageBtn = QToolButton(self.sidebar)
-        self.templatesPageBtn.setObjectName(u"templatesPageBtn")
-        self.templatesPageBtn.setEnabled(True)
-        sizePolicy2.setHeightForWidth(self.templatesPageBtn.sizePolicy().hasHeightForWidth())
-        self.templatesPageBtn.setSizePolicy(sizePolicy2)
-        self.templatesPageBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        icon7 = QIcon()
-        icon7.addFile(u":/icon/pencil.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.templatesPageBtn.setIcon(icon7)
-        self.templatesPageBtn.setCheckable(True)
-        self.templatesPageBtn.setAutoExclusive(True)
-        self.templatesPageBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-        self.templatesPageBtn.setProperty(u"cls", u"sidebarBtn")
-
-        self.verticalLayout.addWidget(self.templatesPageBtn)
-
         self.passcodePageBtn = QToolButton(self.sidebar)
         self.passcodePageBtn.setObjectName(u"passcodePageBtn")
         self.passcodePageBtn.setEnabled(True)
         sizePolicy2.setHeightForWidth(self.passcodePageBtn.sizePolicy().hasHeightForWidth())
         self.passcodePageBtn.setSizePolicy(sizePolicy2)
         self.passcodePageBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        icon8 = QIcon()
-        icon8.addFile(u":/icon/lock.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.passcodePageBtn.setIcon(icon8)
+        icon7 = QIcon()
+        icon7.addFile(u":/icon/lock.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.passcodePageBtn.setIcon(icon7)
         self.passcodePageBtn.setCheckable(True)
         self.passcodePageBtn.setAutoExclusive(True)
         self.passcodePageBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
@@ -429,9 +413,9 @@ class Ui_Nugget(object):
         sizePolicy2.setHeightForWidth(self.tweaksPageBtn.sizePolicy().hasHeightForWidth())
         self.tweaksPageBtn.setSizePolicy(sizePolicy2)
         self.tweaksPageBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        icon9 = QIcon()
-        icon9.addFile(u":/icon/ellipsis.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.tweaksPageBtn.setIcon(icon9)
+        icon8 = QIcon()
+        icon8.addFile(u":/icon/ellipsis.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.tweaksPageBtn.setIcon(icon8)
         self.tweaksPageBtn.setCheckable(True)
         self.tweaksPageBtn.setAutoExclusive(True)
         self.tweaksPageBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
@@ -454,9 +438,9 @@ class Ui_Nugget(object):
         sizePolicy2.setHeightForWidth(self.applyPageBtn.sizePolicy().hasHeightForWidth())
         self.applyPageBtn.setSizePolicy(sizePolicy2)
         self.applyPageBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        icon10 = QIcon()
-        icon10.addFile(u":/icon/check-circle.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.applyPageBtn.setIcon(icon10)
+        icon9 = QIcon()
+        icon9.addFile(u":/icon/check-circle.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.applyPageBtn.setIcon(icon9)
         self.applyPageBtn.setCheckable(True)
         self.applyPageBtn.setAutoExclusive(True)
         self.applyPageBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
@@ -469,9 +453,9 @@ class Ui_Nugget(object):
         sizePolicy2.setHeightForWidth(self.settingsPageBtn.sizePolicy().hasHeightForWidth())
         self.settingsPageBtn.setSizePolicy(sizePolicy2)
         self.settingsPageBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        icon11 = QIcon()
-        icon11.addFile(u":/icon/gear.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.settingsPageBtn.setIcon(icon11)
+        icon10 = QIcon()
+        icon10.addFile(u":/icon/gear.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.settingsPageBtn.setIcon(icon10)
         self.settingsPageBtn.setCheckable(True)
         self.settingsPageBtn.setAutoExclusive(True)
         self.settingsPageBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
@@ -587,9 +571,9 @@ class Ui_Nugget(object):
 "	background-color: transparent;\n"
 "	padding: 0px;\n"
 "}")
-        icon12 = QIcon()
-        icon12.addFile(u":/credits/big_nugget.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.bigNuggetBtn.setIcon(icon12)
+        icon11 = QIcon()
+        icon11.addFile(u":/credits/big_nugget.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.bigNuggetBtn.setIcon(icon11)
         self.bigNuggetBtn.setIconSize(QSize(150, 200))
 
         self.horizontalLayout_27.addWidget(self.bigNuggetBtn)
@@ -626,9 +610,9 @@ class Ui_Nugget(object):
         self.starOnGithubBtn = QToolButton(self.verticalWidget_16)
         self.starOnGithubBtn.setObjectName(u"starOnGithubBtn")
         self.starOnGithubBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        icon13 = QIcon()
-        icon13.addFile(u":/icon/star.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.starOnGithubBtn.setIcon(icon13)
+        icon12 = QIcon()
+        icon12.addFile(u":/icon/star.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.starOnGithubBtn.setIcon(icon12)
         self.starOnGithubBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         self.horizontalLayout_8.addWidget(self.starOnGithubBtn)
@@ -670,9 +654,9 @@ class Ui_Nugget(object):
         self.mainDevBtn.setStyleSheet(u"QToolButton {\n"
 "	background: none;\n"
 "}")
-        icon14 = QIcon()
-        icon14.addFile(u":/icon/github.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.mainDevBtn.setIcon(icon14)
+        icon13 = QIcon()
+        icon13.addFile(u":/icon/github.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.mainDevBtn.setIcon(icon13)
         self.mainDevBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         self.horizontalLayout_6.addWidget(self.mainDevBtn)
@@ -726,9 +710,9 @@ class Ui_Nugget(object):
         self.leminBtn.setStyleSheet(u"QToolButton {\n"
 "	background: none;\n"
 "}")
-        icon15 = QIcon()
-        icon15.addFile(u":/credits/LeminLimez.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.leminBtn.setIcon(icon15)
+        icon14 = QIcon()
+        icon14.addFile(u":/credits/LeminLimez.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.leminBtn.setIcon(icon14)
         self.leminBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         self.horizontalLayout_86.addWidget(self.leminBtn)
@@ -747,9 +731,9 @@ class Ui_Nugget(object):
 "    background-color: #535353;\n"
 "    color: #FFFFFF;\n"
 "}")
-        icon16 = QIcon()
-        icon16.addFile(u":/icon/twitter.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.leminTwitterBtn.setIcon(icon16)
+        icon15 = QIcon()
+        icon15.addFile(u":/icon/twitter.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.leminTwitterBtn.setIcon(icon15)
 
         self.horizontalLayout_86.addWidget(self.leminTwitterBtn)
 
@@ -767,7 +751,7 @@ class Ui_Nugget(object):
 "    background-color: #535353;\n"
 "    color: #FFFFFF;\n"
 "}")
-        self.leminGithubBtn.setIcon(icon14)
+        self.leminGithubBtn.setIcon(icon13)
 
         self.horizontalLayout_86.addWidget(self.leminGithubBtn)
 
@@ -786,9 +770,9 @@ class Ui_Nugget(object):
 "    background-color: #535353;\n"
 "    color: #FFFFFF;\n"
 "}")
-        icon17 = QIcon()
-        icon17.addFile(u":/icon/currency-dollar.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.leminKoFiBtn.setIcon(icon17)
+        icon16 = QIcon()
+        icon16.addFile(u":/icon/currency-dollar.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.leminKoFiBtn.setIcon(icon16)
 
         self.horizontalLayout_86.addWidget(self.leminKoFiBtn)
 
@@ -916,7 +900,7 @@ class Ui_Nugget(object):
 "    background-color: #535353;\n"
 "    color: #FFFFFF;\n"
 "}")
-        self.wind0ws11AeroBtn.setIcon(icon14)
+        self.wind0ws11AeroBtn.setIcon(icon13)
         self.wind0ws11AeroBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         self.horizontalLayout_2.addWidget(self.wind0ws11AeroBtn)
@@ -1394,9 +1378,9 @@ class Ui_Nugget(object):
         self.addGestaltKeyBtn.setObjectName(u"addGestaltKeyBtn")
         self.addGestaltKeyBtn.setEnabled(True)
         self.addGestaltKeyBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        icon18 = QIcon()
-        icon18.addFile(u":/icon/plus.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.addGestaltKeyBtn.setIcon(icon18)
+        icon17 = QIcon()
+        icon17.addFile(u":/icon/plus.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.addGestaltKeyBtn.setIcon(icon17)
         self.addGestaltKeyBtn.setCheckable(False)
         self.addGestaltKeyBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
@@ -2888,9 +2872,9 @@ class Ui_Nugget(object):
 "	padding-right: 5px;\n"
 "	border-radius: 0px;\n"
 "}")
-        icon19 = QIcon()
-        icon19.addFile(u":/icon/app-indicator.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.toolButton_7.setIcon(icon19)
+        icon18 = QIcon()
+        icon18.addFile(u":/icon/app-indicator.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.toolButton_7.setIcon(icon18)
 
         self.horizontalLayout_13.addWidget(self.toolButton_7)
 
@@ -3333,9 +3317,9 @@ class Ui_Nugget(object):
 "	padding-right: 5px;\n"
 "	border-radius: 0px;\n"
 "}")
-        icon20 = QIcon()
-        icon20.addFile(u":/icon/hdd.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.toolButton_10.setIcon(icon20)
+        icon19 = QIcon()
+        icon19.addFile(u":/icon/hdd.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.toolButton_10.setIcon(icon19)
 
         self.horizontalLayout_20.addWidget(self.toolButton_10)
 
@@ -3881,9 +3865,9 @@ class Ui_Nugget(object):
 "	padding-right: 5px;\n"
 "	border-radius: 0px;\n"
 "}")
-        icon21 = QIcon()
-        icon21.addFile(u":/icon/liquid-glass.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.toolButton_101.setIcon(icon21)
+        icon20 = QIcon()
+        icon20.addFile(u":/icon/liquid-glass.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.toolButton_101.setIcon(icon20)
 
         self.horizontalLayout_201.addWidget(self.toolButton_101)
 
@@ -4297,9 +4281,9 @@ class Ui_Nugget(object):
 "	padding-right: 5px;\n"
 "	border-radius: 0px;\n"
 "}")
-        icon22 = QIcon()
-        icon22.addFile(u":/icon/toggles.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.toolButton_102.setIcon(icon22)
+        icon21 = QIcon()
+        icon21.addFile(u":/icon/toggles.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.toolButton_102.setIcon(icon21)
 
         self.horizontalLayout_202.addWidget(self.toolButton_102)
 
@@ -4562,9 +4546,9 @@ class Ui_Nugget(object):
         self.findPBBtn = QToolButton(self.horizontalWidget_7)
         self.findPBBtn.setObjectName(u"findPBBtn")
         self.findPBBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        icon23 = QIcon()
-        icon23.addFile(u":/icon/globe.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.findPBBtn.setIcon(icon23)
+        icon22 = QIcon()
+        icon22.addFile(u":/icon/globe.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.findPBBtn.setIcon(icon22)
         self.findPBBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         self.horizontalLayout_203.addWidget(self.findPBBtn)
@@ -4573,9 +4557,9 @@ class Ui_Nugget(object):
         self.pbHelpBtn.setObjectName(u"pbHelpBtn")
         self.pbHelpBtn.setMinimumSize(QSize(35, 35))
         self.pbHelpBtn.setMaximumSize(QSize(35, 35))
-        icon24 = QIcon()
-        icon24.addFile(u":/icon/questionmark.circle.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.pbHelpBtn.setIcon(icon24)
+        icon23 = QIcon()
+        icon23.addFile(u":/icon/questionmark.circle.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.pbHelpBtn.setIcon(icon23)
         self.pbHelpBtn.setIconSize(QSize(20, 20))
 
         self.horizontalLayout_203.addWidget(self.pbHelpBtn)
@@ -4598,7 +4582,7 @@ class Ui_Nugget(object):
         self.horizontalLayout_14.setContentsMargins(-1, 0, -1, 0)
         self.pbSetupPageBtn = QToolButton(self.pbPagePicker)
         self.pbSetupPageBtn.setObjectName(u"pbSetupPageBtn")
-        self.pbSetupPageBtn.setIcon(icon11)
+        self.pbSetupPageBtn.setIcon(icon10)
         self.pbSetupPageBtn.setCheckable(True)
         self.pbSetupPageBtn.setChecked(True)
         self.pbSetupPageBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
@@ -4614,9 +4598,9 @@ class Ui_Nugget(object):
         self.tendiesPageBtn.setSizePolicy(sizePolicy7)
         self.tendiesPageBtn.setMinimumSize(QSize(0, 25))
         self.tendiesPageBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        icon25 = QIcon()
-        icon25.addFile(u":/icon/file-earmark-zip.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.tendiesPageBtn.setIcon(icon25)
+        icon24 = QIcon()
+        icon24.addFile(u":/icon/file-earmark-zip.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.tendiesPageBtn.setIcon(icon24)
         self.tendiesPageBtn.setCheckable(True)
         self.tendiesPageBtn.setChecked(False)
         self.tendiesPageBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
@@ -4626,7 +4610,9 @@ class Ui_Nugget(object):
         self.templatePageBtn = QToolButton(self.pbPagePicker)
         self.templatePageBtn.setObjectName(u"templatePageBtn")
         self.templatePageBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.templatePageBtn.setIcon(icon7)
+        icon25 = QIcon()
+        icon25.addFile(u":/icon/pencil.svg", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.templatePageBtn.setIcon(icon25)
         self.templatePageBtn.setCheckable(True)
         self.templatePageBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
@@ -5050,7 +5036,7 @@ class Ui_Nugget(object):
 "	padding-right: 5px;\n"
 "	border-radius: 0px;\n"
 "}")
-        self.toolButton_104.setIcon(icon7)
+        self.toolButton_104.setIcon(icon25)
 
         self.horizontalLayout_204.addWidget(self.toolButton_104)
 
@@ -5156,7 +5142,7 @@ class Ui_Nugget(object):
 "	padding-right: 5px;\n"
 "	border-radius: 0px;\n"
 "}")
-        self.toolButton_105.setIcon(icon8)
+        self.toolButton_105.setIcon(icon7)
 
         self.horizontalLayout_205.addWidget(self.toolButton_105)
 
@@ -5187,7 +5173,7 @@ class Ui_Nugget(object):
         self.discoverPassthmBtn = QToolButton(self.horizontalWidget_19)
         self.discoverPassthmBtn.setObjectName(u"discoverPassthmBtn")
         self.discoverPassthmBtn.setText(u"   Discover Themes")
-        self.discoverPassthmBtn.setIcon(icon23)
+        self.discoverPassthmBtn.setIcon(icon22)
         self.discoverPassthmBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         self.horizontalLayout_205.addWidget(self.discoverPassthmBtn)
@@ -5315,7 +5301,7 @@ class Ui_Nugget(object):
 "	padding-right: 5px;\n"
 "	border-radius: 0px;\n"
 "}")
-        self.toolButton_106.setIcon(icon13)
+        self.toolButton_106.setIcon(icon12)
 
         self.horizontalLayout_206.addWidget(self.toolButton_106)
 
@@ -5516,7 +5502,7 @@ class Ui_Nugget(object):
 "    padding-right: 5px;\n"
 "    border-radius: 0px;\n"
 "}")
-        self.toolButton_18.setIcon(icon9)
+        self.toolButton_18.setIcon(icon8)
 
         self.horizontalLayout_33.addWidget(self.toolButton_18)
 
@@ -5588,7 +5574,7 @@ class Ui_Nugget(object):
         self.springboardOptionsPageBtn.setSizePolicy(sizePolicy)
         self.springboardOptionsPageBtn.setMinimumSize(QSize(116, 96))
         self.springboardOptionsPageBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.springboardOptionsPageBtn.setIcon(icon19)
+        self.springboardOptionsPageBtn.setIcon(icon18)
         self.springboardOptionsPageBtn.setIconSize(QSize(36, 36))
         self.springboardOptionsPageBtn.setCheckable(False)
         self.springboardOptionsPageBtn.setAutoExclusive(False)
@@ -5603,7 +5589,7 @@ class Ui_Nugget(object):
         sizePolicy.setHeightForWidth(self.daemonsPageBtn.sizePolicy().hasHeightForWidth())
         self.daemonsPageBtn.setSizePolicy(sizePolicy)
         self.daemonsPageBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.daemonsPageBtn.setIcon(icon22)
+        self.daemonsPageBtn.setIcon(icon21)
         self.daemonsPageBtn.setCheckable(False)
         self.daemonsPageBtn.setAutoExclusive(False)
         self.daemonsPageBtn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
@@ -5616,7 +5602,7 @@ class Ui_Nugget(object):
         sizePolicy.setHeightForWidth(self.internalOptionsPageBtn.sizePolicy().hasHeightForWidth())
         self.internalOptionsPageBtn.setSizePolicy(sizePolicy)
         self.internalOptionsPageBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.internalOptionsPageBtn.setIcon(icon20)
+        self.internalOptionsPageBtn.setIcon(icon19)
         self.internalOptionsPageBtn.setCheckable(False)
         self.internalOptionsPageBtn.setAutoExclusive(False)
         self.internalOptionsPageBtn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
@@ -5627,7 +5613,7 @@ class Ui_Nugget(object):
         self.liquidGlassPageBtn = QToolButton(self.gridOptions_2)
         self.liquidGlassPageBtn.setObjectName(u"liquidGlassPageBtn")
         self.liquidGlassPageBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.liquidGlassPageBtn.setIcon(icon21)
+        self.liquidGlassPageBtn.setIcon(icon20)
         self.liquidGlassPageBtn.setCheckable(False)
         self.liquidGlassPageBtn.setAutoExclusive(False)
         self.liquidGlassPageBtn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
@@ -5672,7 +5658,7 @@ class Ui_Nugget(object):
 "	padding-right: 5px;\n"
 "	border-radius: 0px;\n"
 "}")
-        self.toolButton_181.setIcon(icon10)
+        self.toolButton_181.setIcon(icon9)
 
         self.horizontalLayout_331.addWidget(self.toolButton_181)
 
@@ -5754,7 +5740,7 @@ class Ui_Nugget(object):
         self.applyTweaksBtn = QToolButton(self.horizontalWidget_8)
         self.applyTweaksBtn.setObjectName(u"applyTweaksBtn")
         self.applyTweaksBtn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.applyTweaksBtn.setIcon(icon10)
+        self.applyTweaksBtn.setIcon(icon9)
         self.applyTweaksBtn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         self.horizontalLayout_17.addWidget(self.applyTweaksBtn)
@@ -5836,7 +5822,7 @@ class Ui_Nugget(object):
 "	padding-right: 5px;\n"
 "	border-radius: 0px;\n"
 "}")
-        self.toolButton_71.setIcon(icon11)
+        self.toolButton_71.setIcon(icon10)
 
         self.horizontalLayout_131.addWidget(self.toolButton_71)
 
@@ -6101,7 +6087,6 @@ class Ui_Nugget(object):
         self.gestaltPageBtn.setText(QCoreApplication.translate("Nugget", u"     Mobile Gestalt", None))
         self.euEnablerPageBtn.setText(QCoreApplication.translate("Nugget", u"    Eligibility", None))
         self.statusBarPageBtn.setText(QCoreApplication.translate("Nugget", u"    Status Bar", None))
-        self.templatesPageBtn.setText(QCoreApplication.translate("Nugget", u"    Templates", None))
         self.passcodePageBtn.setText(QCoreApplication.translate("Nugget", u"    Passcode Themes", None))
         self.tweaksPageBtn.setText(QCoreApplication.translate("Nugget", u"    Tweaks", None))
         self.applyPageBtn.setText(QCoreApplication.translate("Nugget", u"    Apply", None))
