@@ -591,16 +591,20 @@ class MainWindow(QtWidgets.QMainWindow):
         return super().eventFilter(obj, event)
 
     def _go_back(self) -> bool:
-        """Navigate back: iOS subpage -> iOS home; in classic mode also to
-        the classic home page."""
+        """Navigate back.
+
+        IOS mode: subpage -> iOS home (stay there).
+        CLASSIC mode: any action page backs out to the classic home.
+        """
         if self.content_stack.currentIndex() == 1:
-            if self.ios_pages.currentIndex() != 0:
-                self.ios_pages.setCurrentIndex(0)
-                return True
-            if self.theme_manager.current_theme == ThemeManager.CLASSIC:
-                self.content_stack.setCurrentIndex(0)
-                return True
-            return False
+            if self.theme_manager.current_theme == ThemeManager.IOS:
+                if self.ios_pages.currentIndex() != 0:
+                    self.ios_pages.setCurrentIndex(0)
+                    return True
+                return False
+            # classic shell: action pages back out straight to classic home
+            self.content_stack.setCurrentIndex(0)
+            return True
         return False
 
     def on_homePageBtn_clicked(self):
@@ -966,16 +970,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 QtCore.Qt.MouseButton.BackButton, QtCore.Qt.MouseButton.ExtraButton1):
             return self._go_back()
         return super().eventFilter(obj, event)
-
-    def _go_back(self) -> bool:
-        """Navigate back: iOS subpage -> iOS home -> classic home."""
-        if self.content_stack.currentIndex() == 1:
-            if self.ios_pages.currentIndex() != 0:
-                self.ios_pages.setCurrentIndex(0)
-                return True
-            self.content_stack.setCurrentIndex(0)
-            return True
-        return False
 
     ## APPLY PAGE
 
