@@ -35,11 +35,11 @@ async def perform_restore(backup: backup.Backup, reboot: bool = False, lockdown_
             if own_lockdown:
                 lockdown_client = await create_using_usbmux()
             async with Mobilebackup2Service(lockdown_client) as mb:
-                # skip_apps=False: required for AppDomain-* domains (PosterBoard).
-                # When True, the device-side restore daemon skips restoring
-                # data for every app in Manifest.plist's Applications dict.
                 # PosterBoard (the only tweak using AppDomain-*) must be
-                # registered there to avoid MBErrorDomain/205.
+                # registered in Manifest.plist's Applications dict to avoid
+                # MBErrorDomain/205. skip_apps only governs the post-restore
+                # app re-installation step — AppDomain data is restored
+                # either way (verified on iOS 27 beta 6).
                 # Note: may trigger an iOS passcode prompt — unlock the
                 # device to proceed.
                 await mb.restore(backup_dir, system=True, reboot=False, copy=False, source=".", progress_callback=progress_callback, skip_apps=False)
