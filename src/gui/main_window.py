@@ -27,6 +27,7 @@ from src.gui.ios.home import IOSHomePage
 from src.gui.ios.tweaks import IOSTweaksPage
 from src.gui.ios.posterboard import IOSPosterboardPage
 from src.gui.ios.daemons import IOSDaemonsPage
+from src.gui.ios.apply import IOSApplyPage
 from src.gui.ios.settings import IOSSettingsPage
 from src.gui.ios.statusbar import IOSStatusBarPage
 
@@ -95,12 +96,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ios_daemons = IOSDaemonsPage(self)
         self.ios_settings = IOSSettingsPage(self)
         self.ios_statusbar = IOSStatusBarPage(self)
+        self.ios_apply = IOSApplyPage(self)
         self.ios_pages.addWidget(self.ios_home)
         self.ios_pages.addWidget(self.ios_tweaks)
         self.ios_pages.addWidget(self.ios_posterboard)
         self.ios_pages.addWidget(self.ios_daemons)
         self.ios_pages.addWidget(self.ios_settings)
         self.ios_pages.addWidget(self.ios_statusbar)
+        self.ios_pages.addWidget(self.ios_apply)
 
         # Shared reusable header: one instance for every iOS subpage,
         # reconfigured on page change (title / back / right action).
@@ -113,6 +116,7 @@ class MainWindow(QtWidgets.QMainWindow):
             3: QtCore.QCoreApplication.translate("Nugget", "Daemons"),
             4: QtCore.QCoreApplication.translate("Nugget", "Settings"),
             5: QCoreApplication.translate("Nugget", "Status Bar"),
+            6: QCoreApplication.translate("Nugget", "Apply"),
         }
         self._nav_right_actions = {
             2: ("+ Add Tendies", self.ios_posterboard.show_add_tendies_dialog),
@@ -656,8 +660,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.show_ios_page(1)
 
     def on_applyPageBtn_clicked(self):
-        # Apply lives on the iOS home page
-        self.show_ios_page(0)
+        self.show_ios_page(6)
 
     def on_settingsPageBtn_clicked(self):
         self.show_ios_page(4)
@@ -997,10 +1000,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def update_label(self, txt: str):
         self.ui.statusLbl.setText(txt)
-        # Mirror progress into the iOS home indicator when in iOS theme
+        # Mirror progress into the iOS surfaces (home indicator + Apply page)
         try:
             if txt:
                 self.ios_home.show_process_status(txt)
+                self.ios_apply.set_status(txt)
         except Exception:
             pass
     def on_removeTweaksBtn_clicked(self):
@@ -1094,5 +1098,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if disabled or not self.apply_in_progress:
             self.ui.applyTweaksBtn.setDisabled(disabled)
             self.ui.removeTweaksBtn.setDisabled(disabled)
+            self.ios_apply.set_busy(disabled)
         if disabled or not self.refresh_in_progress:
             self.ui.refreshBtn.setDisabled(disabled)
