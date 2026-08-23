@@ -118,7 +118,7 @@ class MainWindow(QtWidgets.QMainWindow):
         shell = QtWidgets.QWidget(self)
         shell.setProperty("cls", "central")  # picks up the global #1e1e1e background
         shell_layout = QtWidgets.QHBoxLayout(shell)
-        shell_layout.setContentsMargins(0, 0, 0, 0)
+        shell_layout.setContentsMargins(12, 12, 12, 12)
         shell_layout.setSpacing(0)
         shell_layout.addWidget(self.ui.sidebar)
         shell_layout.addWidget(self.content_stack)
