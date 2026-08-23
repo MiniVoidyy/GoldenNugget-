@@ -540,9 +540,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.homePageBtn.setChecked(True)
 
     def _update_shared_nav(self, index: int):
+        # the iOS home page is full-screen — no header at all
+        self.ios_nav.setVisible(index != 0)
+        if index == 0:
+            self.ios_nav.clear_right_action()
+            return
         title = self._ios_page_titles.get(index, "")
         self.ios_nav.set_title(title)
-        self.ios_nav.set_back_visible(index != 0)
+        self.ios_nav.set_back_visible(True)
         right = self._nav_right_actions.get(index)
         if right:
             self.ios_nav.set_right_action(right[0], right[1])
