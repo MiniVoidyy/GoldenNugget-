@@ -1,4 +1,5 @@
 from PySide6 import QtCore, QtWidgets
+from PySide6.QtCore import QCoreApplication
 from typing import Optional
 
 from src.qt.mainwindow_ui import Ui_Nugget
@@ -81,8 +82,8 @@ class MainWindow(QtWidgets.QMainWindow):
             Page.Settings: Pages.Settings(window=self, ui=self.ui)
         }
 
-        # theme manager keeps per-theme styling helpers; the unified shell
-        # below replaces its classic/ios container switching
+        # theme manager stores the active UI mode (classic sidebar shell vs
+        # full-screen iOS); apply_theme() below applies it
         self.theme_manager = ThemeManager(self)
 
         # build the iOS-style pages stack
@@ -102,7 +103,31 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ios_pages.addWidget(self.ios_settings)
         self.ios_pages.addWidget(self.ios_statusbar)
 
-        # Unified shell: classic sidebar + [classic home | iOS pages].
+        # Shared reusable header: one instance for every iOS subpage,
+        # reconfigured on page change (title / back / right action).
+        from src.gui.ios.components import IOSNavBar
+        self.ios_nav = IOSNavBar("", on_back=self._go_back)
+        self._ios_page_titles = {
+            0: "GoldenNugget",
+            1: QtCore.QCoreApplication.translate("Nugget", "Tweaks"),
+            2: "PosterBoard",
+            3: QtCore.QCoreApplication.translate("Nugget", "Daemons"),
+            4: QtCore.QCoreApplication.translate("Nugget", "Settings"),
+            5: QCoreApplication.translate("Nugget", "Status Bar"),
+        }
+        self._nav_right_actions = {
+            2: ("+ Add Tendies", self.ios_posterboard.show_add_tendies_dialog),
+        }
+        self.ios_pages.currentChanged.connect(self._update_shared_nav)
+
+        ios_root = QtWidgets.QWidget(self)
+        ios_root_layout = QtWidgets.QVBoxLayout(ios_root)
+        ios_root_layout.setContentsMargins(0, 0, 0, 0)
+        ios_root_layout.setSpacing(0)
+        ios_root_layout.addWidget(self.ios_nav)
+        ios_root_layout.addWidget(self.ios_pages)
+
+        # Unified shell: classic sidebar + [classic home | iOS root].
         # The sidebar is the only survivor of the old UI chrome; every page
         # but Home renders through the iOS-style stack. The REST of the
         # classic UI is parked (hidden, alive): wrappers and flows still
@@ -114,15 +139,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.sidebar.setParent(None)
         self.content_stack = QtWidgets.QStackedWidget(self)
         self.content_stack.addWidget(self.ui.homePage)   # 0 = classic home
-        self.content_stack.addWidget(self.ios_pages)     # 1 = iOS pages
+        self.content_stack.addWidget(ios_root)           # 1 = iOS pages
         shell = QtWidgets.QWidget(self)
         shell.setProperty("cls", "central")  # picks up the global #1e1e1e background
         shell_layout = QtWidgets.QHBoxLayout(shell)
         shell_layout.setContentsMargins(12, 12, 12, 12)
         shell_layout.setSpacing(0)
+        self.shell_layout = shell_layout
         shell_layout.addWidget(self.ui.sidebar)
         shell_layout.addWidget(self.content_stack)
         self.setCentralWidget(shell)
+        self.apply_theme(self.theme_manager.current_theme)
 
         # Back navigation: ESC key and mouse back button go to the home page
         QtWidgets.QApplication.instance().installEventFilter(self)
@@ -494,6 +521,34 @@ class MainWindow(QtWidgets.QMainWindow):
      
     
     ## SIDE BAR FUNCTIONS
+    def apply_theme(self, theme: int):
+        """Apply the UI mode.
+
+        CLASSIC: sidebar + classic home; iOS-style pages open as actions.
+        IOS: full-screen iOS UI starting at its own home page, with the
+        shared header providing back navigation.
+        """
+        self.theme_manager.save_theme(theme)
+        is_ios = theme == ThemeManager.IOS
+        self.ui.sidebar.setVisible(not is_ios)
+        if is_ios:
+            self.content_stack.setCurrentIndex(1)
+            self.ios_pages.setCurrentIndex(0)
+            self._update_shared_nav(0)
+        else:
+            self.content_stack.setCurrentIndex(0)
+            self.ui.homePageBtn.setChecked(True)
+
+    def _update_shared_nav(self, index: int):
+        title = self._ios_page_titles.get(index, "")
+        self.ios_nav.set_title(title)
+        self.ios_nav.set_back_visible(index != 0)
+        right = self._nav_right_actions.get(index)
+        if right:
+            self.ios_nav.set_right_action(right[0], right[1])
+        else:
+            self.ios_nav.clear_right_action()
+
     def show_home(self):
         self.content_stack.setCurrentIndex(0)
 
@@ -519,12 +574,16 @@ class MainWindow(QtWidgets.QMainWindow):
         return super().eventFilter(obj, event)
 
     def _go_back(self) -> bool:
-        """Navigate back: iOS subpage -> iOS home -> classic home."""
+        """Navigate back: iOS subpage -> iOS home; in classic mode also to
+        the classic home page."""
         if self.content_stack.currentIndex() == 1:
             if self.ios_pages.currentIndex() != 0:
                 self.ios_pages.setCurrentIndex(0)
                 return True
-            self.content_stack.setCurrentIndex(0)
+            if self.theme_manager.current_theme == ThemeManager.CLASSIC:
+                self.content_stack.setCurrentIndex(0)
+                return True
+            return False
             return True
         return False
 
@@ -875,14 +934,6 @@ class MainWindow(QtWidgets.QMainWindow):
             pass  # Silent fail - autosave is best-effort
      
     
-    ## SIDE BAR FUNCTIONS
-    def show_home(self):
-        self.content_stack.setCurrentIndex(0)
-
-    def show_ios_page(self, index: int):
-        self.content_stack.setCurrentIndex(1)
-        self.ios_pages.setCurrentIndex(index)
-
     def eventFilter(self, obj, event):
         """Handle ESC and the mouse back button as navigation-back.
 

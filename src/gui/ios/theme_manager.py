@@ -38,5 +38,5 @@ class ThemeManager:
         self.stack.setCurrentIndex(1 if self.current_theme == self.IOS else 0)
 
     def switch_to(self, theme: int):
+        # container switching is handled by MainWindow.apply_theme()
         self.save_theme(theme)
-        self.stack.setCurrentIndex(theme)

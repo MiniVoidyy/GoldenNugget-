@@ -1,7 +1,7 @@
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel, QMessageBox
 
-from src.gui.ios.components import IOSNavBar, IOSSectionHeader, IOSSwitch
+from src.gui.ios.components import IOSSectionHeader, IOSSwitch
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.tweak_loader import load_daemons
 from src.tweaks.daemons_tweak import Daemon
@@ -20,8 +20,6 @@ class IOSDaemonsPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        nav = IOSNavBar(QCoreApplication.translate("Nugget", "Daemons"), )
-        layout.addWidget(nav)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)

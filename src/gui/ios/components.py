@@ -28,63 +28,94 @@ class IOSCard(QFrame):
 
 
 class IOSNavBar(QWidget):
+    """Reusable navigation header.
+
+    One shared instance lives in the main window and is reconfigured per
+    page (title / back visibility / right action) instead of every page
+    building its own.
+    """
     def __init__(self, title: str, on_back=None, right_action=None, window=None, parent=None):
         super().__init__(parent)
         self.setObjectName("iosNavBar")
         self.setFixedHeight(56)
         self.setStyleSheet("background-color: #1C1C1E; border-bottom: 1px solid #3A3A3C;")
         self.window = window
+        self._on_back = on_back or (window._go_back if hasattr(window, "_go_back") else None)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 8, 16, 8)
 
-        # Show back button if on_back callback is provided OR window is provided (to go back to iOS home)
-        if on_back or window:
-            back_btn = QPushButton(QCoreApplication.translate("Nugget", "←  Back"), self)
-            back_btn.setCursor(Qt.PointingHandCursor)
-            back_btn.setStyleSheet("""
-                QPushButton {
-                    background: transparent;
-                    color: #007AFF;
-                    font-size: 17px;
-                    font-weight: 400;
-                    border: none;
-                    padding: 8px 0;
-                }
-                QPushButton:hover { color: #0066CC; }
-            """)
-            back_btn.clicked.connect(self._handle_back)
-            layout.addWidget(back_btn)
+        # back button is always created; visibility is controlled by the
+        # owner via set_back_visible()
+        self.back_btn = QPushButton(QCoreApplication.translate("Nugget", "←  Back"), self)
+        self.back_btn.setCursor(Qt.PointingHandCursor)
+        self.back_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #007AFF;
+                font-size: 17px;
+                font-weight: 400;
+                border: none;
+                padding: 8px 0;
+            }
+            QPushButton:hover { color: #0066CC; }
+        """)
+        self.back_btn.clicked.connect(self._handle_back)
+        layout.addWidget(self.back_btn)
+
+        self.title_lbl = QLabel(title, self)
+        self.title_lbl.setAlignment(Qt.AlignCenter)
+        self.title_lbl.setStyleSheet("font-size: 17px; font-weight: 600; color: #FFFFFF;")
+        layout.addWidget(self.title_lbl, 1)
+
+        self._right_widget = None
+        if right_action:
+            label_text, callback = right_action
+            self.set_right_action(label_text, callback)
         else:
             layout.addSpacing(60)
 
-        title_lbl = QLabel(title, self)
-        title_lbl.setAlignment(Qt.AlignCenter)
-        title_lbl.setStyleSheet("font-size: 17px; font-weight: 600; color: #FFFFFF;")
-        layout.addWidget(title_lbl, 1)
+    def set_title(self, title: str):
+        self.title_lbl.setText(title)
 
-        if right_action:
-            label_text, callback = right_action
-            btn = QPushButton(label_text, self)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background: transparent;
-                    color: #007AFF;
-                    font-size: 17px;
-                    font-weight: 400;
-                    border: none;
-                    padding: 8px 0;
-                }
-                QPushButton:hover { color: #0066CC; }
-            """)
-            btn.clicked.connect(callback)
-            layout.addWidget(btn)
+    def set_back_visible(self, visible: bool):
+        self.back_btn.setVisible(visible)
+
+    def set_right_action(self, label_text: str, callback):
+        layout = self.layout()
+        if self._right_widget is not None:
+            layout.removeWidget(self._right_widget)
+            self._right_widget.deleteLater()
+            self._right_widget = None
+        btn = QPushButton(label_text, self)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #007AFF;
+                font-size: 15px;
+                font-weight: 600;
+                border: none;
+                padding: 8px 0;
+            }
+            QPushButton:hover { color: #0066CC; }
+        """)
+        btn.clicked.connect(callback)
+        layout.addWidget(btn)
+        self._right_widget = btn
+
+    def clear_right_action(self):
+        layout = self.layout()
+        if self._right_widget is not None:
+            layout.removeWidget(self._right_widget)
+            self._right_widget.deleteLater()
+            self._right_widget = None
+            layout.addSpacing(60)
         else:
             layout.addSpacing(60)
 
     def _handle_back(self):
-        if self.window and hasattr(self.window, 'ios_pages'):
-            self.window.ios_pages.setCurrentIndex(0)
+        if self._on_back:
+            self._on_back()
 
 
 class IOSSettingsRow(QPushButton):
