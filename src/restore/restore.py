@@ -276,7 +276,8 @@ def _is_transient_restore_error(error) -> bool:
 
 async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
                                       udid: str, reboot: bool,
-                                      progress_callback, backup_password: str = "") -> None:
+                                      progress_callback, backup_password: str = "",
+                                      skip_apps: bool = True) -> None:
     """Phase 3: restore the pruned protective backup.
 
     Retries while SpringBoard / mobilebackup2 are still coming up after the
@@ -292,7 +293,7 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
                     backup_root,
                     system=True, copy=True, remove=False,
                     reboot=reboot, source=udid,
-                    skip_apps=True,
+                    skip_apps=skip_apps,
                     progress_callback=progress_callback,
                     password=backup_password,
                 )
@@ -483,7 +484,8 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
             await _restore_protective_backup(
                 lc, backup_root, udid, reboot,
                 _scaled_callback(progress_callback, _PHASE_TWEAK_END, 100),
-                backup_password=backup_password)
+                backup_password=backup_password,
+                skip_apps=not bool(pb_inject_files))
             log_info("Phase 3: Protective backup restored successfully")
         finally:
             try:
