@@ -116,6 +116,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.content_stack.addWidget(self.ui.homePage)   # 0 = classic home
         self.content_stack.addWidget(self.ios_pages)     # 1 = iOS pages
         shell = QtWidgets.QWidget(self)
+        shell.setProperty("cls", "central")  # picks up the global #1e1e1e background
         shell_layout = QtWidgets.QHBoxLayout(shell)
         shell_layout.setContentsMargins(0, 0, 0, 0)
         shell_layout.setSpacing(0)
@@ -243,7 +244,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if len(self.device_manager.devices) == 0:
             self.ui.devicePicker.setEnabled(False)
             self.ui.devicePicker.addItem(self.noneText)
-            self.ui.pages.setCurrentIndex(Page.Home.value)
+            self.show_home()
             self.ui.homePageBtn.setChecked(True)
 
             # hide all pages
@@ -394,13 +395,12 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.initial_load:
                 self.initial_load = False
                 if len(tweaks[TweakID.PosterBoard].tendies) > 0:
-                    self.pages[Page.Posterboard].load()
-                    self.ui.pages.setCurrentIndex(Page.Posterboard.value)
+                    self.show_ios_page(2)
                     self.ui.posterboardPageBtn.setChecked(True)
                     self.ui.homePageBtn.setChecked(False)
                 elif len(tweaks[TweakID.Templates].templates) > 0:
-                    self.pages[Page.Templates].load()
-                    self.ui.pages.setCurrentIndex(Page.Templates.value)
+                    # templates have no dedicated page in the unified shell
+                    self.show_ios_page(2)
                     self.ui.templatePageBtn.setChecked(True)
                     self.ui.homePageBtn.setChecked(False)
         else:
@@ -626,7 +626,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if len(self.device_manager.devices) == 0:
             self.ui.devicePicker.setEnabled(False)
             self.ui.devicePicker.addItem(self.noneText)
-            self.ui.pages.setCurrentIndex(Page.Home.value)
+            self.show_home()
             self.ui.homePageBtn.setChecked(True)
 
             # hide all pages
@@ -777,13 +777,12 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.initial_load:
                 self.initial_load = False
                 if len(tweaks[TweakID.PosterBoard].tendies) > 0:
-                    self.pages[Page.Posterboard].load()
-                    self.ui.pages.setCurrentIndex(Page.Posterboard.value)
+                    self.show_ios_page(2)
                     self.ui.posterboardPageBtn.setChecked(True)
                     self.ui.homePageBtn.setChecked(False)
                 elif len(tweaks[TweakID.Templates].templates) > 0:
-                    self.pages[Page.Templates].load()
-                    self.ui.pages.setCurrentIndex(Page.Templates.value)
+                    # templates have no dedicated page in the unified shell
+                    self.show_ios_page(2)
                     self.ui.templatePageBtn.setChecked(True)
                     self.ui.homePageBtn.setChecked(False)
         else:
@@ -910,48 +909,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.content_stack.setCurrentIndex(0)
             return True
         return False
-
-    def on_homePageBtn_clicked(self):
-        self.ui.pages.setCurrentIndex(Page.Home.value)
-    
-    def on_statusBarPageBtn_clicked(self):
-        self.pages[Page.StatusBar].load()
-        self.ui.sbScrollArea.verticalScrollBar().setValue(0) # reset scroll to top
-        self.ui.pages.setCurrentIndex(Page.StatusBar.value)
-
-    def on_springboardOptionsPageBtn_clicked(self):
-        self.pages[Page.Springboard].load()
-        self.ui.pages.setCurrentIndex(Page.Springboard.value)
-
-    def on_internalOptionsPageBtn_clicked(self):
-        self.pages[Page.InternalOptions].load()
-        self.ui.pages.setCurrentIndex(Page.InternalOptions.value)
-
-    def on_liquidGlassPageBtn_clicked(self):
-        self.pages[Page.LiquidGlass].load()
-        self.ui.pages.setCurrentIndex(Page.LiquidGlass.value)
-
-    def on_daemonsPageBtn_clicked(self):
-        self.pages[Page.Daemons].load()
-        self.ui.pages.setCurrentIndex(Page.Daemons.value)
-
-    def on_posterboardPageBtn_clicked(self):
-        self.pages[Page.Posterboard].load()
-        self.ui.pages.setCurrentIndex(Page.Posterboard.value)
-
-    def on_templatesPageBtn_clicked(self):
-        self.pages[Page.Templates].load()
-        self.ui.pages.setCurrentIndex(Page.Templates.value)
-
-    def on_tweaksPageBtn_clicked(self):
-        self.ui.pages.setCurrentIndex(Page.Tweaks.value)
-
-    def on_applyPageBtn_clicked(self):
-        self.ui.pages.setCurrentIndex(Page.Apply.value)
-
-    def on_settingsPageBtn_clicked(self):
-        self.pages[Page.Settings].load()
-        self.ui.pages.setCurrentIndex(Page.Settings.value)
 
     ## APPLY PAGE
 
