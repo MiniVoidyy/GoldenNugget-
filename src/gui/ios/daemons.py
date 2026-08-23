@@ -20,7 +20,7 @@ class IOSDaemonsPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        nav = IOSNavBar(QCoreApplication.translate("Nugget", "Daemons"), window=self.window)
+        nav = IOSNavBar(QCoreApplication.translate("Nugget", "Daemons"), )
         layout.addWidget(nav)
 
         scroll = QScrollArea()

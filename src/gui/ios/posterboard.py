@@ -38,7 +38,6 @@ class IOSPosterboardPage(QWidget):
         # Nav bar with add tendies button
         nav = IOSNavBar(
             QCoreApplication.translate("Nugget", "PosterBoard"),
-            window=self.window,
             right_action=(QCoreApplication.translate("Nugget", "+ Add Tendies"), self.show_add_tendies_dialog)
         )
         layout.addWidget(nav)
