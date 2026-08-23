@@ -555,7 +555,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ios_nav.clear_right_action()
 
     def show_home(self):
-        self.content_stack.setCurrentIndex(0)
+        """Open the home page of the ACTIVE UI mode."""
+        if self.theme_manager.current_theme == ThemeManager.IOS:
+            self.content_stack.setCurrentIndex(1)
+            self.ios_pages.setCurrentIndex(0)
+            self._update_shared_nav(0)
+        else:
+            self.content_stack.setCurrentIndex(0)
 
     def show_ios_page(self, index: int):
         self.content_stack.setCurrentIndex(1)
@@ -589,7 +595,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.content_stack.setCurrentIndex(0)
                 return True
             return False
-            return True
         return False
 
     def on_homePageBtn_clicked(self):
