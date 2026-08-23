@@ -204,7 +204,6 @@ class SettingsPage(Page):
     def load_page(self):
         self.ui.autoRebootChk.toggled.connect(self.on_autoRebootChk_toggled)
 
-        self.setup_theme_toggle_ui()
 
         self.ui.ignorePBFrameLimitChk.toggled.connect(self.on_ignorePBFrameLimitChk_toggled)
         self.ui.disableTendiesLimitChk.toggled.connect(self.on_disableTendiesLimitChk_toggled)
@@ -262,34 +261,6 @@ class SettingsPage(Page):
         self.ui.langDrp.activated.connect(self.on_langDrp_activated)
         self.refresh_presets()
 
-    def setup_theme_toggle_ui(self):
-        # iOS-style interface toggle (switches between iOS and classic UI)
-        if hasattr(self.ui, 'themeToggleChk'):
-            self.ui.themeToggleChk.toggled.connect(self.on_themeToggleChk_toggled)
-            return
-        from PySide6.QtWidgets import QCheckBox
-        self.ui.themeToggleChk = QCheckBox(self.ui.settingsPageContent)
-        self.ui.themeToggleChk.setObjectName("themeToggleChk")
-        self.ui.themeToggleChk.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.ui.themeToggleChk.setText(QCoreApplication.tr("iOS-style Interface (new UI)"))
-        from src.gui.ios.theme_manager import ThemeManager
-        theme_on = self.window.theme_manager.current_theme == ThemeManager.IOS
-        self.ui.themeToggleChk.setChecked(theme_on)
-        self.ui.themeToggleChk.toggled.connect(self.on_themeToggleChk_toggled)
-        layout = self.ui._21
-        layout.addWidget(self.ui.themeToggleChk)
-
-    def on_themeToggleChk_toggled(self, checked: bool):
-        from src.gui.ios.theme_manager import ThemeManager
-        if checked:
-            self.window.theme_manager.switch_to(ThemeManager.IOS)
-        else:
-            self.window.theme_manager.switch_to(ThemeManager.CLASSIC)
-        # keep the iOS settings switch in sync
-        if hasattr(self.window, "ios_settings"):
-            self.window.ios_settings.refresh_theme_switch()
-
-    # Load available languages
     def load_available_languages(self):
         for language in available_languages.keys():
             self.lang_indexes.append(available_languages[language])
