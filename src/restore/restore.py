@@ -289,6 +289,8 @@ def _is_transient_restore_error(error) -> bool:
         return True
     if "InvalidService" in name:
         return True
+    if "NotEnoughDiskSpace" in str(error):
+        return True  # device-side purge request — retry after cleanup
     # MBErrorDomain/1: SpringBoard not ready for a restore yet.
     if "SpringBoard" in msg and "ready for a restore" in msg:
         return True

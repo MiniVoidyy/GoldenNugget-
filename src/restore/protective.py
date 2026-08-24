@@ -40,6 +40,7 @@ from typing import Optional
 import pymobiledevice3.exceptions as _pm3_exc
 import pymobiledevice3.service_connection as _sc
 from pymobiledevice3.lockdown import LockdownClient
+from pymobiledevice3.exceptions import NotEnoughDiskSpaceError
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 
 from PySide6.QtCore import QCoreApplication, QStandardPaths
@@ -469,6 +470,13 @@ async def perform_protective_backup(
                                     progress_callback=progress_callback,
                                     filter_callback=_filter_callback)
                     break  # Success
+                except NotEnoughDiskSpaceError:
+                    # device sent DLMessagePurgeDiskSpace — advisory, not fatal
+                    log_warn("Device requested disk space purge (advisory) — continuing")
+                    if attempt < max_retries:
+                        await asyncio.sleep(2)
+                        continue
+                    raise
                 except Exception as e:
                     if _is_device_locked_error(e):
                         log_error("Protective backup failed: Device is locked. Please unlock your device and try again.")
@@ -817,7 +825,6 @@ def _iter_payload_files(device_dir: Path):
 def _is_encrypted_backup(device_dir: Path) -> bool:
     """Check if a backup directory has an encrypted Manifest.db."""
     try:
-        from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
         return Mobilebackup2Service._is_encrypted_backup(device_dir)
     except Exception:
         return False
