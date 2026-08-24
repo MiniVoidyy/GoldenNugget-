@@ -48,7 +48,7 @@ class IOSApplyPage(QWidget):
 
         self.apply_btn = IOSPrimaryButton(QCoreApplication.translate(
             "Nugget", "Apply Tweaks"))
-        self.apply_btn.clicked.connect(self.window.apply_changes)
+        self.apply_btn.clicked.connect(self.window.on_applyTweaksBtn_clicked)
         apply_layout.addWidget(self.apply_btn)
         content_layout.addWidget(apply_card)
 

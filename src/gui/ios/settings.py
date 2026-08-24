@@ -98,10 +98,10 @@ class IOSSettingsPage(QWidget):
         # Backup
         self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Backup")))
 
-        self._make_switch(
+        encrypted_switch = self._make_switch(
             QCoreApplication.translate("Nugget", "Use Encrypted Backups (Experimental)"),
             pref.use_encrypted_backup,
-            self._make_setting_handler("use_encrypted_backup"),
+            lambda checked: self._on_encrypted_backup_toggled(checked, encrypted_switch),
         )
 
         # Setup
@@ -164,6 +164,27 @@ class IOSSettingsPage(QWidget):
             self.window.settings.setValue(pref_attr, checked)
             self.window._sync_settings()
         return handler
+
+    def _on_encrypted_backup_toggled(self, checked: bool, switch):
+        pref = self.window.device_manager.pref_manager
+        if checked:
+            reply = QMessageBox.question(
+                self.window,
+                "Enable Encrypted Backups?",
+                "WARNING: Using encrypted backups with GoldenNugget is experimental "
+                "and may cause DATA LOSS or leave your device stuck on the Setup "
+                "screen after applying tweaks.\n\n"
+                "Make sure you know your backup password before continuing.\n\n"
+                "Enable encrypted backups anyway?",
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                switch.blockSignals(True)
+                switch.setChecked(False)
+                switch.blockSignals(False)
+                return
+        pref.use_encrypted_backup = checked
+        self.window.settings.setValue("use_encrypted_backup", checked)
+        self.window._sync_settings()
 
     def _make_text_row(self, title: str, current: str, on_submit):
         card = QWidget()

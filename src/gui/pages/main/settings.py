@@ -317,6 +317,21 @@ class SettingsPage(Page):
 
     # Experimental options
     def on_encryptedBackupChk_toggled(self, checked: bool):
+        if checked:
+            reply = QMessageBox.question(
+                self,
+                "Enable Encrypted Backups?",
+                "WARNING: Using encrypted backups with GoldenNugget is experimental "
+                "and may cause DATA LOSS or leave your device stuck on the Setup "
+                "screen after applying tweaks.\n\n"
+                "Make sure you know your backup password before continuing.\n\n"
+                "Enable encrypted backups anyway?",
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                self.ui.encryptedBackupChk.blockSignals(True)
+                self.ui.encryptedBackupChk.setChecked(False)
+                self.ui.encryptedBackupChk.blockSignals(False)
+                return
         self.window.device_manager.pref_manager.use_encrypted_backup = checked
         self.window.settings.setValue("use_encrypted_backup", checked)
 
