@@ -323,6 +323,17 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
                 ssl.SSLError, OSError, DeviceNotFoundError, PasswordRequiredError, 
                 NotPairedError, ConnectionFailedError) as e:
             if attempt >= max_retries or not _is_transient_restore_error(e):
+                # The device already told us which file it stubbed on — cross-check
+                # the pruned manifest on disk so the log shows exactly which rows
+                # are missing their payload (MBErrorDomain/205 post-mortem).
+                if not _is_transient_restore_error(e):
+                    try:
+                        missing = verify_backup_payloads(backup_root, udid, backup_password)
+                        if missing:
+                            log_error(f"MBErrorDomain/205 context: {len(missing)} manifest rows "
+                                      f"lack payloads (e.g. {missing[:5]})")
+                    except Exception:
+                        pass
                 raise
             progress_callback(
                 f"Device not ready, retrying ({attempt}/{max_retries})..."
@@ -354,7 +365,12 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
     udid = lockdown_client.udid
     started = time.monotonic()
     using_cache = prepared_backup_root is not None
-    manifest_password = prepared_backup_root.manifest_password if using_cache else ""
+    # With the cache the prune password was captured when the master was built.
+    # Without it, this run's freshly-created backup uses the device's current
+    # encryption, so the Phase 3 restore password doubles as the manifest
+    # password. Leaving it "" would skip pruning and make Phase 3 try to
+    # download the rows that were drained mid-stream → MBErrorDomain/205.
+    manifest_password = prepared_backup_root.manifest_password if using_cache else backup_password
     protective_dir = None
     if using_cache:
         backup_root = await asyncio.to_thread(
@@ -401,14 +417,16 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                     backup_root, udid, file.domain, file.path,
                     file.read_contents(),
                     mode=_FileMode.S_IFREG | 0o644,
-                    owner=file.owner, group=file.group)
+                    owner=file.owner, group=file.group,
+                    manifest_password=manifest_password)
             elif (file.domain == "SystemPreferencesDomain"
                     and file.path in _SYSTEM_PREFERENCES_TWEAK_PATHS):
                 inject_file_into_backup(
                     backup_root, udid, file.domain, file.path,
                     file.read_contents(),
                     mode=_FileMode.S_IFREG | 0o644,
-                    owner=file.owner, group=file.group)
+                    owner=file.owner, group=file.group,
+                    manifest_password=manifest_password)
 
         # PosterBoard files (staged DB + configuration plists) ride the
         # protective restore on beta 6+, since AppDomain sparse restores are
@@ -425,7 +443,8 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
             if inject_file_into_backup(
                     backup_root, udid, f.domain, rel, data,
                     mode=_FileMode.S_IFREG | 0o644,
-                    owner=f.owner, group=f.group):
+                    owner=f.owner, group=f.group,
+                    manifest_password=manifest_password):
                 injected += 1
             else:
                 failed += 1
@@ -437,7 +456,8 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
         # Last line of defence against MBErrorDomain/205: the device requests
         # every regular-file row's payload — a single missing one aborts the
         # whole Phase 3 restore.
-        missing_payloads = await asyncio.to_thread(verify_backup_payloads, backup_root, udid)
+        missing_payloads = await asyncio.to_thread(
+            verify_backup_payloads, backup_root, udid, manifest_password)
         if missing_payloads:
             log_error(f"{len(missing_payloads)} manifest rows lack payloads "
                       f"(e.g. {missing_payloads[:5]}) — Phase 3 will likely fail with MBErrorDomain/205")

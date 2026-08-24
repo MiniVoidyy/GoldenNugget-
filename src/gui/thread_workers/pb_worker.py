@@ -1,17 +1,21 @@
 from PySide6.QtCore import Signal, QThread
+from PySide6.QtWidgets import QMessageBox
+import traceback
+
+from src.gui.thread_workers.apply_worker import ApplyAlertMessage
+
 
 class PBDBThread(QThread):
     progress = Signal(float)
     infoLbl = Signal(str)
-    # TODO: Error messages
-    # alert = Signal(ApplyAlertMessage)
+    alert = Signal(object)  # ApplyAlertMessage
 
     def update_label(self, txt: str):
         self.infoLbl.emit(txt)
     def update_progress(self, amt: float):
         self.progress.emit(amt)
-    # def alert_window(self, msg: ApplyAlertMessage):
-    #     self.alert.emit(msg)
+    def alert_window(self, msg: ApplyAlertMessage):
+        self.alert.emit(msg)
     
     def __init__(self, backup_function):
         super().__init__()
@@ -21,4 +25,13 @@ class PBDBThread(QThread):
         self.backup_function(self.update_label, self.update_progress)
 
     def run(self):
-        self.do_work()
+        try:
+            self.do_work()
+        except Exception as e:
+            self.infoLbl.emit("Backup Failed!")
+            self.alert.emit(ApplyAlertMessage(
+                f"Backup failed: {e}",
+                title="Error",
+                icon=QMessageBox.Critical,
+                detailed_txt=traceback.format_exc()
+            ))

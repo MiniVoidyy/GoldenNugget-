@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal, QThread, QSettings, QTimer
+from PySide6.QtCore import Signal, QThread, QSettings
 from PySide6.QtWidgets import QMessageBox
 from typing import Optional
 import queue
@@ -51,7 +51,12 @@ class ApplyThread(QThread):
     finished_with_result = Signal(bool, str)  # success, error_message
     request_text = Signal(str, str, object)  # title, label, result box (main-thread prompt)
 
-    _TIMEOUT_MS = 10 * 60 * 1000  # 10 minutes max for apply/restore
+    # Only the password prompt is guarded by a timeout. The apply/restore itself
+    # is allowed to run to completion: a three-phase protective restore can
+    # legitimately exceed 10 minutes waiting for the device to reboot, and
+    # forcibly terminating the worker thread mid-restore (QThread.terminate)
+    # would corrupt the device state.
+    _PROMPT_TIMEOUT_SEC = 10 * 60
 
     def __init__(self, manager, settings: QSettings, reset_pages: Optional[list[Page]] = None):
         super().__init__()
@@ -60,7 +65,6 @@ class ApplyThread(QThread):
         self.reset_pages = reset_pages
         self.success = False
         self._error_msg: str = ""
-        self._timeout_timer: Optional[QTimer] = None
 
     def update_label(self, txt: str):
         if txt == 'sudo_pwd':
@@ -78,26 +82,11 @@ class ApplyThread(QThread):
         box = queue.Queue(maxsize=1)
         self.request_text.emit(title, label, box)
         try:
-            return box.get(timeout=self._TIMEOUT_MS / 1000.0)
+            return box.get(timeout=self._PROMPT_TIMEOUT_SEC)
         except queue.Empty:
             return None
 
-    def _on_timeout(self):
-        self._error_msg = "Operation timed out after 10 minutes"
-        self.alert.emit(ApplyAlertMessage(
-            self._error_msg,
-            title="Timeout",
-            icon=QMessageBox.Critical,
-            detailed_txt="The operation took too long and was cancelled. Check device connection and try again."
-        ))
-        self.terminate()
-
     def run(self):
-        self._timeout_timer = QTimer()
-        self._timeout_timer.setSingleShot(True)
-        self._timeout_timer.timeout.connect(self._on_timeout)
-        self._timeout_timer.start(self._TIMEOUT_MS)
-
         try:
             self._do_work()
             self.success = True
@@ -114,9 +103,6 @@ class ApplyThread(QThread):
                 detailed_txt=traceback_str
             ))
             self.finished_with_result.emit(False, self._error_msg)
-        finally:
-            if self._timeout_timer:
-                self._timeout_timer.stop()
 
     def _do_work(self):
         if self.reset_pages is None:

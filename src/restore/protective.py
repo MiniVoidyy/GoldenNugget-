@@ -598,11 +598,14 @@ def make_protective_working_copy(backup_root: str, udid: str) -> str:
     return str(working_root)
 
 
-def verify_backup_payloads(backup_dir: "str | Path", udid: str) -> list:
+def verify_backup_payloads(backup_dir: "str | Path", udid: str,
+                           manifest_password: str = "") -> list:
     """Return relativePaths of regular-file manifest rows whose payload is missing.
 
     Such rows make the Phase 3 restore fail with MBErrorDomain/205 (the device
-    requests the payload and the host cannot provide it).
+    requests the payload and the host cannot provide it). For encrypted backups
+    the manifest is decrypted locally first (``manifest_password``) so the same
+    check still runs instead of being silently skipped.
     """
     device_dir = Path(backup_dir) / udid
     if not device_dir.is_dir():
@@ -611,17 +614,38 @@ def verify_backup_payloads(backup_dir: "str | Path", udid: str) -> list:
         else:
             return []
     manifest_db = device_dir / "Manifest.db"
-    if not _validate_sqlite_db(manifest_db):
+    if not manifest_db.exists():
         return []
+    decrypted_tmp = None
+    if not _validate_sqlite_db(manifest_db):
+        if not _is_encrypted_backup(device_dir):
+            return []
+        if not manifest_password:
+            log_warn("Manifest.db is encrypted and no password was given — "
+                     "skipping local payload verification")
+            return []
+        try:
+            decrypted_tmp = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
+            decrypted_tmp.close()
+            Mobilebackup2Service._decrypt_backup_manifest_db(
+                device_dir, manifest_password, Path(decrypted_tmp.name))
+            manifest_db = Path(decrypted_tmp.name)
+        except Exception as e:
+            log_warn(f"Could not decrypt manifest for payload verification: {e}")
+            return []
     missing = []
-    conn = sqlite3.connect(str(manifest_db))
     try:
-        for file_id, rel_path in conn.execute(
-                "SELECT fileID, relativePath FROM Files WHERE flags = 1"):
-            if not (device_dir / file_id[:2] / file_id).is_file():
-                missing.append(rel_path)
+        conn = sqlite3.connect(str(manifest_db))
+        try:
+            for file_id, rel_path in conn.execute(
+                    "SELECT fileID, relativePath FROM Files WHERE flags = 1"):
+                if not (device_dir / file_id[:2] / file_id).is_file():
+                    missing.append(rel_path)
+        finally:
+            conn.close()
     finally:
-        conn.close()
+        if decrypted_tmp is not None:
+            os.unlink(decrypted_tmp.name)
     return missing
 
 
@@ -1071,7 +1095,8 @@ def inject_file_into_backup(backup_dir: "str | Path", udid: str, domain: str,
                             relative_path: str, contents: bytes,
                             mode: Optional[int] = None,
                             owner: Optional[int] = None,
-                            group: Optional[int] = None) -> bool:
+                            group: Optional[int] = None,
+                            manifest_password: str = "") -> bool:
     """Add a file to a pruned backup's Manifest.db and payload store.
 
     The iOS 27 "safe state recovery" wipe clears HomeDomain files that were
@@ -1090,12 +1115,11 @@ def inject_file_into_backup(backup_dir: "str | Path", udid: str, domain: str,
     convention and the payload is placed in the ``<aa>/<fileID>`` layout the
     restore agent expects. Returns True when the file was added.
 
-    Encrypted backups are supported when ``manifest_password`` is given: the
-    manifest is decrypted to a temp copy, edited there and re-encrypted back.
-    NOTE: the injected payload itself stays plaintext while the rest of an
-    encrypted backup's payloads are device-encrypted — whether the restore
-    agent accepts that mix is unverified, so callers may reasonably skip
-    injection for encrypted backups.
+    Encrypted backups are NOT supported here: their payloads are written to
+    disk encrypted (each with a per-file key wrapped by the manifest keybag),
+    and a locally-injected plaintext payload has no matching wrapped key — the
+    Phase 3 restore agent fails to decrypt it (MBErrorDomain/205). Injection
+    is skipped for encrypted backups rather than corrupting the restore.
     """
     device_dir = Path(backup_dir) / udid
     if not device_dir.is_dir():
@@ -1110,33 +1134,19 @@ def inject_file_into_backup(backup_dir: "str | Path", udid: str, domain: str,
         return False
 
     encrypted = _is_encrypted_backup(device_dir)
-    if encrypted and not manifest_password:
-        log_warn(f"Backup is encrypted and no password was given — skipping local file injection for {domain}/{relative_path}")
+    if encrypted:
+        # See the docstring: plaintext injection into an encrypted backup makes
+        # the Phase 3 restore fail with MBErrorDomain/205.
+        log_warn(f"Skipping injection into encrypted backup for {domain}/{relative_path}")
         return False
 
-    if not encrypted and not _validate_sqlite_db(manifest_db):
+    if not _validate_sqlite_db(manifest_db):
         log_error(f"Manifest.db at {manifest_db} is not a valid SQLite database. Cannot inject file.")
         return False
 
     file_id = hashlib.sha1(f"{domain}-{relative_path}".encode("utf-8")).hexdigest()
 
-    # Work on a decrypted temp manifest when encrypted; re-encrypt afterwards.
-    edit_db = manifest_db
-    tmp_decrypted = None
-    manifest_key = None
-    if encrypted:
-        tmp_decrypted = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
-        tmp_decrypted.close()
-        edit_db = Path(tmp_decrypted.name)
-        try:
-            manifest_key = Mobilebackup2Service._decrypt_backup_manifest_db(
-                device_dir, manifest_password, edit_db)
-        except Exception as e:
-            log_warn(f"Could not decrypt manifest for injection: {e}")
-            os.unlink(edit_db)
-            return False
-
-    conn = sqlite3.connect(str(edit_db))
+    conn = sqlite3.connect(str(manifest_db))
     try:
         # The restore agent skips a file whose parent directory rows are
         # missing, so ensure the whole directory chain first.
@@ -1165,6 +1175,12 @@ def inject_file_into_backup(backup_dir: "str | Path", udid: str, domain: str,
         blob = plistlib.dumps(patched, fmt=plistlib.FMT_BINARY)
         payload = device_dir / file_id[:2] / file_id
         payload.parent.mkdir(parents=True, exist_ok=True)
+        # The working copy hardlinks payloads back to the cache master; writing
+        # through such a link would overwrite the master's pristine payload with
+        # tweaked content and corrupt every later apply. Break the link first so
+        # the master keeps its original bytes.
+        if payload.exists() or payload.is_symlink():
+            payload.unlink(missing_ok=True)
         payload.write_bytes(contents)
         conn.execute(
             "INSERT OR REPLACE INTO Files (fileID, domain, relativePath, flags, file) "
@@ -1176,12 +1192,4 @@ def inject_file_into_backup(backup_dir: "str | Path", udid: str, domain: str,
     finally:
         conn.close()
 
-    if encrypted:
-        try:
-            Mobilebackup2Service._encrypt_backup_manifest_db(edit_db, manifest_db, manifest_key)
-        except Exception as e:
-            log_error(f"Could not re-encrypt manifest after injection: {e}")
-            ok = False
-        finally:
-            os.unlink(edit_db)
     return ok
