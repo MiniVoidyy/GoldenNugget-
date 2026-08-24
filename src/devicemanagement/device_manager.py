@@ -625,13 +625,21 @@ class DeviceManager:
                     return None, False
                 manifest_password = password
                 self._backup_password = password  # reuse it for the Phase 3 restore prompt
+            from src.restore.protective import CACHE_REFRESH_SECS
             cache = ProtectiveBackupCache(udid, product_version=self.get_current_device_version(),
                                           encrypted=encrypted)
-            update_label(QCoreApplication.tr("Backing up device (cached)..."))
-            master_root = await cache.refresh(
-                check_ld,
-                progress_callback=self._backup_progress(update_label),
-                include_photos=True, include_posterboard=needs_posterboard)
+            found = cache.locate()
+            # fast path: a fresh cache (no wallpapers pending) is reused as-is —
+            # no device session at all; past the TTL it gets an incremental refresh
+            if found and not needs_posterboard and found["age_secs"] < CACHE_REFRESH_SECS:
+                log_info(f"Cache is {found['age_secs'] // 60} min old — reusing without a backup session")
+                master_root = str(cache.master_root)
+            else:
+                update_label(QCoreApplication.tr("Backing up device (cached)..."))
+                master_root = await cache.refresh(
+                    check_ld,
+                    progress_callback=self._backup_progress(update_label),
+                    include_photos=True, include_posterboard=needs_posterboard)
 
         if not needs_posterboard or os.environ.get("GOLDENNUGGET_SKIP_PB_BACKUP"):
             return PreparedBackup(root=master_root, manifest_password=manifest_password), True
