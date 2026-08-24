@@ -2,7 +2,6 @@
 ![Artboard][NuggetLogo]
 
 # GoldenNugget
-Continuation of Nugget legacy,
 Unlock your device's full potential, with iOS 27 support!
 
 Customize your device with animated wallpapers, disable pesky daemons, and more!
