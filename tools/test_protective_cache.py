@@ -53,11 +53,13 @@ def main():
 
     # --- build a fake master via the real cache paths ---
     cache = ProtectiveBackupCache(UDID, product_version="27.0")
-    # redirect base into our temp dir
-    cache.base = base
-    cache.master_root = base / "master"
+    # redirect both bases into our temp dir (locate() scans them)
+    cache._temp_base = tmp / "cache"
+    cache._persist_base = tmp / "persist"
+    cache.base = cache._temp_base
+    cache.master_root = cache._temp_base / "master"
     cache.device_dir = cache.master_root / UDID
-    cache.info_path = base / f"{UDID}.json"
+    cache.info_path = cache._temp_base / f"{UDID}.json"
     cache.device_dir.mkdir(parents=True, exist_ok=True)
 
     pb_payload = b"PBDB" * 100
@@ -84,7 +86,9 @@ def main():
     check("master valid after marker", cache.has_valid_master())
 
     other = ProtectiveBackupCache(UDID, product_version="26.2")
-    other.base, other.master_root = base, cache.master_root
+    other._temp_base = cache._temp_base
+    other._persist_base = cache._persist_base
+    other.base, other.master_root = cache.base, cache.master_root
     other.device_dir = cache.device_dir
     other.info_path = cache.info_path
     check("version change invalidates master", not other.has_valid_master())
