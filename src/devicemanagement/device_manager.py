@@ -546,20 +546,34 @@ class DeviceManager:
             # iOS 26.2+ (iOS 27 era) uses the heavy three-phase protective restore
             pb.tendies = original_tendies[:MAX_TENDIES_PER_RESTORE]
 
-            # Phase 0: ONE cached protective backup. The master copy lives in
-            # the temp dir and is refreshed incrementally, so repeat applies
-            # upload only what changed on the device.
-            # When wallpapers are being applied, the PosterBoard container rides
-            # the same backup and its database is extracted right after the
-            # refresh — so the DB always mirrors the live on-device state
-            # without a second full backup. Encrypted backups bypass the cache
-            # entirely (the manifest cannot be pruned locally).
-            needs_posterboard = not (
-                len(pb.tendies) == 0 and pb.videoFile is None
-                and len(tweaks[TweakID.Templates].templates) == 0)
-            prepared_root, pb_from_cache = await self._prepare_protective_backup(
-                update_label, needs_posterboard=needs_posterboard,
-                prompt_password=prompt_password)
+            # Phase 0: protective backup. On NotEnoughDiskSpaceError the user
+            # can choose to continue without it — tweaks still apply, but
+            # there is no data protection (photos/settings get wiped).
+            try:
+                prepared_root, pb_from_cache = await self._prepare_protective_backup(
+                    update_label, needs_posterboard=needs_posterboard,
+                    prompt_password=prompt_password)
+            except NuggetException as e:
+                if "disk space" in str(e).lower() or "NotEnoughDiskSpace" in str(type(e).__name__):
+                    from PySide6.QtWidgets import QMessageBox
+                    reply = QMessageBox.question(
+                        None,
+                        QCoreApplication.tr("Not Enough Disk Space"),
+                        QCoreApplication.tr(
+                            "The protective backup failed because the device or "
+                            "computer does not have enough free disk space.\n\n"
+                            "Continue anyway WITHOUT data protection?\n"
+                            "(Photos, settings and app data may be lost.)"),
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No)
+                    if reply == QMessageBox.StandardButton.Yes:
+                        log_warn("User chose to continue without protective backup")
+                        prepared_root = None
+                        pb_from_cache = False
+                    else:
+                        return
+                else:
+                    raise
 
             # fallback: PosterBoard DB missing from the cache backup (e.g. the
             # device rejected container inclusion) -> legacy separate backup
