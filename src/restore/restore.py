@@ -241,7 +241,7 @@ async def _wait_for_device(udid: str, progress_callback,
     )
     start = time.monotonic()
     deadline = start + timeout
-    delay = 5.0
+    delay = 1.0
     last_error = None
     autopair_tried = False
     while True:
@@ -338,7 +338,7 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
             progress_callback(
                 f"Device not ready, retrying ({attempt}/{max_retries})..."
             )
-            await asyncio.sleep(10)
+            await asyncio.sleep(3)
 
 
 async def _restore_ios27(back: backup.Backup, reboot: bool,
@@ -519,9 +519,9 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
         log_info("Phase 3: Waiting for device to reconnect after security recovery")
         lc = await _wait_for_device(udid, progress_callback)
         try:
-            # SpringBoard may still be launching after a fresh boot
-            log_info("Phase 3: Waiting for SpringBoard to finish launching...")
-            await asyncio.sleep(30)
+            # brief settle time after reconnect — _restore_protective_backup
+            # retries handle any remaining startup delay
+            await asyncio.sleep(3)
             await _restore_protective_backup(
                 lc, backup_root, udid, reboot,
                 _scaled_callback(progress_callback, _PHASE_TWEAK_END, 100),
