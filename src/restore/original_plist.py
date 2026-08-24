@@ -20,6 +20,8 @@ import plistlib
 import sqlite3
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
+from pymobiledevice3.exceptions import NotEnoughDiskSpaceError
 from typing import Optional
 
 from src.devicemanagement.session import lockdown_session
@@ -191,6 +193,12 @@ async def psysbackup(
                                 progress_callback=update_progress,
                                 password=backup_password,
                             )
+                        except NotEnoughDiskSpaceError:
+                            raise NuggetException(
+                                "Not enough free disk space on the computer for "
+                                "the pre-reset capture. Free up space (previous "
+                                "protective backups in the temp dir count against "
+                                "it) and try again.")
                         except Exception as e:
                             if _is_device_locked_error(e):
                                 update_label("Device locked during backup. Please unlock your device and keep it awake (tap screen periodically), then click Retry.")
