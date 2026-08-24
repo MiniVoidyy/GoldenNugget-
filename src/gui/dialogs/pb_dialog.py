@@ -15,7 +15,7 @@ def _validate_sqlite_db(db_path: str) -> bool:
         return False
 
 
-from PySide6.QtWidgets import QWizard, QWizardPage, QLabel, QVBoxLayout, QProgressBar, QSizePolicy, QCheckBox
+from PySide6.QtWidgets import QWizard, QWizardPage, QLabel, QVBoxLayout, QProgressBar, QSizePolicy, QCheckBox, QMessageBox
 from PySide6.QtCore import QSize, Qt, QStandardPaths
 
 from os import path, makedirs
@@ -27,6 +27,7 @@ from src.restore.protective import check_disk_space_for_backup
 
 from src.exceptions.nugget_exception import NuggetException
 from src.devicemanagement.constants import is_supported_by_fork
+from src.gui.thread_workers.apply_worker import ApplyAlertMessage
 from src.gui.thread_workers.pb_worker import PBDBThread
 from src.tweaks.tweaks import tweaks, TweakID
 
@@ -189,6 +190,12 @@ class PosterBoardDBWizard(QWizard):
             self.setButtonLayout([QWizard.WizardButton.Stretch, QWizard.WizardButton.NextButton])
         self.backup_in_progress = False
         # self.next()
+
+    def alert_message(self, msg: ApplyAlertMessage):
+        if msg.detailed_txt:
+            QMessageBox.critical(self, msg.title, f"{msg.txt}\n\n{msg.detailed_txt}")
+        else:
+            QMessageBox.critical(self, msg.title, msg.txt)
     
     def start_device_backup(self, update_label=lambda x: None, update_progress=lambda x: None):
         asyncio.run(self._start_device_backup(update_label, update_progress))
@@ -224,7 +231,7 @@ class PosterBoardDBWizard(QWizard):
             self.worker_thread = PBDBThread(backup_function=self.start_device_backup)
             self.worker_thread.progress.connect(self.update_progress_bar)
             self.worker_thread.infoLbl.connect(self.update_progress_lbl)
-            # self.worker_thread.alert.connect(self.alert_message)
+            self.worker_thread.alert.connect(self.alert_message)
             self.worker_thread.finished.connect(self.finish_backup_thread)
             self.worker_thread.finished.connect(self.worker_thread.deleteLater)
             self.worker_thread.start()

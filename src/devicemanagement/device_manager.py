@@ -137,7 +137,17 @@ class DeviceManager:
         return ""
     
     def get_devices(self, settings: QSettings, show_alert=lambda x: None):
-        asyncio.run(self._get_devices(settings, show_alert))
+        # Guard against an unresponsive usbmuxd/lockdown hang blocking startup
+        # forever. Enumeration of a handful of devices is normally near-instant,
+        # so 60s is a generous ceiling.
+        try:
+            asyncio.run(asyncio.wait_for(self._get_devices(settings, show_alert), timeout=60))
+        except asyncio.TimeoutError:
+            show_alert(ApplyAlertMessage(
+                txt=QCoreApplication.tr("Getting the device list timed out."),
+                detailed_txt=QCoreApplication.tr(
+                    "Device enumeration took too long. Check your USB connection and try again.")
+            ))
     async def _get_devices(self, settings: QSettings, show_alert=lambda x: None):
         # Test mode: use mock device already set up in main_app.py
         if self._test_mode:
