@@ -414,86 +414,23 @@ async def perform_protective_backup(
     include_posterboard: bool = False,
     incremental_ok: bool = False,
 ) -> bool:
-    """Run a selective device backup into ``backup_root``.
-
-    Only protective data (photos, Apple ID, user settings, home screen,
-    Control Center — and optionally the PosterBoard database) is written to
-    disk; everything else is drained mid-stream via pymobiledevice3's native
-    backup filter. Rejected payloads keep their Manifest.db rows, so with
-    ``incremental_ok=True`` the next run only uploads what changed on the
-    device since this backup.
-
-    Returns True if the device backup is encrypted.
-    """
-    if progress_callback is None:
-        progress_callback = lambda x: None
-
-    from src.exceptions.device_errors import is_device_locked_error as _is_device_locked_error
-    from src.exceptions.device_errors import is_connection_error as _is_connection_error
-
-    def _filter_callback(backup_file) -> bool:
-        return is_protective_device_file(
-            backup_file.device_name or "",
-            include_photos=include_photos,
-            include_posterboard=include_posterboard)
-
-    is_encrypted = False
-
-    # the cache master path may not exist yet; disk_usage needs a real path
-    Path(backup_root).mkdir(parents=True, exist_ok=True)
     if not incremental_ok:
-        # A full (re)upload needs real disk headroom; an incremental refresh
-        # writes only the delta, so the floor check would be pure overhead.
-        await check_disk_space_for_backup(lockdown_client, path=backup_root)
-        shutil.rmtree(backup_root, ignore_errors=True)
         Path(backup_root).mkdir(parents=True, exist_ok=True)
 
-    max_retries = 3
-    for attempt in range(1, max_retries + 1):
+    is_encrypted = False
+    async with ProtectiveBackupService(lockdown_client, include_posterboard=include_posterboard) as mb:
         try:
-            async with ProtectiveBackupService(lockdown_client, include_posterboard=include_posterboard) as mb:
-                # Check if encryption is already enabled (don't enable it ourselves)
-                try:
-                    is_encrypted = await mb.get_will_encrypt()
-                except Exception:
-                    pass  # Non-fatal — encryption state only feeds the status label.
-
-                if is_encrypted:
-                    log_info("Backup encryption already enabled on device. Using existing encryption.")
-                    progress_callback("Using existing backup encryption...")
-                else:
-                    log_info("Backup encryption not enabled — local manifest pruning will be used.")
-                    progress_callback("Creating protective backup (unencrypted)...")
-
-                try:
-                    await mb.backup(full=not incremental_ok, backup_directory=backup_root,
-                                    progress_callback=progress_callback,
-                                    filter_callback=_filter_callback)
-                    break  # Success
-                except NotEnoughDiskSpaceError:
-                    # device sent DLMessagePurgeDiskSpace — advisory, not fatal
-                    log_warn("Device requested disk space purge (advisory) — continuing")
-                    if attempt < max_retries:
-                        await asyncio.sleep(2)
-                        continue
-                    raise
-                except Exception as e:
-                    if _is_device_locked_error(e):
-                        log_error("Protective backup failed: Device is locked. Please unlock your device and try again.")
-                        raise NuggetException("Device is locked. Please unlock your device (enter passcode, be on home screen) and try again.")
-                    if _is_connection_error(e) and attempt < max_retries:
-                        delay = min(2 ** attempt, 15)
-                        log_warn(f"Connection error during backup (attempt {attempt}/{max_retries}), retrying in {delay}s: {e}")
-                        progress_callback(f"Connection lost, retrying in {delay}s... (attempt {attempt}/{max_retries})")
-                        await asyncio.sleep(delay)
-                        continue
-                    raise
-        except Exception as e:
-            if _is_device_locked_error(e):
-                raise
-            if _is_connection_error(e) and attempt < max_retries:
-                continue
-            raise
+            is_encrypted = await mb.get_will_encrypt()
+        except Exception:
+            pass
+        if is_encrypted:
+            log_info("Backup encryption already enabled on device.")
+            progress_callback("Using existing backup encryption...")
+        else:
+            progress_callback("Creating protective backup (unencrypted)...")
+        await mb.backup(full=not incremental_ok, backup_directory=backup_root,
+                        progress_callback=progress_callback,
+                        filter_callback=_filter_callback)
 
     return is_encrypted
 
