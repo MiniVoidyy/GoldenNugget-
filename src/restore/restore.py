@@ -385,6 +385,18 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
         log_info(f"Starting iOS 27 restore for device {udid}")
         log_info(f"Protective backup directory: {protective_dir}")
 
+        # clean up stale working copies from crashed runs (>1h old)
+        import glob as _glob
+        for stale in sorted(_glob.glob(os.path.join(
+                tempfile.gettempdir(), "nugget_protective_*"))):
+            try:
+                age_h = (time.time() - os.path.getctime(stale)) / 3600
+                if age_h > 1:
+                    shutil.rmtree(stale, ignore_errors=True)
+                    log_info(f"Cleaned stale protective dir: {stale} ({age_h:.0f}h old)")
+            except OSError:
+                pass
+
         # === Phase 1: selective protective backup (0-40%) ===
         progress_callback(0)
         if using_cache:
