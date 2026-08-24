@@ -172,8 +172,6 @@ class IOSPrimaryButton(QPushButton):
 
 class IOSSwitch(QPushButton):
     """iOS-style toggle switch"""
-    toggled = pyqtSignal(bool)
-
     def __init__(self, checked=False, parent=None):
         super().__init__(parent)
         self.setCheckable(True)
@@ -197,10 +195,6 @@ class IOSSwitch(QPushButton):
             }}
         """)
         self._knob.move(22 if checked else 2, 2)
-
-    def mousePressEvent(self, event):
-        super().mousePressEvent(event)
-        self.toggled.emit(self.isChecked())
 
 
 class IOSValueLabel(QLabel):

@@ -522,9 +522,9 @@ class DeviceManager:
                 return
             update_label(QCoreApplication.tr("Backing up device... ({0:.1f}%)").format(progress))
         return _cb
-    def apply_changes(self, update_label=lambda x: None, show_alert=lambda x: None):
-        asyncio.run(self._apply_changes(update_label, show_alert))
-    async def _apply_changes(self, update_label=lambda x: None, show_alert=lambda x: None):
+    def apply_changes(self, update_label=lambda x: None, show_alert=lambda x: None, prompt_password=None):
+        asyncio.run(self._apply_changes(update_label, show_alert, prompt_password))
+    async def _apply_changes(self, update_label=lambda x: None, show_alert=lambda x: None, prompt_password=None):
         files_to_restore: list[FileToRestore] = []
         final_alert = None
         pb = tweaks[TweakID.PosterBoard]
@@ -548,7 +548,8 @@ class DeviceManager:
                 len(pb.tendies) == 0 and pb.videoFile is None
                 and len(tweaks[TweakID.Templates].templates) == 0)
             prepared_root, pb_from_cache = await self._prepare_protective_backup(
-                update_label, needs_posterboard=needs_posterboard)
+                update_label, needs_posterboard=needs_posterboard,
+                prompt_password=prompt_password)
 
             # fallback: PosterBoard DB missing from the cache backup (e.g. the
             # device rejected container inclusion) -> legacy separate backup
@@ -562,6 +563,7 @@ class DeviceManager:
                 update_label,
                 templates=tweaks[TweakID.Templates].templates,
                 prepared_backup_root=prepared_root,
+                prompt_password=prompt_password,
             )
             update_label(QCoreApplication.tr("Success!"))
         except Exception as e:
@@ -571,7 +573,8 @@ class DeviceManager:
             show_alert(final_alert)
 
     async def _prepare_protective_backup(self, update_label=lambda x: None,
-                                         needs_posterboard: bool = False) -> tuple:
+                                         needs_posterboard: bool = False,
+                                         prompt_password=None) -> tuple:
         """Refresh the cached protective backup; return (PreparedBackup, posterboard_db_ok).
 
         The master is incrementally refreshed FIRST, so with
@@ -600,15 +603,14 @@ class DeviceManager:
             encrypted = await is_backup_encrypted(check_ld)
             manifest_password = ""
             if encrypted:
-                from PySide6.QtWidgets import QInputDialog
-                from PySide6.QtWidgets import QLineEdit
+                if prompt_password is None:
+                    log_info("No password prompt available — bypassing the protective backup cache")
+                    return None, False
                 update_label(QCoreApplication.tr("Backup encryption is enabled. Enter your backup password to use the fast cached backup:"))
-                password, ok = QInputDialog.getText(
-                    None,
+                password = prompt_password(
                     QCoreApplication.tr("Backup Encryption Password"),
-                    QCoreApplication.tr("Enter your iTunes/Finder backup password (used locally to prepare the cached backup):"),
-                    QLineEdit.Password)
-                if not ok or not password:
+                    QCoreApplication.tr("Enter your iTunes/Finder backup password (used locally to prepare the cached backup):"))
+                if not password:
                     log_info("No backup password provided — bypassing the protective backup cache")
                     return None, False
                 manifest_password = password
@@ -737,7 +739,7 @@ class DeviceManager:
                 originals[path] = data
         return originals
 
-    async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None, prepared_backup_root=None):
+    async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None, prepared_backup_root=None, prompt_password=None):
         """Generate all tweak files and restore them to the device in one pass.
 
         Returns (alert, files_to_restore) so the caller can surface the result
@@ -836,7 +838,6 @@ class DeviceManager:
                         async with Mobilebackup2Service(check_ld) as mb:
                             is_encrypted = await mb.get_will_encrypt()
                         if is_encrypted:
-                            from PySide6.QtWidgets import QInputDialog
                             if self.pref_manager.use_encrypted_backup:
                                 # reuse the password entered for the cached backup, if any
                                 backup_password = self._get_backup_password()
@@ -847,13 +848,12 @@ class DeviceManager:
                                     # User wants to keep encryption - ask for password to use it
                                     update_label(QCoreApplication.tr("Backup encryption is enabled. We'll use it for the restore."))
                                     update_label(QCoreApplication.tr("Please enter your iTunes/Finder backup password:"))
-                                    password, ok = QInputDialog.getText(
-                                        None,
+                                    if prompt_password is None:
+                                        raise NuggetException(QCoreApplication.tr("Backup password is required for encrypted restore. Please provide the password or disable encryption in iTunes/Finder."))
+                                    password = prompt_password(
                                         QCoreApplication.tr("Backup Encryption Password"),
-                                        QCoreApplication.tr("Enter your iTunes/Finder backup password (required for encrypted restore):"),
-                                        QLineEdit.Password
-                                    )
-                                    if ok and password:
+                                        QCoreApplication.tr("Enter your iTunes/Finder backup password (required for encrypted restore):"))
+                                    if password:
                                         backup_password = password
                                         log_info("Using existing backup encryption with provided password")
                                         update_label(QCoreApplication.tr("Password accepted. Proceeding with encrypted restore..."))

@@ -1,6 +1,7 @@
 from PySide6.QtCore import Signal, QThread, QSettings, QTimer
 from PySide6.QtWidgets import QMessageBox
 from typing import Optional
+import queue
 import traceback
 import threading
 
@@ -48,6 +49,7 @@ class ApplyThread(QThread):
     progress = Signal(str)
     alert = Signal(object)  # ApplyAlertMessage or None for sudo prompt
     finished_with_result = Signal(bool, str)  # success, error_message
+    request_text = Signal(str, str, object)  # title, label, result box (main-thread prompt)
 
     _TIMEOUT_MS = 10 * 60 * 1000  # 10 minutes max for apply/restore
 
@@ -68,6 +70,17 @@ class ApplyThread(QThread):
 
     def alert_window(self, msg: ApplyAlertMessage):
         self.alert.emit(msg)
+
+    def prompt_password(self, title: str, label: str) -> Optional[str]:
+        # Modal dialogs must be built on the main thread (macOS raises
+        # NSInternalInconsistencyException otherwise), so relay the request
+        # through a queued signal while this worker thread blocks on a queue.
+        box = queue.Queue(maxsize=1)
+        self.request_text.emit(title, label, box)
+        try:
+            return box.get(timeout=self._TIMEOUT_MS / 1000.0)
+        except queue.Empty:
+            return None
 
     def _on_timeout(self):
         self._error_msg = "Operation timed out after 10 minutes"
@@ -107,7 +120,7 @@ class ApplyThread(QThread):
 
     def _do_work(self):
         if self.reset_pages is None:
-            self.manager.apply_changes(self.update_label, self.alert_window)
+            self.manager.apply_changes(self.update_label, self.alert_window, self.prompt_password)
         else:
             self.manager.reset_tweaks(self.reset_pages, self.settings, self.update_label, self.alert_window)
 

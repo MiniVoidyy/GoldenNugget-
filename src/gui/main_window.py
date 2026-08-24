@@ -1022,6 +1022,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, reset_pages=reset_pages)
             self.worker_thread.progress.connect(self.update_label)
             self.worker_thread.alert.connect(self.alert_message)
+            self.worker_thread.request_text.connect(self.on_password_request)
             self.worker_thread.finished_with_result.connect(self.finish_apply_thread)
             self.worker_thread.finished.connect(self.worker_thread.deleteLater)
             self.worker_thread.start()
@@ -1042,6 +1043,17 @@ class MainWindow(QtWidgets.QMainWindow):
         if alert.detailed_txt != None:
             detailsBox.setDetailedText(alert.detailed_txt)
         detailsBox.exec()
+
+    def on_password_request(self, title: str, label: str, box):
+        try:
+            password, ok = QtWidgets.QInputDialog.getText(
+                self, title, label, QtWidgets.QLineEdit.Password)
+            box.put(password if (ok and password) else None)
+        except Exception:
+            try:
+                box.put(None)
+            except Exception:
+                pass
 
     def finish_apply_thread(self, success: bool = False, error_msg: str = ""):
         self.apply_in_progress = False
