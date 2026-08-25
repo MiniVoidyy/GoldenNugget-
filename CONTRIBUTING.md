@@ -1,4 +1,3 @@
-# note: This is 8.x branch (main, stable) only bug fixes and some QOL features accepts here. For development use 9.0 branch (unstable) but be ready for rapid changes
 # note: want translate program to your language? Then go to [Our localization repo!](https://github.com/awesomenull-dev/gNugget-i18n)
 ## 1. AI Usage & Testing Policy
 
