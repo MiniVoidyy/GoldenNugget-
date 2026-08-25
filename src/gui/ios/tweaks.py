@@ -275,9 +275,9 @@ class IOSSectionContent(QWidget):
         dialog = TextInputDialog(title, current, self)
         if dialog.exec() == QDialog.Accepted:
             value = dialog.get_value()
-            if value:
-                tweaks[tweak_id].set_value(value, toggle_enabled=True)
-                row.setText(f"{title}  ({value})")
+            tweaks[tweak_id].set_value(value, toggle_enabled=True)
+            display = value if value else "(empty)"
+            row.setText(f"{title}  ({display})")
 
     def _show_number_input_dialog(self, tweak_id: TweakID, title: str, current: int, row: IOSSettingsRow, min_val: int, max_val: int):
         dialog = NumberInputDialog(title, current, min_val, max_val, self)
