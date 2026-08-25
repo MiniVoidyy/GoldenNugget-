@@ -417,6 +417,12 @@ async def perform_protective_backup(
     if not incremental_ok:
         Path(backup_root).mkdir(parents=True, exist_ok=True)
 
+    def _filter_callback(backup_file):
+        return is_protective_device_file(
+            backup_file.device_name or "",
+            include_photos=include_photos,
+            include_posterboard=include_posterboard)
+
     is_encrypted = False
     async with ProtectiveBackupService(lockdown_client, include_posterboard=include_posterboard) as mb:
         try:
