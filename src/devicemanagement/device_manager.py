@@ -548,8 +548,8 @@ class DeviceManager:
 
             needs_posterboard = not (
                 len(pb.tendies) == 0 and pb.videoFile is None
-                and len(tweaks[TweakID.Templates].templates) == 0) # who the fuck deleted this
-            
+                and len(tweaks[TweakID.Templates].templates) == 0)
+
             # Phase 0: protective backup. On NotEnoughDiskSpaceError the user
             # can choose to continue without it — tweaks still apply, but
             # there is no data protection (photos/settings get wiped).
