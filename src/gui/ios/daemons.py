@@ -7,35 +7,25 @@ from src.tweaks.tweak_loader import load_daemons
 from src.tweaks.daemons_tweak import Daemon
 
 
-class IOSDaemonsPage(QWidget):
+class IOSDaemonsContent(QWidget):
+    """iOS-style daemons controls, usable inside any scroll area or page."""
+
     def __init__(self, window, parent=None):
         super().__init__(parent)
         self.window = window
-        self.setObjectName("iosContainer")
 
         # Ensure daemons tweaks are loaded
         load_daemons()
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("background-color: #1e1e1e; border: none;")
-        content = QWidget()
-        scroll.setWidget(content)
-        layout.addWidget(scroll)
-
-        content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(16, 16, 16, 32)
-        content_layout.setSpacing(8)
-
         self.daemons_tweak = tweaks[TweakID.Daemons]
+        self.screen_time_tweak = tweaks.get(TweakID.ClearScreenTimeAgentPlist)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 32)
+        layout.setSpacing(8)
 
         # Master enable switch
-        content_layout.addWidget(IOSSectionHeader(
+        layout.addWidget(IOSSectionHeader(
             QCoreApplication.translate("Nugget", "Daemons to Disable")
         ))
         master_card = QWidget()
@@ -48,9 +38,10 @@ class IOSDaemonsPage(QWidget):
         self.master_switch = IOSSwitch(self.daemons_tweak.enabled)
         self.master_switch.toggled.connect(self._on_master_toggled)
         master_row.addWidget(self.master_switch)
-        content_layout.addWidget(master_card)
+        layout.addWidget(master_card)
 
         self.daemon_cards = []
+        self.daemon_switches = []
         for title, daemon in [
             (QCoreApplication.translate("Nugget", "Disable thermalmonitord"), Daemon.thermalmonitord),
             (QCoreApplication.translate("Nugget", "Disable OTA"), Daemon.OTA),
@@ -75,13 +66,14 @@ class IOSDaemonsPage(QWidget):
             (QCoreApplication.translate("Nugget", "Follow Up"), Daemon.FollowUp),
             (QCoreApplication.translate("Nugget", "Location Services"), Daemon.Location),
         ]:
-            self.daemon_cards.append(self._make_daemon_switch(content_layout, title, daemon))
+            card, switch = self._make_daemon_switch(layout, title, daemon)
+            self.daemon_cards.append(card)
+            self.daemon_switches.append((daemon, switch))
 
         # Screen Time
-        content_layout.addWidget(IOSSectionHeader(
+        layout.addWidget(IOSSectionHeader(
             QCoreApplication.translate("Nugget", "Disable Screen Time Agent")
         ))
-        self.screen_time_tweak = tweaks.get(TweakID.ClearScreenTimeAgentPlist)
         if self.screen_time_tweak is not None:
             card = QWidget()
             row_layout = QHBoxLayout(card)
@@ -90,15 +82,15 @@ class IOSDaemonsPage(QWidget):
             label = QLabel(QCoreApplication.translate("Nugget", "Clear ScreenTimeAgent.plist file"))
             label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
             row_layout.addWidget(label, 1)
-            switch = IOSSwitch(self.screen_time_tweak.enabled)
-            switch.toggled.connect(self.screen_time_tweak.set_enabled)
-            row_layout.addWidget(switch)
-            content_layout.addWidget(card)
+            self.screen_time_switch = IOSSwitch(self.screen_time_tweak.enabled)
+            self.screen_time_switch.toggled.connect(self.screen_time_tweak.set_enabled)
+            row_layout.addWidget(self.screen_time_switch)
+            layout.addWidget(card)
 
         self._update_daemons_enabled()
-        content_layout.addStretch()
+        layout.addStretch()
 
-    def _make_daemon_switch(self, content_layout, title: str, daemon: Daemon) -> QWidget:
+    def _make_daemon_switch(self, layout, title: str, daemon: Daemon):
         card = QWidget()
         row_layout = QHBoxLayout(card)
         row_layout.setContentsMargins(16, 10, 16, 10)
@@ -115,8 +107,8 @@ class IOSDaemonsPage(QWidget):
         )
         row_layout.addWidget(switch)
 
-        content_layout.addWidget(card)
-        return card
+        layout.addWidget(card)
+        return card, switch
 
     def _on_master_toggled(self, checked: bool):
         self.daemons_tweak.set_enabled(checked)
@@ -149,3 +141,43 @@ class IOSDaemonsPage(QWidget):
         enabled = self.daemons_tweak.enabled
         for card in self.daemon_cards:
             card.setEnabled(enabled)
+
+    def refresh_from_tweaks(self):
+        """Resync every switch with the current tweak state."""
+        self.master_switch.blockSignals(True)
+        self.master_switch.setChecked(self.daemons_tweak.enabled)
+        self.master_switch.blockSignals(False)
+        self._update_daemons_enabled()
+
+        for daemon, switch in self.daemon_switches:
+            value = self.daemons_tweak.value.get(daemon.value[0], False) if self.daemons_tweak.value else False
+            switch.blockSignals(True)
+            switch.setChecked(value)
+            switch.blockSignals(False)
+
+        screen_time_switch = getattr(self, 'screen_time_switch', None)
+        if screen_time_switch is not None:
+            screen_time_switch.blockSignals(True)
+            screen_time_switch.setChecked(self.screen_time_tweak.enabled)
+            screen_time_switch.blockSignals(False)
+
+
+class IOSDaemonsPage(QWidget):
+    def __init__(self, window, parent=None):
+        super().__init__(parent)
+        self.window = window
+        self.setObjectName("iosContainer")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("background-color: #1e1e1e; border: none;")
+        self.content = IOSDaemonsContent(window, self)
+        scroll.setWidget(self.content)
+        layout.addWidget(scroll)
+
+    def refresh_from_tweaks(self):
+        self.content.refresh_from_tweaks()

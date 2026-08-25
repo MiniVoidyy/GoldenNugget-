@@ -77,7 +77,7 @@ class MainWindow(QtWidgets.QMainWindow):
             Page.Springboard: Pages.Springboard(ui=self.ui),
             Page.InternalOptions: Pages.Internal(ui=self.ui),
             Page.LiquidGlass: Pages.LiquidGlass(ui=self.ui),
-            Page.Daemons: Pages.Daemons(ui=self.ui),
+            Page.Daemons: Pages.Daemons(ui=self.ui, window=self),
             Page.Templates: Pages.Templates(window=self, ui=self.ui),
             Page.Settings: Pages.Settings(window=self, ui=self.ui)
         }
@@ -130,21 +130,24 @@ class MainWindow(QtWidgets.QMainWindow):
         ios_root_layout.addWidget(self.ios_nav)
         ios_root_layout.addWidget(self.ios_pages)
 
-        # Unified shell: classic sidebar + [classic home | iOS root].
-        # The sidebar is the only survivor of the old UI chrome; every page
-        # but Home renders through the iOS-style stack. The REST of the
-        # classic UI is parked (hidden, alive): wrappers and flows still
+        # Unified shell: classic sidebar + [classic home | iOS root | classic daemons].
+        # The sidebar is the only survivor of the old UI chrome; most pages
+        # render through the iOS-style stack. Daemons has been ported to the
+        # same iOS-style interface and lives as its own classic page. The REST
+        # of the classic UI is parked (hidden, alive): wrappers and flows still
         # reference its widgets.
         self._classic_parking = QtWidgets.QWidget(self)
         self._classic_parking.hide()
         self.ui.centralwidget.setParent(self._classic_parking)
         self.ui.homePage.setParent(None)
         self.ui.sidebar.setParent(None)
+        self.ui.daemonsPage.setParent(None)
         # the top device bar (phone icon + picker) comes back too
         self.ui.deviceBar.setParent(None)
         self.content_stack = QtWidgets.QStackedWidget(self)
         self.content_stack.addWidget(self.ui.homePage)   # 0 = classic home
         self.content_stack.addWidget(ios_root)           # 1 = iOS pages
+        self.content_stack.addWidget(self.ui.daemonsPage)  # 2 = classic daemons
         shell = QtWidgets.QWidget(self)
         shell.setProperty("cls", "central")  # picks up the global #1e1e1e background
         self.shell_layout = QtWidgets.QVBoxLayout(shell)
@@ -344,7 +347,6 @@ class MainWindow(QtWidgets.QMainWindow):
             # hide options that are for newer versions
             MinTweakVersions = {
                 "no_patch": [self.ui.chooseGestaltBtn, self.ui.gestaltPageBtn, self.ui.gestaltLocationLbl, self.ui.gestaltLocationTitleLbl],
-                "exploit": [("1.0", self.ui.regularDomainsLbl)],
                 "17.4": [self.ui.supportsDIChk],
                 "18.0": [self.ui.aodChk, self.ui.aodVibrancyChk, self.ui.iphone16SettingsChk],
                 "26.0": [self.ui.liquidGlassPageBtn]
@@ -586,6 +588,11 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.theme_manager.current_theme == ThemeManager.CLASSIC:
             if self.content_stack.currentIndex() == 0:
                 idx = 0
+            elif self.content_stack.currentIndex() == 1:
+                idx = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: -1}.get(
+                    self.ios_pages.currentIndex())
+            elif self.content_stack.currentIndex() == 2:
+                idx = 3
         else:
             idx = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: -1}.get(
                 self.ios_pages.currentIndex())
@@ -640,6 +647,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.content_stack.setCurrentIndex(0)
             self._sync_sidebar_selection()
             return True
+        if self.content_stack.currentIndex() == 2:
+            # classic daemons page -> classic home
+            self.content_stack.setCurrentIndex(0)
+            self._sync_sidebar_selection()
+            return True
         return False
 
     def on_homePageBtn_clicked(self):
@@ -659,7 +671,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.show_ios_page(1)
 
     def on_daemonsPageBtn_clicked(self):
-        self.show_ios_page(3)
+        if self.theme_manager.current_theme == ThemeManager.CLASSIC:
+            self.pages[Page.Daemons].load()
+            self.pages[Page.Daemons].refresh()
+            self.content_stack.setCurrentIndex(2)
+        else:
+            self.ios_daemons.refresh_from_tweaks()
+            self.show_ios_page(3)
+        self._sync_sidebar_selection()
 
     def on_posterboardPageBtn_clicked(self):
         self.show_ios_page(2)
@@ -801,7 +820,6 @@ class MainWindow(QtWidgets.QMainWindow):
             # hide options that are for newer versions
             MinTweakVersions = {
                 "no_patch": [self.ui.chooseGestaltBtn, self.ui.gestaltPageBtn, self.ui.gestaltLocationLbl, self.ui.gestaltLocationTitleLbl],
-                "exploit": [("1.0", self.ui.regularDomainsLbl)],
                 "17.4": [self.ui.supportsDIChk],
                 "18.0": [self.ui.aodChk, self.ui.aodVibrancyChk, self.ui.iphone16SettingsChk],
                 "26.0": [self.ui.liquidGlassPageBtn]
