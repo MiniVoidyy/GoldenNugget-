@@ -434,9 +434,12 @@ async def perform_protective_backup(
             progress_callback("Using existing backup encryption...")
         else:
             progress_callback("Creating protective backup (unencrypted)...")
-        await mb.backup(full=not incremental_ok, backup_directory=backup_root,
-                        progress_callback=progress_callback,
-                        filter_callback=_filter_callback)
+        try:
+            await mb.backup(full=not incremental_ok, backup_directory=backup_root,
+                            progress_callback=progress_callback,
+                            filter_callback=_filter_callback)
+        except NotEnoughDiskSpaceError:
+            log_warn("Device sent disk space purge request — ignoring, backup data is preserved")
 
     return is_encrypted
 
