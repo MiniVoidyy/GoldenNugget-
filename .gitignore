@@ -24,3 +24,4 @@ homedomain_extracted
 .mypy_cache/
 .ruff_cache/
 status_setter_windows.exe
+AARCH64-64-cpu0x0.c
