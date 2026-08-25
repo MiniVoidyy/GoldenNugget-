@@ -640,7 +640,7 @@ QSlider::tick:horizontal {
            </widget>
           </item>
           <item>
-           <widget class="QToolButton" name="tweaksPageBtn">
+           <widget class="QToolButton" name="springboardOptionsPageBtn">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -651,11 +651,75 @@ QSlider::tick:horizontal {
              <cursorShape>PointingHandCursor</cursorShape>
             </property>
             <property name="text">
-             <string>    Tweaks</string>
+             <string>    SpringBoard</string>
             </property>
             <property name="icon">
              <iconset resource="resources.qrc">
-              <normaloff>:/icon/ellipsis.svg</normaloff>:/icon/ellipsis.svg</iconset>
+              <normaloff>:/icon/app-indicator.svg</normaloff>:/icon/app-indicator.svg</iconset>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+            <property name="autoExclusive">
+             <bool>true</bool>
+            </property>
+            <property name="toolButtonStyle">
+             <enum>Qt::ToolButtonTextBesideIcon</enum>
+            </property>
+            <property name="cls" stdset="0">
+             <string notr="true">sidebarBtn</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="internalOptionsPageBtn">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="cursor">
+             <cursorShape>PointingHandCursor</cursorShape>
+            </property>
+            <property name="text">
+             <string>    Internal</string>
+            </property>
+            <property name="icon">
+             <iconset resource="resources.qrc">
+              <normaloff>:/icon/hdd.svg</normaloff>:/icon/hdd.svg</iconset>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+            <property name="autoExclusive">
+             <bool>true</bool>
+            </property>
+            <property name="toolButtonStyle">
+             <enum>Qt::ToolButtonTextBesideIcon</enum>
+            </property>
+            <property name="cls" stdset="0">
+             <string notr="true">sidebarBtn</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="liquidGlassPageBtn">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="cursor">
+             <cursorShape>PointingHandCursor</cursorShape>
+            </property>
+            <property name="text">
+             <string>    Liquid Glass</string>
+            </property>
+            <property name="icon">
+             <iconset resource="resources.qrc">
+              <normaloff>:/icon/liquid-glass.svg</normaloff>:/icon/liquid-glass.svg</iconset>
             </property>
             <property name="checkable">
              <bool>true</bool>
@@ -10273,108 +10337,6 @@ Warning: Disabling will cause the battery to show &quot;Unknown Part&quot; or &q
                     <property name="bottomMargin">
                      <number>5</number>
                     </property>
-                    <item row="0" column="0">
-                     <widget class="QToolButton" name="springboardOptionsPageBtn">
-                      <property name="sizePolicy">
-                       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                        <horstretch>0</horstretch>
-                        <verstretch>0</verstretch>
-                       </sizepolicy>
-                      </property>
-                      <property name="minimumSize">
-                       <size>
-                        <width>116</width>
-                        <height>96</height>
-                       </size>
-                      </property>
-                      <property name="cursor">
-                       <cursorShape>PointingHandCursor</cursorShape>
-                      </property>
-                      <property name="text">
-                       <string>SpringBoard</string>
-                      </property>
-                      <property name="icon">
-                       <iconset resource="resources.qrc">
-                        <normaloff>:/icon/app-indicator.svg</normaloff>:/icon/app-indicator.svg</iconset>
-                      </property>
-                      <property name="iconSize">
-                       <size>
-                        <width>36</width>
-                        <height>36</height>
-                       </size>
-                      </property>
-                      <property name="checkable">
-                       <bool>false</bool>
-                      </property>
-                      <property name="autoExclusive">
-                       <bool>false</bool>
-                      </property>
-                      <property name="toolButtonStyle">
-                       <enum>Qt::ToolButtonTextUnderIcon</enum>
-                      </property>
-                      <property name="cls" stdset="0">
-                       <string notr="true">miscBtn</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="0" column="2">
-                     <widget class="QToolButton" name="internalOptionsPageBtn">
-                      <property name="sizePolicy">
-                       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                        <horstretch>0</horstretch>
-                        <verstretch>0</verstretch>
-                       </sizepolicy>
-                      </property>
-                      <property name="cursor">
-                       <cursorShape>PointingHandCursor</cursorShape>
-                      </property>
-                      <property name="text">
-                       <string>Internal</string>
-                      </property>
-                      <property name="icon">
-                       <iconset resource="resources.qrc">
-                        <normaloff>:/icon/hdd.svg</normaloff>:/icon/hdd.svg</iconset>
-                      </property>
-                      <property name="checkable">
-                       <bool>false</bool>
-                      </property>
-                      <property name="autoExclusive">
-                       <bool>false</bool>
-                      </property>
-                      <property name="toolButtonStyle">
-                       <enum>Qt::ToolButtonTextUnderIcon</enum>
-                      </property>
-                      <property name="cls" stdset="0">
-                       <string notr="true">miscBtn</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="1" column="2">
-                     <widget class="QToolButton" name="liquidGlassPageBtn">
-                      <property name="cursor">
-                       <cursorShape>PointingHandCursor</cursorShape>
-                      </property>
-                      <property name="text">
-                       <string>Liquid Glass</string>
-                      </property>
-                      <property name="icon">
-                       <iconset resource="resources.qrc">
-                        <normaloff>:/icon/liquid-glass.svg</normaloff>:/icon/liquid-glass.svg</iconset>
-                      </property>
-                      <property name="checkable">
-                       <bool>false</bool>
-                      </property>
-                      <property name="autoExclusive">
-                       <bool>false</bool>
-                      </property>
-                      <property name="toolButtonStyle">
-                       <enum>Qt::ToolButtonTextUnderIcon</enum>
-                      </property>
-                      <property name="cls" stdset="0">
-                       <string notr="true">miscBtn</string>
-                      </property>
-                     </widget>
-                    </item>
                    </layout>
                   </widget>
                  </item>

@@ -151,30 +151,23 @@ class NumberInputDialog(QDialog):
         return self.spin.value()
 
 
-class IOSTweaksPage(QWidget):
-    def __init__(self, window, parent=None):
+class IOSSectionContent(QWidget):
+    """iOS-style tweak controls for one or more registry sections.
+
+    Can be reused inside any scroll area or page.
+    """
+
+    def __init__(self, window, sections=None, parent=None):
         super().__init__(parent)
         self.window = window
-        self.setObjectName("iosContainer")
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-
-
-        scroll = QScrollArea(self)
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("background-color: #1e1e1e; border: none;")
-        content = QWidget()
-        scroll.setWidget(content)
-        layout.addWidget(scroll)
-
-        content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(16, 16, 16, 32)
-        content_layout.setSpacing(8)
+        self.sections = sections
 
         # Load tweaks (idempotent) so the sections below actually populate
         load_plist_tweaks()
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 32)
+        layout.setSpacing(8)
 
         try:
             device_ver = self.window.device_manager.get_current_device_version()
@@ -213,7 +206,7 @@ class IOSTweaksPage(QWidget):
             switch.toggled.connect(lambda checked: tweak.set_enabled(checked))
             row_layout.addWidget(switch)
 
-            content_layout.addWidget(card)
+            layout.addWidget(card)
 
         # Helper for text input tweaks
         def make_text_input(tweak_id: TweakID, title: str):
@@ -232,7 +225,7 @@ class IOSTweaksPage(QWidget):
                 row.setText(f"{title}  ({current})")
             row.clicked.connect(lambda: self._show_text_input_dialog(tweak_id, title, current, row))
             card_layout.addWidget(row)
-            content_layout.addWidget(card)
+            layout.addWidget(card)
 
         # Helper for number input tweaks
         def make_number_input(tweak_id: TweakID, title: str, min_val: int = 0, max_val: int = 999):
@@ -251,9 +244,9 @@ class IOSTweaksPage(QWidget):
                 row.setText(f"{title}  ({current})")
             row.clicked.connect(lambda: self._show_number_input_dialog(tweak_id, title, current, row, min_val, max_val))
             card_layout.addWidget(row)
-            content_layout.addWidget(card)
+            layout.addWidget(card)
 
-        # Render every section straight from the registry. Titles are stored
+        # Render sections straight from the registry. Titles are stored
         # as QT_TRANSLATE_NOOP markers and translated here, at render time.
         def tr_title(spec) -> str:
             return QCoreApplication.translate("Nugget", spec.title)
@@ -264,13 +257,15 @@ class IOSTweaksPage(QWidget):
             Kind.NUMBER: lambda spec: make_number_input(
                 spec.id, tr_title(spec), spec.min_value, spec.max_value),
         }
-        for section in Section:
-            content_layout.addWidget(IOSSectionHeader(
+
+        sections_to_render = self.sections if self.sections is not None else list(Section)
+        for section in sections_to_render:
+            layout.addWidget(IOSSectionHeader(
                 QCoreApplication.translate("Nugget", section.value)))
             for spec in SPECS_BY_SECTION[section]:
                 renderers[spec.kind](spec)
 
-        content_layout.addStretch()
+        layout.addStretch()
 
     def set_force_solarium_fallback_visible(self, visible: bool):
         if self.force_solarium_fallback_card is not None:
@@ -290,3 +285,48 @@ class IOSTweaksPage(QWidget):
             value = dialog.get_value()
             tweaks[tweak_id].set_value(value, toggle_enabled=True)
             row.setText(f"{title}  ({value})")
+
+
+class IOSTweaksPage(QWidget):
+    def __init__(self, window, parent=None):
+        super().__init__(parent)
+        self.window = window
+        self.setObjectName("iosContainer")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("background-color: #1e1e1e; border: none;")
+        self.content = IOSSectionContent(window, list(Section), self)
+        scroll.setWidget(self.content)
+        layout.addWidget(scroll)
+
+    def set_force_solarium_fallback_visible(self, visible: bool):
+        self.content.set_force_solarium_fallback_visible(visible)
+
+
+class IOSSectionPage(QWidget):
+    """Standalone iOS-style page for a single tweak section."""
+
+    def __init__(self, window, section: Section, parent=None):
+        super().__init__(parent)
+        self.window = window
+        self.section = section
+        self.setObjectName("iosContainer")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("background-color: #1e1e1e; border: none;")
+        self.content = IOSSectionContent(window, [section], self)
+        scroll.setWidget(self.content)
+        layout.addWidget(scroll)
+
+    def set_force_solarium_fallback_visible(self, visible: bool):
+        self.content.set_force_solarium_fallback_visible(visible)
