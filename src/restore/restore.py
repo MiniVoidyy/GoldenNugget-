@@ -446,27 +446,6 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
         log_info(f"Phase 1: Pruned backup: -{removed_rows} manifest rows, -{removed_files} payload files "
                  f"({time.monotonic() - started:.1f}s into the run)")
 
-        # Re-inject the HomeDomain tweak files into the pruned backup
-        for file in back.files:
-            if not isinstance(file, backup.ConcreteFile):
-                continue
-            if (file.domain == "HomeDomain"
-                    and (file.path in _HOME_DOMAIN_TWEAK_PATHS
-                         or file.path.startswith(_HOME_DOMAIN_TWEAK_PREFIXES))):
-                inject_file_into_backup(
-                    backup_root, udid, file.domain, file.path,
-                    file.read_contents(),
-                    mode=_FileMode.S_IFREG | 0o644,
-                    owner=file.owner, group=file.group,
-                    manifest_password=manifest_password)
-            elif (file.domain == "SystemPreferencesDomain"
-                    and file.path in _SYSTEM_PREFERENCES_TWEAK_PATHS):
-                inject_file_into_backup(
-                    backup_root, udid, file.domain, file.path,
-                    file.read_contents(),
-                    mode=_FileMode.S_IFREG | 0o644,
-                    owner=file.owner, group=file.group,
-                    manifest_password=manifest_password)
 
         # PosterBoard files (staged DB + configuration plists) ride the
         # protective restore on beta 6+, since AppDomain sparse restores are
