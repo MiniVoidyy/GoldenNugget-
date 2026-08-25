@@ -633,21 +633,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ios_pages.setCurrentIndex(index)
 
     def eventFilter(self, obj, event):
-        """Handle ESC and the mouse back button as navigation-back.
-
-        Installed app-wide so it works regardless of which widget has focus.
-        Modal dialogs (QInputDialog, QMessageBox, file pickers, ...) are left
-        untouched so ESC keeps closing them.
-        """
+        """Handle ESC and the mouse back button as navigation-back."""
         if QtWidgets.QApplication.activeModalWidget() is not None:
-            return super().eventFilter(obj, event)
-        etype = event.type()
+            return False
+        try:
+            etype = event.type()
+        except (AttributeError, TypeError):
+            return False
         if etype == QtCore.QEvent.Type.KeyPress and event.key() == QtCore.Qt.Key.Key_Escape:
             return self._go_back()
         if etype == QtCore.QEvent.Type.MouseButtonPress and event.button() in (
                 QtCore.Qt.MouseButton.BackButton, QtCore.Qt.MouseButton.ExtraButton1):
             return self._go_back()
-        return super().eventFilter(obj, event)
+        return False
 
     def _go_back(self) -> bool:
         """Navigate back.
