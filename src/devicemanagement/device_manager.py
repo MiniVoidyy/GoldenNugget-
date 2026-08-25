@@ -558,8 +558,8 @@ class DeviceManager:
                 prepared_root, pb_from_cache = await self._prepare_protective_backup(
                     update_label, needs_posterboard=needs_posterboard,
                     prompt_password=prompt_password)
-            except NuggetException as e:
-                if "disk space" in str(e).lower() or "NotEnoughDiskSpace" in str(type(e).__name__):
+            except Exception as e:
+                if "disk space" in str(e).lower() or "NotEnoughDiskSpace" in type(e).__name__:
                     from PySide6.QtWidgets import QMessageBox
                     reply = QMessageBox.question(
                         None,
