@@ -21,6 +21,7 @@ from .protective import (
 )
 from pymobiledevice3.lockdown import LockdownClient, create_using_usbmux
 from pymobiledevice3.services.installation_proxy import InstallationProxyService
+from pymobiledevice3.services.lockdown_service import LockdownService
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 from pymobiledevice3.exceptions import ConnectionTerminatedError, PyMobileDevice3Exception, DeviceNotFoundError, PasswordRequiredError, NotPairedError, ConnectionFailedError
 
@@ -297,6 +298,31 @@ def _is_transient_restore_error(error) -> bool:
     return "start" in msg.lower() and "service" in msg.lower()
 
 
+class _Mobilebackup2NoEscrow(Mobilebackup2Service):
+    """mobilebackup2 started WITHOUT the escrow bag.
+
+    After the iOS 27 safe-state wipe, _wait_for_device() re-pairs the
+    device. The fresh pair record carries no EscrowBag (one is only
+    issued when pairing a passcode-protected device), so the stock
+    Mobilebackup2Service — which hardcodes include_escrow_bag=True —
+    dies with KeyError: 'EscrowBag'.
+    """
+
+    def __init__(self, lockdown: LockdownClient) -> None:
+        LockdownService.__init__(self, lockdown, self.SERVICE_NAME,
+                                 include_escrow_bag=False)
+
+
+def _start_mobilebackup2(lc: LockdownClient) -> Mobilebackup2Service:
+    """Pick the mobilebackup2 variant matching the pair record's escrow state."""
+    pair_record = getattr(lc, "pair_record", None)
+    if pair_record is not None and "EscrowBag" not in pair_record:
+        log_warn("Pair record has no EscrowBag (fresh re-pair after the "
+                 "wipe) — starting mobilebackup2 without it")
+        return _Mobilebackup2NoEscrow(lc)
+    return Mobilebackup2Service(lc)
+
+
 async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
                                       udid: str, reboot: bool,
                                       progress_callback, backup_password: str = "",
@@ -311,7 +337,7 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
     max_retries = 18
     for attempt in range(1, max_retries + 1):
         try:
-            async with Mobilebackup2Service(lc) as mb:
+            async with _start_mobilebackup2(lc) as mb:
                 await mb.restore(
                     backup_root,
                     system=True, copy=True, remove=False,

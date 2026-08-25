@@ -147,16 +147,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.content_stack.addWidget(ios_root)           # 1 = iOS pages
         shell = QtWidgets.QWidget(self)
         shell.setProperty("cls", "central")  # picks up the global #1e1e1e background
-        shell_layout = QtWidgets.QVBoxLayout(shell)
-        shell_layout.setContentsMargins(0, 0, 0, 0)
-        shell_layout.setSpacing(0)
-        shell_layout.addWidget(self.ui.deviceBar)
-        body_row = QtWidgets.QHBoxLayout()
-        body_row.setContentsMargins(0, 0, 0, 0)
-        body_row.setSpacing(0)
-        body_row.addWidget(self.ui.sidebar)
-        body_row.addWidget(self.content_stack, 1)
-        shell_layout.addLayout(body_row)
+        self.shell_layout = QtWidgets.QVBoxLayout(shell)
+        self.shell_layout.setContentsMargins(0, 0, 0, 0)
+        self.shell_layout.setSpacing(0)
+        self.shell_layout.addWidget(self.ui.deviceBar)
+        self.body_row = QtWidgets.QHBoxLayout()
+        self.body_row.setContentsMargins(0, 0, 0, 0)
+        self.body_row.setSpacing(0)
+        self.body_row.addWidget(self.ui.sidebar)
+        self.body_row.addWidget(self.content_stack, 1)
+        self.shell_layout.addLayout(self.body_row)
         self.setCentralWidget(shell)
         self.apply_theme(self.theme_manager.current_theme)
 
@@ -539,12 +539,20 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.sidebar.setVisible(not is_ios)
         self.ui.deviceBar.setVisible(not is_ios)
         if is_ios:
+            # iOS mode: full-screen, no padding
+            self.shell_layout.setContentsMargins(0, 0, 0, 0)
+            self.shell_layout.setSpacing(0)
+            self.body_row.setSpacing(0)
             # entering the new UI: land on its home unless already inside it
             if self.content_stack.currentIndex() != 1:
                 self.content_stack.setCurrentIndex(1)
                 self.ios_pages.setCurrentIndex(0)
             self._update_shared_nav(self.ios_pages.currentIndex())
         else:
+            # Classic mode: add padding around the shell
+            self.shell_layout.setContentsMargins(16, 16, 16, 16)
+            self.shell_layout.setSpacing(12)
+            self.body_row.setSpacing(16)
             # classic UI never shows the shared header
             self.ios_nav.setVisible(False)
             if self.ios_pages.currentIndex() == 0:

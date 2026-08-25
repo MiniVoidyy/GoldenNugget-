@@ -68,7 +68,7 @@ async def apply_skip_all_setup(udid: str | None = None):
             pass
 
 def main(argv: list[str]):
-    asyncio.run(argv[1])
+    asyncio.run(apply_skip_all_setup(argv[1]))
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

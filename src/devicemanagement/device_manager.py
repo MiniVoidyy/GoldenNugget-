@@ -546,6 +546,10 @@ class DeviceManager:
             # iOS 26.2+ (iOS 27 era) uses the heavy three-phase protective restore
             pb.tendies = original_tendies[:MAX_TENDIES_PER_RESTORE]
 
+            needs_posterboard = not (
+                len(pb.tendies) == 0 and pb.videoFile is None
+                and len(tweaks[TweakID.Templates].templates) == 0) # who the fuck deleted this
+            
             # Phase 0: protective backup. On NotEnoughDiskSpaceError the user
             # can choose to continue without it — tweaks still apply, but
             # there is no data protection (photos/settings get wiped).
