@@ -549,6 +549,7 @@ class DeviceManager:
             needs_posterboard = not (
                 len(pb.tendies) == 0 and pb.videoFile is None
                 and len(tweaks[TweakID.Templates].templates) == 0)
+            log_info(f'needs_posterboard={needs_posterboard}, tendies={len(pb.tendies)}, videoFile={pb.videoFile is not None}')
 
             # Phase 0: protective backup. On NotEnoughDiskSpaceError the user
             # can choose to continue without it — tweaks still apply, but
