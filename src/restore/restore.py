@@ -661,8 +661,18 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
     # create the backup
     back = backup.Backup(files=files_list, apps=apps_list)
 
-    # iOS 26.2+ (iOS 27 era) uses three-phase protective backup + restore
-    await _restore_ios27(back, reboot, lockdown_client, progress_callback,
-                         backup_password=backup_password,
-                         prepared_backup_root=prepared_backup_root,
-                         pb_inject_files=pb_inject_files)
+    from src.devicemanagement.constants import Version as _V
+    device_ver = _V(lockdown_client.product_version)
+
+    if device_ver >= _V("27.0"):
+        # iOS 27 era: three-phase protective backup + restore
+        await _restore_ios27(back, reboot, lockdown_client, progress_callback,
+                             backup_password=backup_password,
+                             prepared_backup_root=prepared_backup_root,
+                             pb_inject_files=pb_inject_files)
+    else:
+        # iOS 26.x: plain sparse restore — no security recovery wipe,
+        # no protective backup needed
+        await perform_restore(backup=back, reboot=reboot,
+                              lockdown_client=lockdown_client,
+                              progress_callback=progress_callback)
