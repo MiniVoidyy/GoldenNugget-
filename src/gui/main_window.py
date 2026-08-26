@@ -172,6 +172,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.body_row.addWidget(self.content_stack, 1)
         self.shell_layout.addLayout(self.body_row)
         self.setCentralWidget(shell)
+
+        # First launch: ask user which interface they prefer
+        if not self.theme_manager.settings.contains("ui/theme"):
+            from src.gui.interface_picker import InterfacePickerDialog
+            dlg = InterfacePickerDialog(self)
+            if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted and dlg.choice == "ios":
+                self.theme_manager.save_theme(ThemeManager.IOS)
+            else:
+                self.theme_manager.save_theme(ThemeManager.CLASSIC)
+
         self.apply_theme(self.theme_manager.current_theme)
 
         # Back navigation: ESC key and mouse back button go to the home page
