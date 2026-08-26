@@ -114,8 +114,10 @@ Want to see your name here? Open [Pull Request](https://github.com/awesomenull-d
  </picture>
 </a>
 
-
+<div align="center">
 <br>We think you can star this repo if you think this is a good project.</br>
+</div>
+
 > [!NOTE]
 > ## Mobilegestalt
 > Don't even ask me for it. It will be NEVER realized again. 
