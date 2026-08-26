@@ -20,7 +20,7 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
 <details>
 <summary>iOS 26.2 - 27.0+</summary>
 
-- PosterBoard: Animated wallpapers and descriptors. (Apple patched it on iOS 27 beta 7)
+- PosterBoard: Animated wallpapers and descriptors.
   - Community wallpapers can be found [here][WallpapersWebsite]
   - Customizing community-made wallpapers via batter files
   - See documentation on the structure of tendies and batter files in [documentation.md](documentation.md)
