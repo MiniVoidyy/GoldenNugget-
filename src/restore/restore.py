@@ -6,8 +6,9 @@ import ssl
 import tempfile
 import time
 
-from . import backup, perform_restore
+from . import backup, perform_restore, reboot_device
 from .mbdb import _FileMode
+from .skip_setup27 import skip_all_setup27
 from .protective import (
     PreparedBackup,
     clean_backup_for_restore,
@@ -373,8 +374,9 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                           lockdown_client: LockdownClient, progress_callback,
                           backup_password: str = "",
                           prepared_backup_root: PreparedBackup = None,
-                          pb_inject_files: list = None):
-    """iOS 27+ three-phase restore: backup → tweak → reboot → restore.
+                          pb_inject_files: list = None,
+                          skip_setup: bool = True):
+    """iOS 27+ restore: backup → tweak → wipe → restore → skip setup → reboot.
 
     Phase 1 (0-40%):  Selective backup of photos, Apple ID, and user
                       settings. Non-protective data is drained mid-stream,
@@ -387,8 +389,11 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                       pruned working copy.
     Phase 2 (40-60%): Apply tweaks via sparse restore → reboot, which
                       triggers the iOS 27 "safe state recovery" wipe.
-    Phase 3 (60-100%): Reconnect and restore the pruned Phase 1 backup so
-                      user data survives the wipe.
+    Phase 3 (60-90%):  Reconnect and restore the pruned Phase 1 backup so
+                      user data survives the wipe. The restore itself does
+                      not reboot; that happens after setup skip.
+    Phase 4 (90-95%): Skip the iOS setup panes via cloud configuration.
+    Phase 5 (95-100%): Reboot the device so the changes take effect.
     """
     udid = lockdown_client.udid
     started = time.monotonic()
@@ -534,7 +539,7 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                 break
         progress_callback(_PHASE_TWEAK_END)
 
-        # === Phase 3: reconnect + restore protective backup (60-100%) ===
+        # === Phase 3: reconnect + restore protective backup (60-90%) ===
         log_info("Phase 3: Waiting for device to reconnect after security recovery")
         lc = await _wait_for_device(udid, progress_callback)
         try:
@@ -542,11 +547,27 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
             # retries handle any remaining startup delay
             await asyncio.sleep(3)
             await _restore_protective_backup(
-                lc, backup_root, udid, reboot,
-                _scaled_callback(progress_callback, _PHASE_TWEAK_END, 100),
+                lc, backup_root, udid, False,
+                _scaled_callback(progress_callback, _PHASE_TWEAK_END, 90),
                 backup_password=backup_password,
                 skip_apps=not bool(pb_inject_files))
             log_info("Phase 3: Protective backup restored successfully")
+
+            # === Phase 4: skip setup panes (90-95%) ===
+            if skip_setup:
+                progress_callback("Skipping setup panes...")
+                log_info("Phase 4: Skipping setup panes via MobileConfigService")
+                await skip_all_setup27(lc, udid)
+                log_info("Phase 4: Setup panes skipped successfully")
+                progress_callback(95)
+
+            # === Phase 5: reboot (95-100%) ===
+            if reboot:
+                progress_callback("Rebooting device...")
+                log_info("Phase 5: Rebooting device")
+                await reboot_device(reboot=True, lockdown_client=lc)
+                log_info("Phase 5: Reboot command sent")
+                progress_callback(100)
         finally:
             try:
                 await lc.close()
@@ -578,7 +599,7 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
 
 
 # files is a list of FileToRestore objects
-async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdown_client: LockdownClient = None, progress_callback = lambda x: None, backup_password: str = "", prepared_backup_root: PreparedBackup = None):
+async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdown_client: LockdownClient = None, progress_callback = lambda x: None, backup_password: str = "", prepared_backup_root: PreparedBackup = None, skip_setup: bool = True):
     # create the files to be backed up
     files_list = [
     ]
@@ -669,7 +690,8 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
         await _restore_ios27(back, reboot, lockdown_client, progress_callback,
                              backup_password=backup_password,
                              prepared_backup_root=prepared_backup_root,
-                             pb_inject_files=pb_inject_files)
+                             pb_inject_files=pb_inject_files,
+                             skip_setup=skip_setup)
     else:
         # iOS 26.x: plain sparse restore — no security recovery wipe,
         # no protective backup needed
