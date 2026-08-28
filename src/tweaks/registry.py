@@ -74,7 +74,7 @@ GP = FileLocation.globalPreferences
 
 SPECS: tuple[TweakSpec, ...] = (
     # --- Liquid Glass ---
-    _t(TweakID.ForceSolariumFallback, Section.LIQUID_GLASS, "Force Solarium Fallback", GP, "SolariumForceFallback", min_version="26.0", max_version="26.99"),
+    _t(TweakID.ForceSolariumFallback, Section.LIQUID_GLASS, "Force Solarium Fallback", GP, "SolariumForceFallback", min_version="26.0"),
     _t(TweakID.IgnoreSolariumLinkedOnCheck, Section.LIQUID_GLASS, "Ignore Solarium Linked-On Check", GP, "com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck", min_version="26.0"),
     _t(TweakID.ForceSolariumIntelligence, Section.LIQUID_GLASS, "Force Solarium Intelligence", GP, "SolariumForceIntelligence", min_version="27.0"),
     _t(TweakID.ForceEnhancedSpeculars, Section.LIQUID_GLASS, "Force Enhanced Speculars", GP, "SolariumForceEnhancedSpeculars", min_version="27.0"),

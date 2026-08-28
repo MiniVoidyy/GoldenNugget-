@@ -395,16 +395,15 @@ class MainWindow(QtWidgets.QMainWindow):
                             view.hide()
             # The Status Bar override file is dropped by the iOS 27
             # safe-state-recovery wipe, so the whole feature is hidden on iOS 27+.
+            # Force Solarium Fallback is now supported on iOS 27 as well, so it is
+            # kept visible across all supported versions.
             if device_ver >= Version("27.0"):
                 self.ui.statusBarPageBtn.hide()
-                self.ui.forceSolariumFallbackContent.hide()
-                if hasattr(self, "ios_tweaks"):
-                    self.ios_tweaks.set_force_solarium_fallback_visible(False)
             else:
                 self.ui.statusBarPageBtn.show()
-                self.ui.forceSolariumFallbackContent.show()
-                if hasattr(self, "ios_tweaks"):
-                    self.ios_tweaks.set_force_solarium_fallback_visible(True)
+            self.ui.forceSolariumFallbackContent.show()
+            if hasattr(self, "ios_tweaks"):
+                self.ios_tweaks.set_force_solarium_fallback_visible(True)
             # mirror the Status Bar gating in the iOS UI
             if hasattr(self, "ios_home"):
                 self.ios_home.set_statusbar_visible(device_ver < Version("27.0"))

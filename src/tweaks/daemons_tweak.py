@@ -1,4 +1,5 @@
-from enum import Enum
+from enum import Enum, auto
+
 
 class Daemon(Enum):
     thermalmonitord = ["com.apple.thermalmonitord"]
@@ -88,3 +89,127 @@ class Daemon(Enum):
     ]
     NanoTimeKit = ["com.apple.nanotimekitcompaniond"]
     FollowUp = ["com.apple.followupd"]
+    PromotedContent = ["com.apple.promotedcontentd"]
+    WifiAnalytics = ["com.apple.wifianalyticsd"]
+    News = ["com.apple.newsd"]
+    AskPermissions = ["com.apple.askpermissiond"]
+    FamilyCircle = ["com.apple.familycircled"]
+    FamilyNotification = ["com.apple.familynotificationd"]
+    AdPrivacy = ["com.apple.adprivacyd"]
+    AdServices = ["com.apple.adservicesd"]
+    VideosSubscriptions = ["com.apple.videosubscriptionsd"]
+    WebBookmarks = ["com.apple.webbookmarksd"]
+    NanoRegistry = ["com.apple.nanoregistryd"]
+    NanoMediaControl = ["com.apple.nanomediacontrold"]
+    NanoPreferences = ["com.apple.nanopreferencesd"]
+    SiriActions = ["com.apple.siriactionsd"]
+    SiriInference = ["com.apple.siriinferenced"]
+    Feedback = ["com.apple.feedbackd"]
+    Commerce = ["com.apple.commerce"]
+    CoreDuet = ["com.apple.coreduetd"]
+    Insight = ["com.apple.insightd"]
+    Metrics = ["com.apple.metricsd"]
+    AnalyticsHelper = [
+        "com.apple.analyticsd",
+        "com.apple.analyticsd.admin",
+        "com.apple.analyticsd.events"
+    ]
+    CallAnalytics = ["com.apple.rtcreportingd"]
+    Symptomsd = ["com.apple.symptomsd", "com.apple.symptomsd-app"]
+    MobileAssetd = ["com.apple.mobileassetd"]
+    Ubiquityd = ["com.apple.ubd"]
+    CoreTelephonyAnalytics = ["com.apple.commcenter.coretelephony"]
+    MediaExperience = ["com.apple.mediaremoted"]
+    Automount = ["com.apple.automountd"]
+    SiriIntent = ["com.apple.assistant.intentdaemon"]
+    CloudKeychain = ["com.apple.cloudkeychainproxy", "com.apple.security.cloudkeychainproxy"]
+    NetworkExtension = ["com.apple.networkextension"]
+    DeviceCheck = ["com.apple.devicecheckd"]
+    ManagedConfiguration = ["com.apple.managedconfiguration", "com.apple.managedconfiguration.mdm", "com.apple.managedconfiguration.tesla"]
+    Containermanagerd = ["com.apple.containermanagerd"]
+    MobileGestaltHelper = ["com.apple.mobilegestalt_helper"]
+    TimeSync = ["com.apple.timed"]
+    MockLocation = ["com.apple.mocksynclocationd"]
+    APFSD = ["com.apple.apfsd"]
+    Persistence = ["com.apple.persistence-helper", "com.apple.persistence-d"]
+    Calendar = ["com.apple.calendar.database", "com.apple.CalendarAgent"]
+    DataAccess = ["com.apple.dataaccess.dataaccessd"]
+    Networkd = ["com.apple.networkd"]
+    Privacy = ["com.apple.privacyd"]
+    AppStore = ["com.apple.appstored"]
+    Books = ["com.apple.bookdatastored"]
+    Podcasts = ["com.apple.podcasts"]
+    UserNotifications = ["com.apple.usernotificationsd"]
+    ActivityStream = ["com.apple.mobile.installd"]
+    Photos = ["com.apple.photolibraryd"]
+    Music = ["com.apple.itunesstored"]
+    AppleAccount = ["com.apple.appleaccountd"]
+    Bluetooth = ["com.apple.bluetoothd"]
+    WiFiManager = ["com.apple.wifi_manager"]
+    WiFiLogging = ["com.apple.wifilogd"]
+    Maps = ["com.apple.geod"]
+    HealthSync = ["com.apple.healthd.sync"]
+    AccountSync = ["com.apple.accountsd"]
+    DiskArbitration = ["com.apple.DiskArbitrationd"]
+    MediaRemoteControl = ["com.apple.mediaremotecontrol"]
+    Notifications = ["com.apple.notificationd"]
+    Parse = ["com.apple.parsecd"]
+    Shazam = ["com.apple.shazamd"]
+    Restore = ["com.apple.mobile.restored"]
+    Keybag = ["com.apple.keybagd"]
+    Security = ["com.apple.securityd"]
+    Siri = ["com.apple.siri"]
+    SettingsStats = ["com.apple.settings-statsd"]
+    StatusKit = ["com.apple.statuskit"]
+    Reminders = ["com.apple.reminderd"]
+    ConfigurationProfiles = ["com.apple.managedconfigurationprofiles"]
+    CertificateRevocation = ["com.apple.security.certrevocation"]
+    EAP = ["com.apple.eapolclient"]
+    AirPlay = ["com.apple.airplay"]
+    iCloudContainer = ["com.apple.cloudd"]
+    GameKitService = ["com.apple.gamekitservice"]
+    NFC = ["com.apple.nfcd"]
+    UARTPairing = ["com.apple.uarpairingd"]
+    Sidecar = ["com.apple.sidecarcore"]
+    Continuity = ["com.apple.continuityd"]
+    Sharing = ["com.apple.sharingd"]
+    FindMy = ["com.apple.findmylocate", "com.apple.findmydeviced"]
+    NearbyInteraction = ["com.apple.nearbyinteractiond"]
+    SignpostReporter = ["com.apple.signpost.signpost_reporter"]
+    CoreTelephony = ["com.apple.coretelephony"]
+    MediaSession = ["com.apple.mediasessiond"]
+    SpeechRecognition = ["com.apple.speechrecognition"]
+    Translate = ["com.apple.translated"]
+    ReplayKit = ["com.apple.replayd"]
+    AddressBook = ["com.apple.addressbook"]
+    CoreAnimation = ["com.apple.coreanimation"]
+    CoreBluetooth = ["com.apple.corebluetoothd"]
+
+
+class DaemonGroup(Enum):
+    """Grouped selections that enable a set of daemons in one tap."""
+    Recommended = auto()
+
+
+# Analytics / telemetry / tracking daemons selected by "Recommended".
+# Disabling these reduces data collection while keeping core device
+# functionality intact.
+RECOMMENDED_ANALYTICS = [
+    Daemon.CrashReports,
+    Daemon.Diagnostics,
+    Daemon.UsageTrackingAgent,
+    Daemon.WifiAnalytics,
+    Daemon.AnalyticsHelper,
+    Daemon.CallAnalytics,
+    Daemon.Symptomsd,
+    Daemon.CoreTelephonyAnalytics,
+    Daemon.AdPrivacy,
+    Daemon.AdServices,
+    Daemon.PromotedContent,
+    Daemon.News,
+    Daemon.VideosSubscriptions,
+    Daemon.WebBookmarks,
+    Daemon.CoreDuet,
+    Daemon.Insight,
+    Daemon.Metrics,
+]

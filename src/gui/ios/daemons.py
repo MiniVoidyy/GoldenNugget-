@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QL
 from src.gui.ios.components import IOSSectionHeader, IOSSwitch
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.tweak_loader import load_daemons
-from src.tweaks.daemons_tweak import Daemon
+from src.tweaks.daemons_tweak import Daemon, RECOMMENDED_ANALYTICS
 
 
 class IOSDaemonsContent(QWidget):
@@ -40,6 +40,9 @@ class IOSDaemonsContent(QWidget):
         master_row.addWidget(self.master_switch)
         layout.addWidget(master_card)
 
+        # Recommended: select all analytics/telemetry daemons in one tap
+        self.recommended_card, self.recommended_switch = self._make_recommended_switch(layout)
+
         self.daemon_cards = []
         self.daemon_switches = []
         for title, daemon in [
@@ -65,6 +68,96 @@ class IOSDaemonsContent(QWidget):
             (QCoreApplication.translate("Nugget", "Disable System Diagnostics"), Daemon.Diagnostics),
             (QCoreApplication.translate("Nugget", "Follow Up"), Daemon.FollowUp),
             (QCoreApplication.translate("Nugget", "Location Services"), Daemon.Location),
+            (QCoreApplication.translate("Nugget", "Disable Promoted Content"), Daemon.PromotedContent),
+            (QCoreApplication.translate("Nugget", "Disable Wi-Fi Analytics"), Daemon.WifiAnalytics),
+            (QCoreApplication.translate("Nugget", "Disable News"), Daemon.News),
+            (QCoreApplication.translate("Nugget", "Disable Ask Permissions"), Daemon.AskPermissions),
+            (QCoreApplication.translate("Nugget", "Disable Family Circle (Family Sharing)"), Daemon.FamilyCircle),
+            (QCoreApplication.translate("Nugget", "Disable Family Notifications"), Daemon.FamilyNotification),
+            (QCoreApplication.translate("Nugget", "Disable Ad Privacy"), Daemon.AdPrivacy),
+            (QCoreApplication.translate("Nugget", "Disable Ad Services"), Daemon.AdServices),
+            (QCoreApplication.translate("Nugget", "Disable Video Subscriptions"), Daemon.VideosSubscriptions),
+            (QCoreApplication.translate("Nugget", "Disable Web Bookmarks"), Daemon.WebBookmarks),
+            (QCoreApplication.translate("Nugget", "Disable Nano Registry (Apple Watch)"), Daemon.NanoRegistry),
+            (QCoreApplication.translate("Nugget", "Disable Nano Media Control (Apple Watch)"), Daemon.NanoMediaControl),
+            (QCoreApplication.translate("Nugget", "Disable Nano Preferences (Apple Watch)"), Daemon.NanoPreferences),
+            (QCoreApplication.translate("Nugget", "Disable Siri Actions"), Daemon.SiriActions),
+            (QCoreApplication.translate("Nugget", "Disable Siri Inference"), Daemon.SiriInference),
+            (QCoreApplication.translate("Nugget", "Disable Feedback"), Daemon.Feedback),
+            (QCoreApplication.translate("Nugget", "Disable Commerce (App Store Checks)"), Daemon.Commerce),
+            (QCoreApplication.translate("Nugget", "Disable CoreDuet (Battery/Usage Statistics)"), Daemon.CoreDuet),
+            (QCoreApplication.translate("Nugget", "Disable Insight"), Daemon.Insight),
+            (QCoreApplication.translate("Nugget", "Disable Metrics"), Daemon.Metrics),
+            (QCoreApplication.translate("Nugget", "Disable System Analytics"), Daemon.AnalyticsHelper),
+            (QCoreApplication.translate("Nugget", "Disable Call Analytics (RTC Reporting)"), Daemon.CallAnalytics),
+            (QCoreApplication.translate("Nugget", "Disable Symptom Diagnostics"), Daemon.Symptomsd),
+            (QCoreApplication.translate("Nugget", "Disable Mobile Asset Downloads (Telemetry)"), Daemon.MobileAssetd),
+            (QCoreApplication.translate("Nugget", "Disable Ubiquity (iCloud Usage Sync)"), Daemon.Ubiquityd),
+            (QCoreApplication.translate("Nugget", "Disable Core Telephony Analytics"), Daemon.CoreTelephonyAnalytics),            (QCoreApplication.translate("Nugget", "Disable Media Experience Analytics"), Daemon.MediaExperience),
+            (QCoreApplication.translate("Nugget", "Disable Automount"), Daemon.Automount),
+            (QCoreApplication.translate("Nugget", "Disable Siri Intent"), Daemon.SiriIntent),
+            (QCoreApplication.translate("Nugget", "Disable Cloud Keychain"), Daemon.CloudKeychain),
+            (QCoreApplication.translate("Nugget", "Disable Network Extensions"), Daemon.NetworkExtension),
+            (QCoreApplication.translate("Nugget", "Disable Device Check"), Daemon.DeviceCheck),
+            (QCoreApplication.translate("Nugget", "Disable Managed Configuration (MDM)"), Daemon.ManagedConfiguration),
+            (QCoreApplication.translate("Nugget", "Disable Container Manager"), Daemon.Containermanagerd),
+            (QCoreApplication.translate("Nugget", "Disable MobileGestalt Helper"), Daemon.MobileGestaltHelper),
+            (QCoreApplication.translate("Nugget", "Disable Time Sync"), Daemon.TimeSync),
+            (QCoreApplication.translate("Nugget", "Disable Mock Location"), Daemon.MockLocation),
+            (QCoreApplication.translate("Nugget", "Disable APFS Daemon"), Daemon.APFSD),
+            (QCoreApplication.translate("Nugget", "Disable Persistence"), Daemon.Persistence),
+            (QCoreApplication.translate("Nugget", "Disable Calendar Database"), Daemon.Calendar),
+            (QCoreApplication.translate("Nugget", "Disable Data Access"), Daemon.DataAccess),
+            (QCoreApplication.translate("Nugget", "Disable Networkd"), Daemon.Networkd),
+            (QCoreApplication.translate("Nugget", "Disable Privacy"), Daemon.Privacy),
+            (QCoreApplication.translate("Nugget", "Disable App Store"), Daemon.AppStore),
+            (QCoreApplication.translate("Nugget", "Disable Books"), Daemon.Books),
+            (QCoreApplication.translate("Nugget", "Disable Podcasts"), Daemon.Podcasts),
+            (QCoreApplication.translate("Nugget", "Disable User Notifications"), Daemon.UserNotifications),
+            (QCoreApplication.translate("Nugget", "Disable Activity Stream (App Installation)"), Daemon.ActivityStream),
+            (QCoreApplication.translate("Nugget", "Disable Photos Library"), Daemon.Photos),
+            (QCoreApplication.translate("Nugget", "Disable Music Store"), Daemon.Music),
+            (QCoreApplication.translate("Nugget", "Disable Apple Account"), Daemon.AppleAccount),
+            (QCoreApplication.translate("Nugget", "Disable Bluetooth"), Daemon.Bluetooth),
+            (QCoreApplication.translate("Nugget", "Disable Wi-Fi Manager"), Daemon.WiFiManager),
+            (QCoreApplication.translate("Nugget", "Disable Wi-Fi Logging"), Daemon.WiFiLogging),
+            (QCoreApplication.translate("Nugget", "Disable Maps (Geod)"), Daemon.Maps),
+            (QCoreApplication.translate("Nugget", "Disable Health Sync"), Daemon.HealthSync),
+            (QCoreApplication.translate("Nugget", "Disable Account Sync"), Daemon.AccountSync),
+            (QCoreApplication.translate("Nugget", "Disable Disk Arbitration"), Daemon.DiskArbitration),
+            (QCoreApplication.translate("Nugget", "Disable Media Remote Control"), Daemon.MediaRemoteControl),
+            (QCoreApplication.translate("Nugget", "Disable Notifications"), Daemon.Notifications),
+            (QCoreApplication.translate("Nugget", "Disable Parse (Safari Suggestions)"), Daemon.Parse),
+            (QCoreApplication.translate("Nugget", "Disable Shazam"), Daemon.Shazam),
+            (QCoreApplication.translate("Nugget", "Disable Siri"), Daemon.Siri),
+            (QCoreApplication.translate("Nugget", "Disable Settings Stats"), Daemon.SettingsStats),
+            (QCoreApplication.translate("Nugget", "Disable Status Kit"), Daemon.StatusKit),
+            (QCoreApplication.translate("Nugget", "Disable Reminders"), Daemon.Reminders),
+            (QCoreApplication.translate("Nugget", "Disable Configuration Profiles"), Daemon.ConfigurationProfiles),
+            (QCoreApplication.translate("Nugget", "Disable Certificate Revocation"), Daemon.CertificateRevocation),
+            (QCoreApplication.translate("Nugget", "Disable EAP (Wi-Fi Auth)"), Daemon.EAP),
+            (QCoreApplication.translate("Nugget", "Disable AirPlay"), Daemon.AirPlay),
+            (QCoreApplication.translate("Nugget", "Disable iCloud Container"), Daemon.iCloudContainer),
+            (QCoreApplication.translate("Nugget", "Disable GameKit Service"), Daemon.GameKitService),
+            (QCoreApplication.translate("Nugget", "Disable NFC"), Daemon.NFC),
+            (QCoreApplication.translate("Nugget", "Disable UART Pairing"), Daemon.UARTPairing),
+            (QCoreApplication.translate("Nugget", "Disable Sidecar"), Daemon.Sidecar),
+            (QCoreApplication.translate("Nugget", "Disable Continuity"), Daemon.Continuity),
+            (QCoreApplication.translate("Nugget", "Disable Sharing (AirDrop)"), Daemon.Sharing),
+            (QCoreApplication.translate("Nugget", "Disable Find My"), Daemon.FindMy),
+            (QCoreApplication.translate("Nugget", "Disable Nearby Interaction"), Daemon.NearbyInteraction),
+            (QCoreApplication.translate("Nugget", "Disable Media Session"), Daemon.MediaSession),
+            (QCoreApplication.translate("Nugget", "Disable Speech Recognition"), Daemon.SpeechRecognition),
+            (QCoreApplication.translate("Nugget", "Disable ReplayKit"), Daemon.ReplayKit),
+            (QCoreApplication.translate("Nugget", "Disable Address Book"), Daemon.AddressBook),
+            (QCoreApplication.translate("Nugget", "Disable Core Animation"), Daemon.CoreAnimation),
+            (QCoreApplication.translate("Nugget", "Disable Core Bluetooth"), Daemon.CoreBluetooth),
+            (QCoreApplication.translate("Nugget", "Disable Core Telephony"), Daemon.CoreTelephony),
+            (QCoreApplication.translate("Nugget", "Disable Keybag (Encryption Keys)"), Daemon.Keybag),
+            (QCoreApplication.translate("Nugget", "Disable Restore Service"), Daemon.Restore),
+            (QCoreApplication.translate("Nugget", "Disable Security"), Daemon.Security),
+            (QCoreApplication.translate("Nugget", "Disable Signpost Reporter"), Daemon.SignpostReporter),
+            (QCoreApplication.translate("Nugget", "Disable Translate"), Daemon.Translate),
         ]:
             card, switch = self._make_daemon_switch(layout, title, daemon)
             self.daemon_cards.append(card)
@@ -110,6 +203,41 @@ class IOSDaemonsContent(QWidget):
         layout.addWidget(card)
         return card, switch
 
+    def _make_recommended_switch(self, layout):
+        """Recommended button that toggles every analytics daemon at once."""
+        card = QWidget()
+        row_layout = QHBoxLayout(card)
+        row_layout.setContentsMargins(16, 10, 16, 10)
+        row_layout.setSpacing(12)
+
+        label = QLabel(QCoreApplication.translate(
+            "Nugget", "Recommended (all analytics daemons)"))
+        label.setStyleSheet("color: #FFFFFF; font-size: 15px; font-weight: 600;")
+        row_layout.addWidget(label, 1)
+
+        value = all(
+            self.daemons_tweak.value.get(d.value[0], False)
+            if self.daemons_tweak.value else False
+            for d in RECOMMENDED_ANALYTICS)
+        switch = IOSSwitch(value)
+        switch.toggled.connect(self._on_recommended_toggled)
+        row_layout.addWidget(switch)
+
+        layout.addWidget(card)
+        return card, switch
+
+    def _on_recommended_toggled(self, checked: bool):
+        for daemon in RECOMMENDED_ANALYTICS:
+            self.daemons_tweak.set_multiple_values(daemon.value, value=checked)
+            for d, sw in self.daemon_switches:
+                if d is daemon:
+                    sw.blockSignals(True)
+                    sw.setChecked(checked)
+                    sw.blockSignals(False)
+                    break
+        if checked:
+            self.master_switch.setChecked(True)
+
     def _on_master_toggled(self, checked: bool):
         self.daemons_tweak.set_enabled(checked)
         self._update_daemons_enabled()
@@ -141,6 +269,14 @@ class IOSDaemonsContent(QWidget):
         enabled = self.daemons_tweak.enabled
         for card in self.daemon_cards:
             card.setEnabled(enabled)
+        if hasattr(self, 'recommended_card'):
+            self.recommended_card.setEnabled(enabled)
+
+    def _recommended_all_on(self) -> bool:
+        value = self.daemons_tweak.value
+        if not value:
+            return False
+        return all(value.get(d.value[0], False) for d in RECOMMENDED_ANALYTICS)
 
     def refresh_from_tweaks(self):
         """Resync every switch with the current tweak state."""
@@ -154,6 +290,12 @@ class IOSDaemonsContent(QWidget):
             switch.blockSignals(True)
             switch.setChecked(value)
             switch.blockSignals(False)
+
+        recommended_switch = getattr(self, 'recommended_switch', None)
+        if recommended_switch is not None:
+            recommended_switch.blockSignals(True)
+            recommended_switch.setChecked(self._recommended_all_on())
+            recommended_switch.blockSignals(False)
 
         screen_time_switch = getattr(self, 'screen_time_switch', None)
         if screen_time_switch is not None:

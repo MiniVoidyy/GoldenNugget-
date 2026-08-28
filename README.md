@@ -69,7 +69,8 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - Show Notifications for System Pastes
 - Disable Liquid Glass (iOS 26.0+):
   - Ignore Liquid Glass App Build Check (iOS 26.0+)
-  - Force Solarium Fallback (iOS 26.0+, doesn't work on iOS 27 anymore)
+  - Force Solarium Fallback (iOS 26.0+, including iOS 27)
+  - UI Solarium Fallback (iOS 27.0+)
 - Disable Daemons:
   - OTAd
   - UsageTrackingAgent
@@ -88,6 +89,98 @@ Make sure you have installed the [requirements](#requirements) if you are on Win
   - PassBook
   - Spotlight
   - Voice Control
+  - Promoted Content
+  - Wi-Fi Analytics
+  - News
+  - Ask Permissions
+  - Family Circle (Family Sharing)
+  - Family Notifications
+  - Ad Privacy
+  - Ad Services
+  - Video Subscriptions
+  - Web Bookmarks
+  - Nano Registry (Apple Watch)
+  - Nano Media Control (Apple Watch)
+  - Nano Preferences (Apple Watch)
+  - Siri Actions
+  - Siri Inference
+  - Feedback
+  - Commerce (App Store Checks)
+  - CoreDuet (Battery/Usage Statistics)
+  - Insight
+  - Metrics
+  - System Analytics (analyticsd)
+  - Call Analytics (RTC Reporting)
+  - Symptom Diagnostics (symptomsd)
+  - Mobile Asset Downloads (Telemetry)
+  - Ubiquity (iCloud Usage Sync)
+  - Core Telephony Analytics
+  - Media Experience Analytics
+  - Automount
+  - Siri Intent
+  - Cloud Keychain
+  - Network Extensions
+  - Device Check
+  - Managed Configuration (MDM)
+  - Container Manager
+  - MobileGestalt Helper
+  - Time Sync
+  - Mock Location
+  - APFS Daemon
+  - Persistence
+  - Calendar Database
+  - Data Access
+  - Networkd
+  - Privacy
+  - App Store
+  - Books
+  - Podcasts
+  - User Notifications
+  - Activity Stream (App Installation)
+  - Photos Library
+  - Music Store
+  - Apple Account
+  - Bluetooth
+  - Wi-Fi Manager
+  - Wi-Fi Logging
+  - Maps (Geod)
+  - Health Sync
+  - Disk Arbitration
+  - Media Remote Control
+  - Notifications
+  - Parse (Safari Suggestions)
+  - Shazam
+  - Siri
+  - Settings Stats
+  - Status Kit
+  - Reminders
+  - Configuration Profiles
+  - Certificate Revocation
+  - EAP (Wi-Fi Auth)
+  - AirPlay
+  - iCloud Container
+  - GameKit Service
+  - NFC
+  - UART Pairing
+  - Sidecar
+  - Continuity
+  - Sharing (AirDrop)
+  - Find My
+  - Nearby Interaction
+  - Media Session
+  - Speech Recognition
+  - ReplayKit
+  - Address Book
+  - Core Animation
+  - Core Bluetooth
+  - Core Telephony
+  - Keybag (Encryption Keys)
+  - Restore Service
+  - Security
+  - Signpost Reporter
+  - Translate
+- Recommended (one tap to disable all analytics/telemetry daemons):
+  - Selects every analytics/telemetry/tracking daemon in one tap
 </details>
 
 ## Contributors 
