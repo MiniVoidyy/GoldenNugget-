@@ -845,18 +845,30 @@ class DeviceManager:
                     files_to_restore=files_to_restore,
                     owner=ownership, group=ownership
                 )
-            # iOS 27+: Also write .GlobalPreferences.plist to HomeDomain so
-            # tweaks that depend on it survive the Phase 3 protective backup restore.
-            # ManagedPreferencesDomain is the primary location; HomeDomain is a
-            # secondary copy for iOS 27 compatibility. (Phase 3 skips this file
-            # to avoid overwriting the tweak copy.)
-            home_plist = basic_plists.get(FileLocation.globalPreferences, {})
-            self.concat_file(
-                contents=plistlib.dumps(home_plist),
-                path=FileLocation.globalPreferencesHomeDomain.value,
-                files_to_restore=files_to_restore,
-                owner=501, group=501
-            )
+            # iOS 27+: Also write ManagedPreferencesDomain and SysSharedContainerDomain plists to HomeDomain so
+            # tweaks survive the Phase 3 protective backup restore.
+            # ManagedPreferencesDomain and SysSharedContainerDomain are wiped by iOS 27; HomeDomain is re-injected.
+            from src.tweaks.basic_plist_locations import FileLocation
+            managed_prefs_mappings = {
+                FileLocation.globalPreferences: FileLocation.globalPreferencesHomeDomain,
+                FileLocation.springboard: FileLocation.springboardHomeDomain,
+                FileLocation.airdrop: FileLocation.airdropHomeDomain,
+                FileLocation.appStore: FileLocation.appStoreHomeDomain,
+                FileLocation.backboardd: FileLocation.backboarddHomeDomain,
+                FileLocation.coreMotion: FileLocation.coreMotionHomeDomain,
+                FileLocation.pasteboard: FileLocation.pasteboardHomeDomain,
+                FileLocation.notes: FileLocation.notesHomeDomain,
+                FileLocation.uikit: FileLocation.uikitHomeDomain,
+                FileLocation.footnote: FileLocation.footnoteHomeDomain,
+            }
+            for managed_loc, home_loc in managed_prefs_mappings.items():
+                if managed_loc in basic_plists:
+                    self.concat_file(
+                        contents=plistlib.dumps(basic_plists[managed_loc]),
+                        path=home_loc.value,
+                        files_to_restore=files_to_restore,
+                        owner=501, group=501
+                    )
 
             for location, data in files_data.items():
                 self.concat_file(
