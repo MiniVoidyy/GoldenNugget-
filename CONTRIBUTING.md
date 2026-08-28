@@ -57,4 +57,3 @@ To keep the repository history clean and easy to read, please use the appropriat
 
 * This guide may be updated at any time. 
 * **Existing pull requests will not be affected** if these guidelines are updated later.
-* Feel free to leave your thoughts or feedback about this guide in the repository discussions!
