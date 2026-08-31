@@ -164,6 +164,75 @@ class Daemon(Enum):
     CoreBluetooth = ["com.apple.corebluetoothd"]
 
 
+class DaemonCategory(Enum):
+    """UI grouping for the standalone daemon toggles."""
+    LOGGING = "Logging"
+    ANALYTICS = "Analytics"
+    TRACKING = "Tracking"
+    OTHER = "Other"
+
+
+# Category tag for every standalone daemon toggle. Determines which
+# IOSSectionHeader the daemon appears under in the daemons page.
+DAEMON_CATEGORY = {
+    # Logging / crash-report / diagnostic capture
+    Daemon.CrashReports: DaemonCategory.LOGGING,
+    Daemon.Diagnostics: DaemonCategory.LOGGING,
+    Daemon.WiFiLogging: DaemonCategory.LOGGING,
+    Daemon.SignpostReporter: DaemonCategory.LOGGING,
+    Daemon.Symptomsd: DaemonCategory.LOGGING,
+
+    # Analytics / telemetry / usage / advertising data
+    Daemon.UsageTrackingAgent: DaemonCategory.ANALYTICS,
+    Daemon.WifiAnalytics: DaemonCategory.ANALYTICS,
+    Daemon.AnalyticsHelper: DaemonCategory.ANALYTICS,
+    Daemon.CallAnalytics: DaemonCategory.ANALYTICS,
+    Daemon.CoreDuet: DaemonCategory.ANALYTICS,
+    Daemon.Insight: DaemonCategory.ANALYTICS,
+    Daemon.Metrics: DaemonCategory.ANALYTICS,
+    Daemon.AdPrivacy: DaemonCategory.ANALYTICS,
+    Daemon.AdServices: DaemonCategory.ANALYTICS,
+    Daemon.PromotedContent: DaemonCategory.ANALYTICS,
+    Daemon.Commerce: DaemonCategory.ANALYTICS,
+    Daemon.SettingsStats: DaemonCategory.ANALYTICS,
+    Daemon.StatusKit: DaemonCategory.ANALYTICS,
+    Daemon.MediaExperience: DaemonCategory.ANALYTICS,
+    Daemon.DataAccess: DaemonCategory.ANALYTICS,
+    Daemon.Feedback: DaemonCategory.ANALYTICS,
+    Daemon.News: DaemonCategory.ANALYTICS,
+    Daemon.VideosSubscriptions: DaemonCategory.ANALYTICS,
+    Daemon.WebBookmarks: DaemonCategory.ANALYTICS,
+    Daemon.MobileAssetd: DaemonCategory.ANALYTICS,
+    Daemon.NanoRegistry: DaemonCategory.ANALYTICS,
+    Daemon.CoreTelephonyAnalytics: DaemonCategory.ANALYTICS,
+
+    # Tracking / activity / on-device behavior & suggestions
+    Daemon.SiriInference: DaemonCategory.TRACKING,
+    Daemon.SiriActions: DaemonCategory.TRACKING,
+    Daemon.SiriIntent: DaemonCategory.TRACKING,
+    Daemon.Siri: DaemonCategory.TRACKING,
+    Daemon.FollowUp: DaemonCategory.TRACKING,
+    Daemon.Parse: DaemonCategory.TRACKING,
+    Daemon.Spotlight: DaemonCategory.TRACKING,
+    Daemon.GameCenter: DaemonCategory.TRACKING,
+    Daemon.GameKitService: DaemonCategory.TRACKING,
+    Daemon.Shazam: DaemonCategory.TRACKING,
+    Daemon.Location: DaemonCategory.TRACKING,
+    Daemon.VoiceControl: DaemonCategory.TRACKING,
+    Daemon.ScreenTime: DaemonCategory.TRACKING,
+    Daemon.AskPermissions: DaemonCategory.TRACKING,
+    Daemon.AccountSync: DaemonCategory.TRACKING,
+    Daemon.NanoMediaControl: DaemonCategory.TRACKING,
+    Daemon.NanoTimeKit: DaemonCategory.TRACKING,
+    Daemon.Ubiquityd: DaemonCategory.TRACKING,
+}
+
+
+def daemon_category(daemon: Daemon) -> DaemonCategory:
+    """Return the UI category for a daemon, defaulting to OTHER."""
+    return DAEMON_CATEGORY.get(daemon, DaemonCategory.OTHER)
+
+
 class DaemonGroup(Enum):
     """Grouped selections that enable a set of daemons in one tap."""
     Recommended = auto()

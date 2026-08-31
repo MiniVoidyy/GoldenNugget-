@@ -4,7 +4,12 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QL
 from src.gui.ios.components import IOSSectionHeader, IOSSwitch
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.tweak_loader import load_daemons
-from src.tweaks.daemons_tweak import Daemon, RECOMMENDED_ANALYTICS
+from src.tweaks.daemons_tweak import (
+    Daemon,
+    DaemonCategory,
+    RECOMMENDED_ANALYTICS,
+    daemon_category,
+)
 
 
 class IOSDaemonsContent(QWidget):
@@ -45,7 +50,7 @@ class IOSDaemonsContent(QWidget):
 
         self.daemon_cards = []
         self.daemon_switches = []
-        for title, daemon in [
+        daemon_items = [
             (QCoreApplication.translate("Nugget", "Disable thermalmonitord"), Daemon.thermalmonitord),
             (QCoreApplication.translate("Nugget", "Disable OTA"), Daemon.OTA),
             (QCoreApplication.translate("Nugget", "Disable UsageTrackingAgent"), Daemon.UsageTrackingAgent),
@@ -150,10 +155,29 @@ class IOSDaemonsContent(QWidget):
             (QCoreApplication.translate("Nugget", "Disable Core Bluetooth"), Daemon.CoreBluetooth),
             (QCoreApplication.translate("Nugget", "Disable Core Telephony"), Daemon.CoreTelephony),
             (QCoreApplication.translate("Nugget", "Disable Signpost Reporter"), Daemon.SignpostReporter),
-        ]:
-            card, switch = self._make_daemon_switch(layout, title, daemon)
-            self.daemon_cards.append(card)
-            self.daemon_switches.append((daemon, switch))
+        ]
+
+        section_order = [
+            DaemonCategory.LOGGING,
+            DaemonCategory.ANALYTICS,
+            DaemonCategory.TRACKING,
+            DaemonCategory.OTHER,
+        ]
+        section_titles = {
+            DaemonCategory.LOGGING: QCoreApplication.translate("Nugget", "Logging"),
+            DaemonCategory.ANALYTICS: QCoreApplication.translate("Nugget", "Analytics"),
+            DaemonCategory.TRACKING: QCoreApplication.translate("Nugget", "Tracking"),
+            DaemonCategory.OTHER: QCoreApplication.translate("Nugget", "Other"),
+        }
+        for category in section_order:
+            items = [(t, d) for t, d in daemon_items if daemon_category(d) is category]
+            if not items:
+                continue
+            layout.addWidget(IOSSectionHeader(section_titles[category]))
+            for title, daemon in items:
+                card, switch = self._make_daemon_switch(layout, title, daemon)
+                self.daemon_cards.append(card)
+                self.daemon_switches.append((daemon, switch))
 
         # Screen Time
         layout.addWidget(IOSSectionHeader(
