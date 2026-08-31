@@ -104,7 +104,6 @@ class IOSDaemonsContent(QWidget):
             (QCoreApplication.translate("Nugget", "Disable MobileGestalt Helper"), Daemon.MobileGestaltHelper),
             (QCoreApplication.translate("Nugget", "Disable Time Sync"), Daemon.TimeSync),
             (QCoreApplication.translate("Nugget", "Disable Mock Location"), Daemon.MockLocation),
-            (QCoreApplication.translate("Nugget", "Disable APFS Daemon"), Daemon.APFSD),
             (QCoreApplication.translate("Nugget", "Disable Persistence"), Daemon.Persistence),
             (QCoreApplication.translate("Nugget", "Disable Calendar Database"), Daemon.Calendar),
             (QCoreApplication.translate("Nugget", "Disable Data Access"), Daemon.DataAccess),
@@ -114,7 +113,6 @@ class IOSDaemonsContent(QWidget):
             (QCoreApplication.translate("Nugget", "Disable Books"), Daemon.Books),
             (QCoreApplication.translate("Nugget", "Disable Podcasts"), Daemon.Podcasts),
             (QCoreApplication.translate("Nugget", "Disable User Notifications"), Daemon.UserNotifications),
-            (QCoreApplication.translate("Nugget", "Disable Activity Stream (App Installation)"), Daemon.ActivityStream),
             (QCoreApplication.translate("Nugget", "Disable Photos Library"), Daemon.Photos),
             (QCoreApplication.translate("Nugget", "Disable Music Store"), Daemon.Music),
             (QCoreApplication.translate("Nugget", "Disable Apple Account"), Daemon.AppleAccount),
@@ -149,15 +147,9 @@ class IOSDaemonsContent(QWidget):
             (QCoreApplication.translate("Nugget", "Disable Media Session"), Daemon.MediaSession),
             (QCoreApplication.translate("Nugget", "Disable Speech Recognition"), Daemon.SpeechRecognition),
             (QCoreApplication.translate("Nugget", "Disable ReplayKit"), Daemon.ReplayKit),
-            (QCoreApplication.translate("Nugget", "Disable Address Book"), Daemon.AddressBook),
-            (QCoreApplication.translate("Nugget", "Disable Core Animation"), Daemon.CoreAnimation),
             (QCoreApplication.translate("Nugget", "Disable Core Bluetooth"), Daemon.CoreBluetooth),
             (QCoreApplication.translate("Nugget", "Disable Core Telephony"), Daemon.CoreTelephony),
-            (QCoreApplication.translate("Nugget", "Disable Keybag (Encryption Keys)"), Daemon.Keybag),
-            (QCoreApplication.translate("Nugget", "Disable Restore Service"), Daemon.Restore),
-            (QCoreApplication.translate("Nugget", "Disable Security"), Daemon.Security),
             (QCoreApplication.translate("Nugget", "Disable Signpost Reporter"), Daemon.SignpostReporter),
-            (QCoreApplication.translate("Nugget", "Disable Translate"), Daemon.Translate),
         ]:
             card, switch = self._make_daemon_switch(layout, title, daemon)
             self.daemon_cards.append(card)

@@ -31,21 +31,7 @@ class Daemon(Enum):
         "com.apple.crashreportcopymobile",
         "com.apple.DumpBasebandCrash",
         "com.apple.DumpPanic",
-        "com.apple.logd",
-        "com.apple.logd.admin",
-        "com.apple.logd.events",
-        "com.apple.logd.watchdog",
-        "com.apple.logd_helper",
-        "com.apple.logd_reporter",
-        "com.apple.logd_reporter.report_statistics",
-        "com.apple.system.logger",
-        "com.apple.hangreporter",
-        "com.apple.hangtracerd",
-        "com.apple.spindump",
-        "com.apple.tailspind",
         "com.apple.rtcreportingd",
-        "com.apple.syslogd",
-        "com.apple.signpost.signpost_reporter",
         "com.apple.pluginkit.pkreporter",
         "com.apple.ProxiedCrashCopier",
         "com.apple.ProxiedCrashCopier.ProxyingDevice",
@@ -130,7 +116,6 @@ class Daemon(Enum):
     MobileGestaltHelper = ["com.apple.mobilegestalt_helper"]
     TimeSync = ["com.apple.timed"]
     MockLocation = ["com.apple.mocksynclocationd"]
-    APFSD = ["com.apple.apfsd"]
     Persistence = ["com.apple.persistence-helper", "com.apple.persistence-d"]
     Calendar = ["com.apple.calendar.database", "com.apple.CalendarAgent"]
     DataAccess = ["com.apple.dataaccess.dataaccessd"]
@@ -140,7 +125,6 @@ class Daemon(Enum):
     Books = ["com.apple.bookdatastored"]
     Podcasts = ["com.apple.podcasts"]
     UserNotifications = ["com.apple.usernotificationsd"]
-    ActivityStream = ["com.apple.mobile.installd"]
     Photos = ["com.apple.photolibraryd"]
     Music = ["com.apple.itunesstored"]
     AppleAccount = ["com.apple.appleaccountd"]
@@ -155,9 +139,6 @@ class Daemon(Enum):
     Notifications = ["com.apple.notificationd"]
     Parse = ["com.apple.parsecd"]
     Shazam = ["com.apple.shazamd"]
-    Restore = ["com.apple.mobile.restored"]
-    Keybag = ["com.apple.keybagd"]
-    Security = ["com.apple.securityd"]
     Siri = ["com.apple.siri"]
     SettingsStats = ["com.apple.settings-statsd"]
     StatusKit = ["com.apple.statuskit"]
@@ -179,10 +160,7 @@ class Daemon(Enum):
     CoreTelephony = ["com.apple.coretelephony"]
     MediaSession = ["com.apple.mediasessiond"]
     SpeechRecognition = ["com.apple.speechrecognition"]
-    Translate = ["com.apple.translated"]
     ReplayKit = ["com.apple.replayd"]
-    AddressBook = ["com.apple.addressbook"]
-    CoreAnimation = ["com.apple.coreanimation"]
     CoreBluetooth = ["com.apple.corebluetoothd"]
 
 
@@ -193,7 +171,8 @@ class DaemonGroup(Enum):
 
 # Analytics / telemetry / tracking daemons selected by "Recommended".
 # Disabling these reduces data collection while keeping core device
-# functionality intact.
+# functionality intact. Core logging/cellular/security daemons are
+# intentionally EXCLUDED to avoid boot/setup loops.
 RECOMMENDED_ANALYTICS = [
     Daemon.CrashReports,
     Daemon.Diagnostics,
@@ -201,8 +180,6 @@ RECOMMENDED_ANALYTICS = [
     Daemon.WifiAnalytics,
     Daemon.AnalyticsHelper,
     Daemon.CallAnalytics,
-    Daemon.Symptomsd,
-    Daemon.CoreTelephonyAnalytics,
     Daemon.AdPrivacy,
     Daemon.AdServices,
     Daemon.PromotedContent,
