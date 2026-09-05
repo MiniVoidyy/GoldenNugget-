@@ -151,56 +151,56 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.is_time_overridden(),
             self.status_manager.get_time_override(),
             self.status_manager.set_time, self.status_manager.unset_time,
-            desc=QCoreApplication.translate("Nugget", "Overrides the status bar clock time string with custom text."),
+            desc=QCoreApplication.translate("Nugget", "Replaces the status bar clock time string with custom text (e.g. your own custom time string)."),
         )
         self.date_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Change Status Bar Date Text"),
             self.status_manager.is_date_overridden(),
             self.status_manager.get_date_override(),
             self.status_manager.set_date, self.status_manager.unset_date,
-            desc=QCoreApplication.translate("Nugget", "Overrides the Lock Screen date text with custom text."),
+            desc=QCoreApplication.translate("Nugget", "Replaces the Lock Screen date text with a custom string."),
         )
         self.breadcrumb_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Change Breadcrumb Text"),
             self.status_manager.is_crumb_overridden(),
             self.status_manager.get_crumb_override(),
             self.status_manager.set_crumb, self.status_manager.unset_crumb,
-            desc=QCoreApplication.translate("Nugget", "Overrides the return breadcrumb text shown when switching apps."),
+            desc=QCoreApplication.translate("Nugget", "Changes the 'Back to [App]' return link text displayed at the top left of the status bar when exiting an app."),
         )
         self.battery_detail_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Change Battery Detail Text"),
             self.status_manager.is_battery_detail_overridden(),
             self.status_manager.get_battery_detail_override(),
             self.status_manager.set_battery_detail, self.status_manager.unset_battery_detail,
-            desc=QCoreApplication.translate("Nugget", "Overrides the battery status detail text."),
+            desc=QCoreApplication.translate("Nugget", "Overrides the secondary battery detail status string (such as charging status or time remaining)."),
         )
         self.carrier_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Change Carrier Text"),
             self.status_manager.is_carrier_overridden(),
             self.status_manager.get_carrier_override(),
             self.status_manager.set_carrier_override, self.status_manager.unset_carrier_override,
-            desc=QCoreApplication.translate("Nugget", "Overrides the primary carrier name displayed in the status bar."),
+            desc=QCoreApplication.translate("Nugget", "Replaces your mobile operator carrier name in the status bar with custom text."),
         )
         self.badge_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Change Service Badge Text"),
             self.status_manager.is_primary_service_badge_overridden(),
             self.status_manager.get_primary_service_badge_override(),
             self.status_manager.set_primary_service_badge, self.status_manager.unset_primary_service_badge,
-            desc=QCoreApplication.translate("Nugget", "Overrides the primary cellular network badge (e.g. LTE/5G)."),
+            desc=QCoreApplication.translate("Nugget", "Replaces the network technology badge (e.g. 5G, LTE, 4G) with a custom string."),
         )
         self.secondary_carrier_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Secondary Carrier Name"),
             self.status_manager.is_secondary_carrier_overridden(),
             self.status_manager.get_secondary_carrier_override(),
             self.status_manager.set_secondary_carrier_override, self.status_manager.unset_secondary_carrier_override,
-            desc=QCoreApplication.translate("Nugget", "Overrides the secondary carrier name for dual-SIM setups."),
+            desc=QCoreApplication.translate("Nugget", "Replaces the carrier name for your secondary SIM card in dual-SIM mode."),
         )
         self.secondary_badge_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Secondary Service Badge"),
             self.status_manager.is_secondary_service_badge_overridden(),
             self.status_manager.get_secondary_service_badge_override(),
             self.status_manager.set_secondary_service_badge, self.status_manager.unset_secondary_service_badge,
-            desc=QCoreApplication.translate("Nugget", "Overrides the secondary cellular network badge."),
+            desc=QCoreApplication.translate("Nugget", "Replaces the network technology badge for your secondary SIM card."),
         )
 
         # Number rows
@@ -211,7 +211,7 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_gsm_signal_strength_bars_override(),
             self.status_manager.set_gsm_signal_strength_bars, self.status_manager.unset_gsm_signal_strength_bars,
             0, 5,
-            desc=QCoreApplication.translate("Nugget", "Overrides cellular signal strength bars (0 to 5)."),
+            desc=QCoreApplication.translate("Nugget", "Forces the cellular signal bars indicator to show a specific number of bars from 0 to 5 regardless of actual reception."),
         )
         self.secondary_gsm_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Secondary Cellular Signal Bars"),
@@ -219,7 +219,7 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_secondary_gsm_signal_strength_bars_override(),
             self.status_manager.set_secondary_gsm_signal_strength_bars, self.status_manager.unset_secondary_gsm_signal_strength_bars,
             0, 5,
-            desc=QCoreApplication.translate("Nugget", "Overrides secondary SIM signal strength bars (0 to 5)."),
+            desc=QCoreApplication.translate("Nugget", "Forces the secondary SIM signal bars indicator to show a specific level from 0 to 5."),
         )
         self.wifi_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Change Wi-Fi Signal Strength"),
@@ -227,7 +227,7 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_wifi_signal_strength_bars_override(),
             self.status_manager.set_wifi_signal_strength_bars, self.status_manager.unset_wifi_signal_strength_bars,
             0, 5,
-            desc=QCoreApplication.translate("Nugget", "Overrides Wi-Fi signal strength bars (0 to 5)."),
+            desc=QCoreApplication.translate("Nugget", "Forces the Wi-Fi signal bars indicator to show a specific level from 0 to 5 regardless of actual signal strength."),
         )
         self.battery_capacity_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Change Battery Icon Capacity"),
@@ -235,7 +235,7 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_battery_capacity_override(),
             self.status_manager.set_battery_capacity, self.status_manager.unset_battery_capacity,
             0, 100,
-            desc=QCoreApplication.translate("Nugget", "Overrides the displayed battery percentage/capacity (0 to 100)."),
+            desc=QCoreApplication.translate("Nugget", "Forces the battery fill level in the status bar to show a custom percentage from 0 to 100."),
         )
         self.network_type_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Change Data Network Type"),
@@ -243,7 +243,7 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_data_network_type_override(),
             self.status_manager.set_data_network_type, self.status_manager.unset_data_network_type,
             0, 30,
-            desc=QCoreApplication.translate("Nugget", "Overrides the data network technology indicator type (0 to 30)."),
+            desc=QCoreApplication.translate("Nugget", "Overrides the data connection type code (0 to 30) to simulate different cellular network types like 3G, LTE, 5G, or 5G+."),
         )
         self.secondary_network_type_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Secondary Data Network Type"),
@@ -251,22 +251,22 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_secondary_data_network_type_override(),
             self.status_manager.set_secondary_data_network_type, self.status_manager.unset_secondary_data_network_type,
             0, 30,
-            desc=QCoreApplication.translate("Nugget", "Overrides the secondary SIM data network indicator type (0 to 30)."),
+            desc=QCoreApplication.translate("Nugget", "Overrides the data network technology code for your secondary SIM card slot (0 to 30)."),
         )
 
         # Raw signal strength
         self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Raw Signal Strength")))
         self._make_switch(
             QCoreApplication.translate("Nugget", "Show Numeric Cellular Strength"),
-            self.status_manager.is_raw_gsm_signal_shown(),
+            self.status_manager.is_raw_gsm_signal_strength_bars_overridden() if hasattr(self.status_manager, 'is_raw_gsm_signal_strength_bars_overridden') else self.status_manager.is_raw_gsm_signal_shown(),
             lambda checked: self.status_manager.show_raw_gsm_signal(checked),
-            desc=QCoreApplication.translate("Nugget", "Displays numeric dBm values instead of signal bars."),
+            desc=QCoreApplication.translate("Nugget", "Toggle ON: replaces the cellular signal bars with an exact numerical dBm signal strength value."),
         )
         self._make_switch(
             QCoreApplication.translate("Nugget", "Show Numeric Wi-Fi Strength"),
             self.status_manager.is_raw_wifi_signal_shown(),
             lambda checked: self.status_manager.show_raw_wifi_signal(checked),
-            desc=QCoreApplication.translate("Nugget", "Displays numeric Wi-Fi dBm values instead of signal bars."),
+            desc=QCoreApplication.translate("Nugget", "Toggle ON: replaces the Wi-Fi signal arcs with an exact numerical dBm signal strength value."),
         )
 
         # Item show/hide toggles
