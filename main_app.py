@@ -146,6 +146,10 @@ if __name__ == "__main__":
     widget.resize(800, 600)
     widget.show()
 
+    # Check for updates in background/startup
+    from src.controllers.update_checker import check_for_updates
+    check_for_updates(widget)
+
     for arg in sys.argv:
         if arg.endswith('.tendies'):
             tweaks[TweakID.PosterBoard].add_tendie(arg)
