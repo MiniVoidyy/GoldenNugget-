@@ -826,7 +826,7 @@ class MainWindow(QtWidgets.QMainWindow):
         box.exec()
         if box.clickedButton() == star_btn:
             from PySide6.QtGui import QDesktopServices
-            QDesktopServices.openUrl(QtCore.QUrl("https://github.com/awesomenull-dev/GoldenNugget"))
+            QDesktopServices.openUrl(QtCore.QUrl("https://github.com/MiniVoidyy/GoldenNugget-"))
 
     def _sync_settings(self):
         """Sync settings to disk immediately after critical changes."""

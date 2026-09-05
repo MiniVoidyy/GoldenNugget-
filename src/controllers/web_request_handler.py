@@ -2,7 +2,7 @@ from requests import get, RequestException, HTTPError
 from json import JSONDecodeError
 from src.devicemanagement.constants import Version
 
-Nugget_Repo = "awesomenull-dev/GoldenNugget/releases/latest"
+Nugget_Repo = "MiniVoidyy/GoldenNugget-/releases/latest"
 
 last_fetched_version: str = None
 

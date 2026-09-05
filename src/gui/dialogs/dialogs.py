@@ -148,7 +148,7 @@ class AboutProgramDialog(QDialog):
         
         # Credits data - from original home page
         credits = [
-            ("Main Developer", "awesomenull", "https://github.com/awesomenull-dev"),
+            ("Main Developer", "MiniVoidyy", "https://github.com/MiniVoidyy"),
             ("iOS 27 Support", "Wind0ws11Aero", "https://github.com/Wind0ws11Aero"),
             ("Nugget Creator", "leminlemiz", "https://github.com/leminlemiz"),
             ("PosterRestore Team", "PosterRestore Discord", "https://discord.gg/gWtzTVhMvh"),
@@ -207,7 +207,7 @@ class AboutProgramDialog(QDialog):
         github_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
         github_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         github_btn.setStyleSheet("QToolButton { color: #007AFF; font-size: 14px; font-weight: 500; background: none; border: none; padding: 4px 8px; } QToolButton:hover { text-decoration: underline; }")
-        github_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/awesomenull-dev/GoldenNugget")))
+        github_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/MiniVoidyy/GoldenNugget-")))
         links_layout.addWidget(github_btn)
         
         website_btn = QToolButton()
