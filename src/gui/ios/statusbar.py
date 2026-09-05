@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.gui.ios.components import (
-    IOSSectionHeader, IOSSwitch, IOSSettingsRow
+    IOSSectionHeader, IOSSwitch, IOSSettingsRow, install_instant_tooltip
 )
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.status_bar.status_setter import StatusBarItem
@@ -141,6 +141,7 @@ class IOSStatusBarPage(QWidget):
             QCoreApplication.translate("Nugget", "Enable Status Bar Modifications"),
             self.status_manager.enabled,
             self._on_enabled_toggled,
+            desc=QCoreApplication.translate("Nugget", "Master switch for status bar modifications. When OFF, none of the status bar text, level or icon overrides apply."),
         )
 
         # Text rows
@@ -150,48 +151,56 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.is_time_overridden(),
             self.status_manager.get_time_override(),
             self.status_manager.set_time, self.status_manager.unset_time,
+            desc=QCoreApplication.translate("Nugget", "Overrides the status bar clock time string with custom text."),
         )
         self.date_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Change Status Bar Date Text"),
             self.status_manager.is_date_overridden(),
             self.status_manager.get_date_override(),
             self.status_manager.set_date, self.status_manager.unset_date,
+            desc=QCoreApplication.translate("Nugget", "Overrides the Lock Screen date text with custom text."),
         )
         self.breadcrumb_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Change Breadcrumb Text"),
             self.status_manager.is_crumb_overridden(),
             self.status_manager.get_crumb_override(),
             self.status_manager.set_crumb, self.status_manager.unset_crumb,
+            desc=QCoreApplication.translate("Nugget", "Overrides the return breadcrumb text shown when switching apps."),
         )
         self.battery_detail_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Change Battery Detail Text"),
             self.status_manager.is_battery_detail_overridden(),
             self.status_manager.get_battery_detail_override(),
             self.status_manager.set_battery_detail, self.status_manager.unset_battery_detail,
+            desc=QCoreApplication.translate("Nugget", "Overrides the battery status detail text."),
         )
         self.carrier_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Change Carrier Text"),
             self.status_manager.is_carrier_overridden(),
             self.status_manager.get_carrier_override(),
             self.status_manager.set_carrier_override, self.status_manager.unset_carrier_override,
+            desc=QCoreApplication.translate("Nugget", "Overrides the primary carrier name displayed in the status bar."),
         )
         self.badge_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Change Service Badge Text"),
             self.status_manager.is_primary_service_badge_overridden(),
             self.status_manager.get_primary_service_badge_override(),
             self.status_manager.set_primary_service_badge, self.status_manager.unset_primary_service_badge,
+            desc=QCoreApplication.translate("Nugget", "Overrides the primary cellular network badge (e.g. LTE/5G)."),
         )
         self.secondary_carrier_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Secondary Carrier Name"),
             self.status_manager.is_secondary_carrier_overridden(),
             self.status_manager.get_secondary_carrier_override(),
             self.status_manager.set_secondary_carrier_override, self.status_manager.unset_secondary_carrier_override,
+            desc=QCoreApplication.translate("Nugget", "Overrides the secondary carrier name for dual-SIM setups."),
         )
         self.secondary_badge_row = self._make_text_row(
             QCoreApplication.translate("Nugget", "Secondary Service Badge"),
             self.status_manager.is_secondary_service_badge_overridden(),
             self.status_manager.get_secondary_service_badge_override(),
             self.status_manager.set_secondary_service_badge, self.status_manager.unset_secondary_service_badge,
+            desc=QCoreApplication.translate("Nugget", "Overrides the secondary cellular network badge."),
         )
 
         # Number rows
@@ -202,6 +211,7 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_gsm_signal_strength_bars_override(),
             self.status_manager.set_gsm_signal_strength_bars, self.status_manager.unset_gsm_signal_strength_bars,
             0, 5,
+            desc=QCoreApplication.translate("Nugget", "Overrides cellular signal strength bars (0 to 5)."),
         )
         self.secondary_gsm_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Secondary Cellular Signal Bars"),
@@ -209,6 +219,7 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_secondary_gsm_signal_strength_bars_override(),
             self.status_manager.set_secondary_gsm_signal_strength_bars, self.status_manager.unset_secondary_gsm_signal_strength_bars,
             0, 5,
+            desc=QCoreApplication.translate("Nugget", "Overrides secondary SIM signal strength bars (0 to 5)."),
         )
         self.wifi_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Change Wi-Fi Signal Strength"),
@@ -216,6 +227,7 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_wifi_signal_strength_bars_override(),
             self.status_manager.set_wifi_signal_strength_bars, self.status_manager.unset_wifi_signal_strength_bars,
             0, 5,
+            desc=QCoreApplication.translate("Nugget", "Overrides Wi-Fi signal strength bars (0 to 5)."),
         )
         self.battery_capacity_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Change Battery Icon Capacity"),
@@ -223,6 +235,7 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_battery_capacity_override(),
             self.status_manager.set_battery_capacity, self.status_manager.unset_battery_capacity,
             0, 100,
+            desc=QCoreApplication.translate("Nugget", "Overrides the displayed battery percentage/capacity (0 to 100)."),
         )
         self.network_type_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Change Data Network Type"),
@@ -230,6 +243,7 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_data_network_type_override(),
             self.status_manager.set_data_network_type, self.status_manager.unset_data_network_type,
             0, 30,
+            desc=QCoreApplication.translate("Nugget", "Overrides the data network technology indicator type (0 to 30)."),
         )
         self.secondary_network_type_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Secondary Data Network Type"),
@@ -237,6 +251,7 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.get_secondary_data_network_type_override(),
             self.status_manager.set_secondary_data_network_type, self.status_manager.unset_secondary_data_network_type,
             0, 30,
+            desc=QCoreApplication.translate("Nugget", "Overrides the secondary SIM data network indicator type (0 to 30)."),
         )
 
         # Raw signal strength
@@ -245,11 +260,13 @@ class IOSStatusBarPage(QWidget):
             QCoreApplication.translate("Nugget", "Show Numeric Cellular Strength"),
             self.status_manager.is_raw_gsm_signal_shown(),
             lambda checked: self.status_manager.show_raw_gsm_signal(checked),
+            desc=QCoreApplication.translate("Nugget", "Displays numeric dBm values instead of signal bars."),
         )
         self._make_switch(
             QCoreApplication.translate("Nugget", "Show Numeric Wi-Fi Strength"),
             self.status_manager.is_raw_wifi_signal_shown(),
             lambda checked: self.status_manager.show_raw_wifi_signal(checked),
+            desc=QCoreApplication.translate("Nugget", "Displays numeric Wi-Fi dBm values instead of signal bars."),
         )
 
         # Item show/hide toggles
@@ -276,6 +293,7 @@ class IOSStatusBarPage(QWidget):
                 name,
                 overridden and shown,
                 self._make_item_handler(item),
+                desc=QCoreApplication.translate("Nugget", "Toggle to force-show or hide this status bar item."),
             )
 
         # Silly mode
@@ -284,6 +302,7 @@ class IOSStatusBarPage(QWidget):
             QCoreApplication.translate("Nugget", "Silly Mode"),
             self.status_manager.is_silly_mode_enabled(),
             lambda checked: self.status_manager.toggle_silly_mode(checked),
+            desc=QCoreApplication.translate("Nugget", "Enables fun Easter egg text overrides in the status bar."),
         )
 
         self.content_layout.addStretch()
@@ -299,21 +318,29 @@ class IOSStatusBarPage(QWidget):
                     self.status_manager.set_item_override(item, False)
         return handler
 
-    def _make_switch(self, title: str, checked: bool, on_toggled):
+    def _make_switch(self, title: str, checked: bool, on_toggled, desc: str = ""):
         card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
         row.setSpacing(12)
         label = QLabel(title)
         label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
+        if desc:
+            card.setToolTip(desc)
+            label.setToolTip(desc)
+            install_instant_tooltip(card)
+            install_instant_tooltip(label)
         row.addWidget(label, 1)
         switch = IOSSwitch(checked)
+        if desc:
+            switch.setToolTip(desc)
+            install_instant_tooltip(switch)
         switch.toggled.connect(on_toggled)
         row.addWidget(switch)
         self.content_layout.addWidget(card)
         return switch
 
-    def _make_text_row(self, title: str, overridden: bool, current: str, setter, unsetter):
+    def _make_text_row(self, title: str, overridden: bool, current: str, setter, unsetter, desc: str = ""):
         card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
@@ -321,6 +348,11 @@ class IOSStatusBarPage(QWidget):
 
         label = QLabel(title)
         label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
+        if desc:
+            card.setToolTip(desc)
+            label.setToolTip(desc)
+            install_instant_tooltip(card)
+            install_instant_tooltip(label)
         row.addWidget(label, 1)
 
         value_lbl = QLabel(current if overridden else QCoreApplication.translate("Nugget", "Default"))
@@ -328,6 +360,9 @@ class IOSStatusBarPage(QWidget):
         row.addWidget(value_lbl)
 
         switch = IOSSwitch(overridden)
+        if desc:
+            switch.setToolTip(desc)
+            install_instant_tooltip(switch)
         switch.toggled.connect(lambda checked: self._on_text_row_toggled(checked, setter, unsetter, label, value_lbl, current))
         row.addWidget(switch)
 
@@ -363,7 +398,7 @@ class IOSStatusBarPage(QWidget):
             value_lbl.setText(value if value else QCoreApplication.translate("Nugget", "Default"))
             label.setText(title)
 
-    def _make_number_row(self, title: str, overridden: bool, current: int, setter, unsetter, min_val: int, max_val: int):
+    def _make_number_row(self, title: str, overridden: bool, current: int, setter, unsetter, min_val: int, max_val: int, desc: str = ""):
         card = QWidget()
         row = QHBoxLayout(card)
         row.setContentsMargins(16, 10, 16, 10)
@@ -371,6 +406,11 @@ class IOSStatusBarPage(QWidget):
 
         label = QLabel(title)
         label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
+        if desc:
+            card.setToolTip(desc)
+            label.setToolTip(desc)
+            install_instant_tooltip(card)
+            install_instant_tooltip(label)
         row.addWidget(label, 1)
 
         value_lbl = QLabel(str(current) if overridden else QCoreApplication.translate("Nugget", "Default"))

@@ -1,24 +1,34 @@
 from enum import Enum, auto
 
 
-class Daemon(Enum):
-    thermalmonitord = ["com.apple.thermalmonitord"]
-    OTA = [
+class DaemonCategory(Enum):
+    """UI grouping for the standalone daemon toggles."""
+    LOGGING = "Logging"
+    ANALYTICS = "Analytics"
+    TRACKING = "Tracking"
+    OTHER = "Other"
+
+
+# One source of truth for every standalone daemon toggle.
+# Record: (enum_member_name, DaemonCategory, [launchd labels], display_title)
+DAEMON_RECORDS = [
+    ("thermalmonitord", DaemonCategory.OTHER, ["com.apple.thermalmonitord"], "Disable thermalmonitord"),
+    ("OTA", DaemonCategory.OTHER, [
         "com.apple.mobile.softwareupdated",
         "com.apple.OTATaskingAgent",
         "com.apple.softwareupdateservicesd",
         "com.apple.mobile.NRDUpdated"
-    ]
-    UsageTrackingAgent = ["com.apple.UsageTrackingAgent"]
-    GameCenter = ["com.apple.gamed"]
-    ScreenTime = [
+    ], "Disable OTA"),
+    ("UsageTrackingAgent", DaemonCategory.ANALYTICS, ["com.apple.UsageTrackingAgent"], "Disable UsageTrackingAgent"),
+    ("GameCenter", DaemonCategory.TRACKING, ["com.apple.gamed"], "Disable Game Center"),
+    ("ScreenTime", DaemonCategory.TRACKING, [
         "com.apple.ScreenTimeAgent",
         "com.apple.homed",
         "com.apple.familycircled",
         "com.apple.familynotification",
         "com.apple.asktod"
-    ]
-    CrashReports = [
+    ], "Disable Screen Time Agent"),
+    ("CrashReports", DaemonCategory.LOGGING, [
         "com.apple.ReportCrash",
         "com.apple.ReportCrash.Jetsam",
         "com.apple.ReportMemoryException",
@@ -36,8 +46,8 @@ class Daemon(Enum):
         "com.apple.ProxiedCrashCopier",
         "com.apple.ProxiedCrashCopier.ProxyingDevice",
         "com.apple.ReportSystemMemory"
-    ]
-    Diagnostics = [
+    ], "Disable Logs, Dumps, and Crash Reports"),
+    ("Diagnostics", DaemonCategory.LOGGING, [
         "com.apple.diagnosticd",
         "com.apple.diagnosticextensionsd",
         "com.apple.diagnosticservicesd",
@@ -46,185 +56,323 @@ class Daemon(Enum):
         "com.apple.sysdiagnose",
         "com.apple.sysdiagnose.darwinos",
         "com.apple.sysdiagnose_helper"
-    ]
-    ATWAKEUP = ["com.apple.atc.atwakeup"]
-    Tips = ["com.apple.tipsd"]
-    VPN = ["com.apple.racoon"]
-    Location = ["com.apple.locationd"]
-    ChineseLAN = [
+    ], "Disable System Diagnostics"),
+    ("ATWAKEUP", DaemonCategory.OTHER, ["com.apple.atc.atwakeup"], "Disable ATWAKEUP"),
+    ("Tips", DaemonCategory.OTHER, ["com.apple.tipsd"], "Disable Tips Services"),
+    ("VPN", DaemonCategory.OTHER, ["com.apple.racoon"], "VPN Icon"),
+    ("Location", DaemonCategory.TRACKING, ["com.apple.locationd"], "Location Services"),
+    ("ChineseLAN", DaemonCategory.OTHER, [
         "com.apple.wapic",
         "com.apple.wifi.wapic"
-    ]
-    HealthKit = ["com.apple.healthd"]
-    AirPrint = ["com.apple.printd"]
-    AssistiveTouch = ["com.apple.assistivetouchd"]
-    iCloud = ["com.apple.itunescloudd"]
-    InternetTethering = ["com.apple.MobileInternetSharing"]
-    PassBook = ["com.apple.passd"]
-    Spotlight = [
+    ], "Disable Chinese WLAN Service"),
+    ("HealthKit", DaemonCategory.OTHER, ["com.apple.healthd"], "Disable HealthKit"),
+    ("AirPrint", DaemonCategory.OTHER, ["com.apple.printd"], "Disable AirPrint"),
+    ("AssistiveTouch", DaemonCategory.OTHER, ["com.apple.assistivetouchd"], "Disable Assistive Touch"),
+    ("iCloud", DaemonCategory.OTHER, ["com.apple.itunescloudd"], "Disable iCloud"),
+    ("InternetTethering", DaemonCategory.OTHER, ["com.apple.MobileInternetSharing"], "Disable Internet Tethering (Hotspot)"),
+    ("PassBook", DaemonCategory.OTHER, ["com.apple.passd"], "Disable Passbook"),
+    ("Spotlight", DaemonCategory.TRACKING, [
         "com.apple.searchd",
         "com.apple.corespotlightservice",
         "com.apple.spotlightknowledged",
         "com.apple.spotlightknowledged.updater",
         "com.apple.spotlight.IndexAgent"
-    ]
-    VoiceControl = [
+    ], "Disable Spotlight"),
+    ("VoiceControl", DaemonCategory.TRACKING, [
         "com.apple.assistant_service",
         "com.apple.assistantd",
         "com.apple.voiced"
-    ]
-    NanoTimeKit = ["com.apple.nanotimekitcompaniond"]
-    FollowUp = ["com.apple.followupd"]
-    PromotedContent = ["com.apple.promotedcontentd"]
-    WifiAnalytics = ["com.apple.wifianalyticsd"]
-    News = ["com.apple.newsd"]
-    AskPermissions = ["com.apple.askpermissiond"]
-    FamilyCircle = ["com.apple.familycircled"]
-    FamilyNotification = ["com.apple.familynotificationd"]
-    AdPrivacy = ["com.apple.adprivacyd"]
-    AdServices = ["com.apple.adservicesd"]
-    VideosSubscriptions = ["com.apple.videosubscriptionsd"]
-    WebBookmarks = ["com.apple.webbookmarksd"]
-    NanoRegistry = ["com.apple.nanoregistryd"]
-    NanoMediaControl = ["com.apple.nanomediacontrold"]
-    NanoPreferences = ["com.apple.nanopreferencesd"]
-    SiriActions = ["com.apple.siriactionsd"]
-    SiriInference = ["com.apple.siriinferenced"]
-    Feedback = ["com.apple.feedbackd"]
-    Commerce = ["com.apple.commerce"]
-    CoreDuet = ["com.apple.coreduetd"]
-    Insight = ["com.apple.insightd"]
-    Metrics = ["com.apple.metricsd"]
-    AnalyticsHelper = [
+    ], "Voice Control Icon"),
+    ("NanoTimeKit", DaemonCategory.TRACKING, ["com.apple.nanotimekitcompaniond"], "Disable NanoTimeKit (Apple Watch Face Sync)"),
+    ("FollowUp", DaemonCategory.TRACKING, ["com.apple.followupd"], "Follow Up"),
+    ("PromotedContent", DaemonCategory.ANALYTICS, ["com.apple.promotedcontentd"], "Disable Promoted Content"),
+    ("WifiAnalytics", DaemonCategory.ANALYTICS, ["com.apple.wifianalyticsd"], "Disable Wi-Fi Analytics"),
+    ("News", DaemonCategory.ANALYTICS, ["com.apple.newsd"], "Disable News"),
+    ("AskPermissions", DaemonCategory.TRACKING, ["com.apple.askpermissiond"], "Disable Ask Permissions"),
+    ("FamilyCircle", DaemonCategory.OTHER, ["com.apple.familycircled"], "Disable Family Circle (Family Sharing)"),
+    ("FamilyNotification", DaemonCategory.OTHER, ["com.apple.familynotificationd"], "Disable Family Notifications"),
+    ("AdPrivacy", DaemonCategory.ANALYTICS, ["com.apple.adprivacyd"], "Disable Ad Privacy"),
+    ("AdServices", DaemonCategory.ANALYTICS, ["com.apple.adservicesd"], "Disable Ad Services"),
+    ("VideosSubscriptions", DaemonCategory.ANALYTICS, ["com.apple.videosubscriptionsd"], "Disable Video Subscriptions"),
+    ("WebBookmarks", DaemonCategory.ANALYTICS, ["com.apple.webbookmarksd"], "Disable Web Bookmarks"),
+    ("NanoRegistry", DaemonCategory.ANALYTICS, ["com.apple.nanoregistryd"], "Disable Nano Registry (Apple Watch)"),
+    ("NanoMediaControl", DaemonCategory.TRACKING, ["com.apple.nanomediacontrold"], "Disable Nano Media Control (Apple Watch)"),
+    ("NanoPreferences", DaemonCategory.OTHER, ["com.apple.nanopreferencesd"], "Disable Nano Preferences (Apple Watch)"),
+    ("SiriActions", DaemonCategory.TRACKING, ["com.apple.siriactionsd"], "Disable Siri Actions"),
+    ("SiriInference", DaemonCategory.TRACKING, ["com.apple.siriinferenced"], "Disable Siri Inference"),
+    ("Feedback", DaemonCategory.ANALYTICS, ["com.apple.feedbackd"], "Disable Feedback"),
+    ("Commerce", DaemonCategory.ANALYTICS, ["com.apple.commerce"], "Disable Commerce (App Store Checks)"),
+    ("CoreDuet", DaemonCategory.ANALYTICS, ["com.apple.coreduetd"], "Disable CoreDuet (Battery/Usage Statistics)"),
+    ("Insight", DaemonCategory.ANALYTICS, ["com.apple.insightd"], "Disable Insight"),
+    ("Metrics", DaemonCategory.ANALYTICS, ["com.apple.metricsd"], "Disable Metrics"),
+    ("AnalyticsHelper", DaemonCategory.ANALYTICS, [
         "com.apple.analyticsd",
         "com.apple.analyticsd.admin",
         "com.apple.analyticsd.events"
-    ]
-    CallAnalytics = ["com.apple.rtcreportingd"]
-    Symptomsd = ["com.apple.symptomsd", "com.apple.symptomsd-app"]
-    MobileAssetd = ["com.apple.mobileassetd"]
-    Ubiquityd = ["com.apple.ubd"]
-    CoreTelephonyAnalytics = ["com.apple.commcenter.coretelephony"]
-    MediaExperience = ["com.apple.mediaremoted"]
-    Automount = ["com.apple.automountd"]
-    SiriIntent = ["com.apple.assistant.intentdaemon"]
-    CloudKeychain = ["com.apple.cloudkeychainproxy", "com.apple.security.cloudkeychainproxy"]
-    NetworkExtension = ["com.apple.networkextension"]
-    DeviceCheck = ["com.apple.devicecheckd"]
-    ManagedConfiguration = ["com.apple.managedconfiguration", "com.apple.managedconfiguration.mdm", "com.apple.managedconfiguration.tesla"]
-    Containermanagerd = ["com.apple.containermanagerd"]
-    MobileGestaltHelper = ["com.apple.mobilegestalt_helper"]
-    TimeSync = ["com.apple.timed"]
-    MockLocation = ["com.apple.mocksynclocationd"]
-    Persistence = ["com.apple.persistence-helper", "com.apple.persistence-d"]
-    Calendar = ["com.apple.calendar.database", "com.apple.CalendarAgent"]
-    DataAccess = ["com.apple.dataaccess.dataaccessd"]
-    Networkd = ["com.apple.networkd"]
-    Privacy = ["com.apple.privacyd"]
-    AppStore = ["com.apple.appstored"]
-    Books = ["com.apple.bookdatastored"]
-    Podcasts = ["com.apple.podcasts"]
-    UserNotifications = ["com.apple.usernotificationsd"]
-    Photos = ["com.apple.photolibraryd"]
-    Music = ["com.apple.itunesstored"]
-    AppleAccount = ["com.apple.appleaccountd"]
-    Bluetooth = ["com.apple.bluetoothd"]
-    WiFiManager = ["com.apple.wifi_manager"]
-    WiFiLogging = ["com.apple.wifilogd"]
-    Maps = ["com.apple.geod"]
-    HealthSync = ["com.apple.healthd.sync"]
-    AccountSync = ["com.apple.accountsd"]
-    DiskArbitration = ["com.apple.DiskArbitrationd"]
-    MediaRemoteControl = ["com.apple.mediaremotecontrol"]
-    Notifications = ["com.apple.notificationd"]
-    Parse = ["com.apple.parsecd"]
-    Shazam = ["com.apple.shazamd"]
-    Siri = ["com.apple.siri"]
-    SettingsStats = ["com.apple.settings-statsd"]
-    StatusKit = ["com.apple.statuskit"]
-    Reminders = ["com.apple.reminderd"]
-    ConfigurationProfiles = ["com.apple.managedconfigurationprofiles"]
-    CertificateRevocation = ["com.apple.security.certrevocation"]
-    EAP = ["com.apple.eapolclient"]
-    AirPlay = ["com.apple.airplay"]
-    iCloudContainer = ["com.apple.cloudd"]
-    GameKitService = ["com.apple.gamekitservice"]
-    NFC = ["com.apple.nfcd"]
-    UARTPairing = ["com.apple.uarpairingd"]
-    Sidecar = ["com.apple.sidecarcore"]
-    Continuity = ["com.apple.continuityd"]
-    Sharing = ["com.apple.sharingd"]
-    FindMy = ["com.apple.findmylocate", "com.apple.findmydeviced"]
-    NearbyInteraction = ["com.apple.nearbyinteractiond"]
-    SignpostReporter = ["com.apple.signpost.signpost_reporter"]
-    CoreTelephony = ["com.apple.coretelephony"]
-    MediaSession = ["com.apple.mediasessiond"]
-    SpeechRecognition = ["com.apple.speechrecognition"]
-    ReplayKit = ["com.apple.replayd"]
-    CoreBluetooth = ["com.apple.corebluetoothd"]
+    ], "Disable System Analytics"),
+    ("CallAnalytics", DaemonCategory.ANALYTICS, ["com.apple.rtcreportingd"], "Disable Call Analytics (RTC Reporting)"),
+    ("Symptomsd", DaemonCategory.LOGGING, ["com.apple.symptomsd", "com.apple.symptomsd-app"], "Disable Symptom Diagnostics"),
+    ("MobileAssetd", DaemonCategory.ANALYTICS, ["com.apple.mobileassetd"], "Disable Mobile Asset Downloads (Telemetry)"),
+    ("Ubiquityd", DaemonCategory.TRACKING, ["com.apple.ubd"], "Disable Ubiquity (iCloud Usage Sync)"),
+    ("CoreTelephonyAnalytics", DaemonCategory.ANALYTICS, ["com.apple.commcenter.coretelephony"], "Disable Core Telephony Analytics"),
+    ("MediaExperience", DaemonCategory.ANALYTICS, ["com.apple.mediaremoted"], "Disable Media Experience Analytics"),
+    ("Automount", DaemonCategory.OTHER, ["com.apple.automountd"], "Disable Automount"),
+    ("SiriIntent", DaemonCategory.TRACKING, ["com.apple.assistant.intentdaemon"], "Disable Siri Intent"),
+    ("CloudKeychain", DaemonCategory.OTHER, ["com.apple.cloudkeychainproxy", "com.apple.security.cloudkeychainproxy"], "Disable Cloud Keychain"),
+    ("NetworkExtension", DaemonCategory.OTHER, ["com.apple.networkextension"], "Disable Network Extensions"),
+    ("DeviceCheck", DaemonCategory.OTHER, ["com.apple.devicecheckd"], "Disable Device Check"),
+    ("ManagedConfiguration", DaemonCategory.OTHER, ["com.apple.managedconfiguration", "com.apple.managedconfiguration.mdm", "com.apple.managedconfiguration.tesla"], "Disable Managed Configuration (MDM)"),
+    ("Containermanagerd", DaemonCategory.OTHER, ["com.apple.containermanagerd"], "Disable Container Manager"),
+    ("MobileGestaltHelper", DaemonCategory.OTHER, ["com.apple.mobilegestalt_helper"], "Disable MobileGestalt Helper"),
+    ("TimeSync", DaemonCategory.OTHER, ["com.apple.timed"], "Disable Time Sync"),
+    ("MockLocation", DaemonCategory.OTHER, ["com.apple.mocksynclocationd"], "Disable Mock Location"),
+    ("Calendar", DaemonCategory.OTHER, ["com.apple.calendar.database", "com.apple.CalendarAgent"], "Disable Calendar Database"),
+    ("DataAccess", DaemonCategory.ANALYTICS, ["com.apple.dataaccess.dataaccessd"], "Disable Data Access"),
+    ("Networkd", DaemonCategory.OTHER, ["com.apple.networkd"], "Disable Networkd"),
+    ("Privacy", DaemonCategory.OTHER, ["com.apple.privacyd"], "Disable Privacy"),
+    ("AppStore", DaemonCategory.OTHER, ["com.apple.appstored"], "Disable App Store"),
+    ("Books", DaemonCategory.OTHER, ["com.apple.bookdatastored"], "Disable Books"),
+    ("Podcasts", DaemonCategory.OTHER, ["com.apple.podcasts"], "Disable Podcasts"),
+    ("UserNotifications", DaemonCategory.OTHER, ["com.apple.usernotificationsd"], "Disable User Notifications"),
+    ("Photos", DaemonCategory.OTHER, ["com.apple.photolibraryd"], "Disable Photos Library"),
+    ("Music", DaemonCategory.OTHER, ["com.apple.itunesstored"], "Disable Music Store"),
+    ("AppleAccount", DaemonCategory.OTHER, ["com.apple.appleaccountd"], "Disable Apple Account"),
+    ("Bluetooth", DaemonCategory.OTHER, ["com.apple.bluetoothd"], "Disable Bluetooth"),
+    ("WiFiManager", DaemonCategory.OTHER, ["com.apple.wifi_manager"], "Disable Wi-Fi Manager"),
+    ("WiFiLogging", DaemonCategory.LOGGING, ["com.apple.wifilogd"], "Disable Wi-Fi Logging"),
+    ("Maps", DaemonCategory.OTHER, ["com.apple.geod"], "Disable Maps (Geod)"),
+    ("HealthSync", DaemonCategory.OTHER, ["com.apple.healthd.sync"], "Disable Health Sync"),
+    ("AccountSync", DaemonCategory.TRACKING, ["com.apple.accountsd"], "Disable Account Sync"),
+    ("DiskArbitration", DaemonCategory.OTHER, ["com.apple.DiskArbitrationd"], "Disable Disk Arbitration"),
+    ("MediaRemoteControl", DaemonCategory.OTHER, ["com.apple.mediaremotecontrol"], "Disable Media Remote Control"),
+    ("Notifications", DaemonCategory.OTHER, ["com.apple.notificationd"], "Disable Notifications"),
+    ("Parse", DaemonCategory.TRACKING, ["com.apple.parsecd"], "Disable Parse (Safari Suggestions)"),
+    ("Shazam", DaemonCategory.TRACKING, ["com.apple.shazamd"], "Disable Shazam"),
+    ("Siri", DaemonCategory.TRACKING, ["com.apple.siri"], "Disable Siri"),
+    ("SettingsStats", DaemonCategory.ANALYTICS, ["com.apple.settings-statsd"], "Disable Settings Stats"),
+    ("StatusKit", DaemonCategory.ANALYTICS, ["com.apple.statuskit"], "Disable Status Kit"),
+    ("Reminders", DaemonCategory.OTHER, ["com.apple.reminderd"], "Disable Reminders"),
+    ("ConfigurationProfiles", DaemonCategory.OTHER, ["com.apple.managedconfigurationprofiles"], "Disable Configuration Profiles"),
+    ("CertificateRevocation", DaemonCategory.OTHER, ["com.apple.security.certrevocation"], "Disable Certificate Revocation"),
+    ("EAP", DaemonCategory.OTHER, ["com.apple.eapolclient"], "Disable EAP (Wi-Fi Auth)"),
+    ("AirPlay", DaemonCategory.OTHER, ["com.apple.airplay"], "Disable AirPlay"),
+    ("iCloudContainer", DaemonCategory.OTHER, ["com.apple.cloudd"], "Disable iCloud Container"),
+    ("GameKitService", DaemonCategory.TRACKING, ["com.apple.gamekitservice"], "Disable GameKit Service"),
+    ("NFC", DaemonCategory.OTHER, ["com.apple.nfcd"], "Disable NFC"),
+    ("UARTPairing", DaemonCategory.OTHER, ["com.apple.uarpairingd"], "Disable UART Pairing"),
+    ("Sidecar", DaemonCategory.OTHER, ["com.apple.sidecarcore"], "Disable Sidecar"),
+    ("Continuity", DaemonCategory.OTHER, ["com.apple.continuityd"], "Disable Continuity"),
+    ("Sharing", DaemonCategory.OTHER, ["com.apple.sharingd"], "Disable Sharing (AirDrop)"),
+    ("FindMy", DaemonCategory.OTHER, ["com.apple.findmylocate", "com.apple.findmydeviced"], "Disable Find My"),
+    ("NearbyInteraction", DaemonCategory.OTHER, ["com.apple.nearbyinteractiond"], "Disable Nearby Interaction"),
+    ("SignpostReporter", DaemonCategory.LOGGING, ["com.apple.signpost.signpost_reporter"], "Disable Signpost Reporter"),
+    ("MediaSession", DaemonCategory.OTHER, ["com.apple.mediasessiond"], "Disable Media Session"),
+    ("SpeechRecognition", DaemonCategory.OTHER, ["com.apple.speechrecognition"], "Disable Speech Recognition"),
+    ("ReplayKit", DaemonCategory.OTHER, ["com.apple.replayd"], "Disable ReplayKit"),
+    ("CoreBluetooth", DaemonCategory.OTHER, ["com.apple.corebluetoothd"], "Disable Core Bluetooth"),
+    # --- Expanded real iOS daemons (Logging / Analytics / Tracking focus) ---
+    ("Logd", DaemonCategory.LOGGING, ["com.apple.logd", "com.apple.logd.admin", "com.apple.logd.events", "com.apple.logd.watchdog", "com.apple.logd_helper"], "Disable Logd (Unified Logging)"),
+    ("Syslogd", DaemonCategory.LOGGING, ["com.apple.syslogd"], "Disable Syslogd"),
+    ("SystemLogger", DaemonCategory.LOGGING, ["com.apple.system.logger"], "Disable System Logger"),
+    ("LogdReporter", DaemonCategory.LOGGING, ["com.apple.logd_reporter", "com.apple.logd_reporter.report_statistics"], "Disable Logd Reporter"),
+    ("HangReporter", DaemonCategory.LOGGING, ["com.apple.hangreporter", "com.apple.hangtracerd"], "Disable Hang Reporter"),
+    ("Spindump", DaemonCategory.LOGGING, ["com.apple.spindump", "com.apple.tailspind"], "Disable Spindump (Stack Sampling)"),
+    ("StatisticalDiagnostic", DaemonCategory.LOGGING, ["com.apple.StatisticalDiagnosticService"], "Disable Statistical Diagnostics"),
+    ("Aggregated", DaemonCategory.LOGGING, ["com.apple.aggregated"], "Disable Aggregated Logging"),
+    ("WirelessDiagnostics", DaemonCategory.LOGGING, ["com.apple.wirelessdiagnostics"], "Disable Wireless Diagnostics"),
+    ("Pcapd", DaemonCategory.LOGGING, ["com.apple.pcapd"], "Disable Pcapd (Packet Capture)"),
+    ("DuetHeuristic", DaemonCategory.ANALYTICS, ["com.apple.DuetHeuristic-BM", "com.apple.DuetHeuristic-BM.Baseband"], "Disable Duet Heuristic"),
+    ("DuetExpert", DaemonCategory.ANALYTICS, ["com.apple.duetexpertd"], "Disable Duet Expert"),
+    ("Decisiond", DaemonCategory.ANALYTICS, ["com.apple.decisiond"], "Disable Decisiond"),
+    ("Triald", DaemonCategory.ANALYTICS, ["com.apple.triald"], "Disable Triald (A/B Experiment Telemetry)"),
+    ("Sociald", DaemonCategory.ANALYTICS, ["com.apple.sociald"], "Disable Sociald"),
+    ("Sportskitd", DaemonCategory.ANALYTICS, ["com.apple.sportskitd"], "Disable SportsKit Analytics"),
+    ("Watchlistd", DaemonCategory.ANALYTICS, ["com.apple.watchlistd"], "Disable Watchlistd"),
+    ("CalendarNextd", DaemonCategory.ANALYTICS, ["com.apple.calnextd"], "Disable Calendar Nextd"),
+    ("CalAccessd", DaemonCategory.ANALYTICS, ["com.apple.calaccessd"], "Disable Calendar Accessd"),
+    ("Maild", DaemonCategory.ANALYTICS, ["com.apple.maild"], "Disable Maild"),
+    ("MediaServicesd", DaemonCategory.ANALYTICS, ["com.apple.mediaservicesd"], "Disable Media Servicesd"),
+    ("MediaServerd", DaemonCategory.ANALYTICS, ["com.apple.mediaserverd"], "Disable Media Serverd"),
+    ("VoiceNotesd", DaemonCategory.ANALYTICS, ["com.apple.voicenotesd"], "Disable Voice Notesd"),
+    ("VoiceMemoRecording", DaemonCategory.ANALYTICS, ["com.apple.voicememod"], "Disable Voice Memo Recording"),
+    ("SiriKnowledge", DaemonCategory.TRACKING, ["com.apple.siriknowledged"], "Disable Siri Knowledge"),
+    ("SiriUnattended", DaemonCategory.TRACKING, ["com.apple.siriunattended"], "Disable Siri Unattended"),
+    ("SiriService", DaemonCategory.TRACKING, ["com.apple.SiriService"], "Disable Siri Service"),
+    ("SiriHearingGain", DaemonCategory.TRACKING, ["com.apple.siriHearingGainService"], "Disable Siri Hearing Gain"),
+    ("VoiceServices", DaemonCategory.TRACKING, ["com.apple.VoiceServices"], "Disable Voice Services"),
+    ("Assistantd", DaemonCategory.TRACKING, ["com.apple.assistant_service", "com.apple.assistantd"], "Disable Assistantd"),
+    ("IMAgent", DaemonCategory.TRACKING, ["com.apple.imagent", "com.apple.imfoundation", "com.apple.IMFoundation"], "Disable iMessage Agent"),
+    ("IMTranscodingAgent", DaemonCategory.TRACKING, ["com.apple.imtranscodingagent"], "Disable iMessage Transcoding"),
+    ("IMETrafficCollector", DaemonCategory.ANALYTICS, ["com.apple.imetrafficcollector"], "Disable iMessage Traffic Collector"),
+    ("AvatarService", DaemonCategory.ANALYTICS, ["com.apple.purplebrained"], "Disable PurpleBrained (Usage Service)"),
+    ("DeviceManagementd", DaemonCategory.TRACKING, ["com.apple.devicemanagementd"], "Disable Device Management"),
+    ("FamilyKvs", DaemonCategory.ANALYTICS, ["com.apple.fam-kvs", "com.apple.fam-notification"], "Disable Family Key-Value Store"),
+    ("Fams", DaemonCategory.ANALYTICS, ["com.apple.fams"], "Disable Family Analytics"),
+    ("Fellowd", DaemonCategory.ANALYTICS, ["com.apple.fellowd"], "Disable Fellowd"),
+    ("Keyboardservicesd", DaemonCategory.ANALYTICS, ["com.apple.keyboardservicesd"], "Disable Keyboard Services (Typing Data)"),
+    ("TCCd", DaemonCategory.ANALYTICS, ["com.apple.tccd"], "Disable TCCd (Permission Tracking)"),
+    ("NPSd", DaemonCategory.ANALYTICS, ["com.apple.npsd"], "Disable NPSd"),
+    ("AppLED", DaemonCategory.ANALYTICS, ["com.apple.akd"], "Disable Apple ID (akd)"),
+    ("AppIDServiced", DaemonCategory.ANALYTICS, ["com.apple.appleidservice"], "Disable Apple ID Service"),
+    ("APSD", DaemonCategory.ANALYTICS, ["com.apple.apsd"], "Disable APSd (Push/Telemetry)"),
+    ("CloudPhotod", DaemonCategory.ANALYTICS, ["com.apple.cloudphotod"], "Disable Cloud Photo Library"),
+    ("Accountsd", DaemonCategory.TRACKING, ["com.apple.accountsd", "com.apple.accounts.domains"], "Disable Accountsd"),
+    ("SocialNotification", DaemonCategory.ANALYTICS, ["com.apple.SocialNotification"], "Disable Social Notifications"),
+    ("StoreKit", DaemonCategory.ANALYTICS, ["com.apple.StoreKit"], "Disable StoreKit"),
+    ("StoreBookkeeper", DaemonCategory.ANALYTICS, ["com.apple.StoreBookkeeper"], "Disable Store Bookkeeper"),
+    ("Appsyncd", DaemonCategory.ANALYTICS, ["com.apple.app-sync"], "Disable App Sync"),
+    ("FileProviderd", DaemonCategory.TRACKING, ["com.apple.fileproviderd"], "Disable File Provider"),
+    ("SearchPartyd", DaemonCategory.TRACKING, ["com.apple.searchpartyd"], "Disable Search Party"),
+    ("Nearbyd", DaemonCategory.TRACKING, ["com.apple.nearbyd"], "Disable Nearbyd (Location/Proximity)"),
+    ("Faced", DaemonCategory.ANALYTICS, ["com.apple.faced"], "Disable Face Analytics"),
+    ("HealthSyncWatch", DaemonCategory.ANALYTICS, ["com.apple.HealthEx"], "Disable Health Export"),
+    ("Lifescienced", DaemonCategory.ANALYTICS, ["com.apple.lifescienced"], "Disable Life Science Analytics"),
+    ("Medicald", DaemonCategory.ANALYTICS, ["com.apple.milld"], "Disable Medical Logging"),
+    ("Recalibrationd", DaemonCategory.ANALYTICS, ["com.apple.recalibrationd"], "Disable Recalibration"),
+    ("Repaird", DaemonCategory.TRACKING, ["com.apple.repaird"], "Disable Repaird"),
+    ("SafetyAlertsd", DaemonCategory.TRACKING, ["com.apple.safetyalertsd"], "Disable Safety Alerts"),
+    ("Pasteboardd", DaemonCategory.TRACKING, ["com.apple.pasteboardd"], "Disable Pasteboardd (Clipboard)"),
+    ("Nsurlstoraged", DaemonCategory.ANALYTICS, ["com.apple.nsurlstoraged"], "Disable NSURL Storage"),
+    ("Filecoordinationd", DaemonCategory.OTHER, ["com.apple.filecoordinationd"], "Disable File Coordination"),
+    ("Fseventsd", DaemonCategory.OTHER, ["com.apple.fseventsd"], "Disable FSEvents"),
+    ("BatteryCenter", DaemonCategory.OTHER, ["com.apple.batterycenter"], "Disable Battery Center"),
+    ("Audiotoolboxd", DaemonCategory.OTHER, ["com.apple.audiohald"], "Disable Audio HAL"),
+    ("AudioD", DaemonCategory.OTHER, ["com.apple.audioengineeringd"], "Disable Audio Engineering"),
+    ("AudioClockSyncer", DaemonCategory.OTHER, ["com.apple.audioclocksyncer"], "Disable Audio Clock Syncer"),
+    ("Stereod", DaemonCategory.OTHER, ["com.apple.stereod"], "Disable Stereo Audio"),
+    ("Carkitd", DaemonCategory.OTHER, ["com.apple.carkitd", "com.apple.carplayd"], "Disable CarPlay"),
+    ("AirPort", DaemonCategory.OTHER, ["com.apple.AirPort", "com.apple.airportd"], "Disable AirPort"),
+    ("CaptiveAgent", DaemonCategory.OTHER, ["com.apple.captiveagent"], "Disable Captive Agent"),
+    ("CoreCaptured", DaemonCategory.OTHER, ["com.apple.corecaptured"], "Disable Core Capture"),
+    ("IPConfigd", DaemonCategory.OTHER, ["com.apple.ipconfigd"], "Disable IP Config"),
+    ("Biometrickitd", DaemonCategory.OTHER, ["com.apple.biometrickitd"], "Disable Biometric Kit"),
+    ("SecureElementd", DaemonCategory.OTHER, ["com.apple.secureelementd"], "Disable Secure Element"),
+    ("CertInfo", DaemonCategory.OTHER, ["com.apple.CertInfo"], "Disable Certificate Info"),
+    ("Kextd", DaemonCategory.OTHER, ["com.apple.kextd"], "Disable Kextd"),
+    ("FileIntegrity", DaemonCategory.OTHER, ["com.apple.MobileFileIntegrity"], "Disable File Integrity"),
+    ("Runwayd", DaemonCategory.OTHER, ["com.apple.generatord"], "Disable Generatord"),
+    ("ManagedMode", DaemonCategory.OTHER, ["com.apple.devicectld", "com.apple.devicectl_dpd"], "Disable Device Control"),
+    ("Accessibility", DaemonCategory.OTHER, ["com.apple.AccessibilityUI"], "Disable Accessibility UI"),
+    ("HearingMode", DaemonCategory.OTHER, ["com.apple.HearingModeService"], "Disable Hearing Mode"),
+    ("Gaze", DaemonCategory.OTHER, ["com.apple.gaze"], "Disable Gaze (Eye Tracking)"),
+    ("ARd", DaemonCategory.OTHER, ["com.apple.arkitd"], "Disable ARKit"),
+    ("ImageIO", DaemonCategory.OTHER, ["com.apple.ImageIO"], "Disable Image IO"),
+    ("QuickLookd", DaemonCategory.OTHER, ["com.apple.quicklookd"], "Disable QuickLook"),
+    ("Geniusd", DaemonCategory.OTHER, ["com.apple.appleseedd"], "Disable AppleSeed Feedback"),
+    ("Cashd", DaemonCategory.OTHER, ["com.apple.Commerced"], "Disable Commerced"),
+    ("Saled", DaemonCategory.OTHER, ["com.apple.saled"], "Disable Saled (Sampling)"),
+    ("VehicularAccess", DaemonCategory.OTHER, ["com.apple.dpad"], "Disable DPad (Vehicle Digital)"),
+    ("Airdropd", DaemonCategory.OTHER, ["com.apple.sharing"], "Disable Sharing"),
+    ("BluetoothStack", DaemonCategory.OTHER, ["com.apple.BTStack", "com.apple.bluetooth"], "Disable Bluetooth Stack"),
+    ("SharedLock", DaemonCategory.OTHER, ["com.apple.multipathd"], "Disable Multipathd"),
+    ("Mld", DaemonCategory.OTHER, ["com.apple.mlt"], "Disable MLT (Machine Learning)"),
+    ("Barrel", DaemonCategory.OTHER, ["com.apple.barrel"], "Disable Barrel"),
+    ("MobileBackup", DaemonCategory.OTHER, ["com.apple.MobileBackup", "com.apple.backupd"], "Disable Backup"),
+    ("MobileStorage", DaemonCategory.OTHER, ["com.apple.MobileStorageMounter"], "Disable Storage Mounter"),
+    ("MobileDelete", DaemonCategory.OTHER, ["com.apple.MobileDelete"], "Disable Mobile Delete"),
+    ("MobilePatch", DaemonCategory.OTHER, ["com.apple.MobilePatch"], "Disable Software Patch"),
+    ("MobileAccessoryUpdater", DaemonCategory.OTHER, ["com.apple.MobileAccessoryUpdater"], "Disable Accessory Updater"),
+    ("USBd", DaemonCategory.OTHER, ["com.apple.mediausbd"], "Disable Media USB"),
+    ("ExFAT", DaemonCategory.OTHER, ["com.apple.ExFAT"], "Disable ExFAT"),
+    ("Bom", DaemonCategory.OTHER, ["com.apple.Bom"], "Disable Bom (Atomic File)"),
+    ("DPFS", DaemonCategory.OTHER, ["com.apple.dpfs"], "Disable DPFS (Data Protection Filesystem)"),
+    ("CipherMining", DaemonCategory.OTHER, ["com.apple.cipherminingd"], "Disable Cipher Mining"),
+    ("SMSOTT", DaemonCategory.OTHER, ["com.apple.smsott"], "Disable SMS OTT"),
+    ("StoreFilesystem", DaemonCategory.OTHER, ["com.apple.cache_delete", "com.apple.cache_installation", "com.apple.cache_servicer"], "Disable Cache Services"),
+    ("WatchCompaniond", DaemonCategory.OTHER, ["com.apple.synapse"], "Disable Synapse (SOS)"),
+    ("CalibrationData", DaemonCategory.OTHER, ["com.apple.CalibrationDataService"], "Disable Calibration Data"),
+    ("CommonUserAssetd", DaemonCategory.OTHER, ["com.apple.commonuserassetd"], "Disable Common User Assets"),
+    ("LanguageAssetd", DaemonCategory.OTHER, ["com.apple.languageassetd"], "Disable Language Assets"),
+    ("Otapackd", DaemonCategory.OTHER, ["com.apple.otapackd"], "Disable OTA Pack"),
+]
 
 
-class DaemonCategory(Enum):
-    """UI grouping for the standalone daemon toggles."""
-    LOGGING = "Logging"
-    ANALYTICS = "Analytics"
-    TRACKING = "Tracking"
-    OTHER = "Other"
+def _humanize(member_name: str) -> str:
+    """Turn 'UsageTrackingAgent' -> 'Usage Tracking Agent'."""
+    import re
+    parts = re.findall(r"[A-Z][a-z0-9]*|[A-Z]+(?=[A-Z][a-z])|\d+", member_name)
+    return " ".join(parts) if parts else member_name
 
 
-# Category tag for every standalone daemon toggle. Determines which
-# IOSSectionHeader the daemon appears under in the daemons page.
+# Daemons that were only loosely tagged analytics/tracking but are really
+# core Apple services (mail, media, iCloud, auth, push…). They belong under
+# "Other", not in the analytics/data-tracking/logging section.
+_CATEGORY_OVERRIDES = {
+    "iCloudContainer": DaemonCategory.OTHER,
+    "CoreTelephonyAnalytics": DaemonCategory.OTHER,
+    "MobileAssetd": DaemonCategory.OTHER,
+    "NanoRegistry": DaemonCategory.OTHER,
+    "Maild": DaemonCategory.OTHER,
+    "MediaServicesd": DaemonCategory.OTHER,
+    "MediaServerd": DaemonCategory.OTHER,
+    "VoiceNotesd": DaemonCategory.OTHER,
+    "VoiceMemoRecording": DaemonCategory.OTHER,
+    "IMETrafficCollector": DaemonCategory.OTHER,
+    "AvatarService": DaemonCategory.OTHER,
+    "FamilyKvs": DaemonCategory.OTHER,
+    "Fams": DaemonCategory.OTHER,
+    "Fellowd": DaemonCategory.OTHER,
+    "Keyboardservicesd": DaemonCategory.OTHER,
+    "NPSd": DaemonCategory.OTHER,
+    "AppLED": DaemonCategory.OTHER,
+    "AppIDServiced": DaemonCategory.OTHER,
+    "APSD": DaemonCategory.OTHER,
+    "CloudPhotod": DaemonCategory.OTHER,
+    "SocialNotification": DaemonCategory.OTHER,
+    "StoreKit": DaemonCategory.OTHER,
+    "StoreBookkeeper": DaemonCategory.OTHER,
+    "Appsyncd": DaemonCategory.OTHER,
+    "Faced": DaemonCategory.OTHER,
+    "HealthSyncWatch": DaemonCategory.OTHER,
+    "Lifescienced": DaemonCategory.OTHER,
+    "Medicald": DaemonCategory.OTHER,
+    "Recalibrationd": DaemonCategory.OTHER,
+    "Nsurlstoraged": DaemonCategory.OTHER,
+    "NanoTimeKit": DaemonCategory.OTHER,
+    "AskPermissions": DaemonCategory.OTHER,
+    "NanoMediaControl": DaemonCategory.OTHER,
+    "Ubiquityd": DaemonCategory.OTHER,
+    "AccountSync": DaemonCategory.OTHER,
+    "Accountsd": DaemonCategory.OTHER,
+    "IMAgent": DaemonCategory.OTHER,
+    "IMTranscodingAgent": DaemonCategory.OTHER,
+    "DeviceManagementd": DaemonCategory.OTHER,
+    "FileProviderd": DaemonCategory.OTHER,
+    "Repaird": DaemonCategory.OTHER,
+    "SafetyAlertsd": DaemonCategory.OTHER,
+    "Pasteboardd": DaemonCategory.OTHER,
+    "VoiceControl": DaemonCategory.OTHER,
+    # Remaining "random stuff": content/app-store/media services that were
+    # still showing up under Analytics — none of these are telemetry.
+    "News": DaemonCategory.OTHER,
+    "VideosSubscriptions": DaemonCategory.OTHER,
+    "WebBookmarks": DaemonCategory.OTHER,
+    "Commerce": DaemonCategory.OTHER,
+    "StatusKit": DaemonCategory.OTHER,
+    "Sportskitd": DaemonCategory.OTHER,
+    "Watchlistd": DaemonCategory.OTHER,
+    "CalendarNextd": DaemonCategory.OTHER,
+    "CalAccessd": DaemonCategory.OTHER,
+    "TCCd": DaemonCategory.OTHER,
+    "DataAccess": DaemonCategory.OTHER,
+    "MediaExperience": DaemonCategory.OTHER,
+    # Tracking section still had gaming / dictation / hearing aid.
+    "GameCenter": DaemonCategory.OTHER,
+    "GameKitService": DaemonCategory.OTHER,
+    "VoiceServices": DaemonCategory.OTHER,
+    "SiriHearingGain": DaemonCategory.OTHER,
+}
+
+Daemon = Enum("Daemon", {rec[0]: rec[2] for rec in DAEMON_RECORDS})
+
 DAEMON_CATEGORY = {
-    # Logging / crash-report / diagnostic capture
-    Daemon.CrashReports: DaemonCategory.LOGGING,
-    Daemon.Diagnostics: DaemonCategory.LOGGING,
-    Daemon.WiFiLogging: DaemonCategory.LOGGING,
-    Daemon.SignpostReporter: DaemonCategory.LOGGING,
-    Daemon.Symptomsd: DaemonCategory.LOGGING,
+    getattr(Daemon, rec[0]): _CATEGORY_OVERRIDES.get(rec[0], rec[1])
+    for rec in DAEMON_RECORDS
+}
 
-    # Analytics / telemetry / usage / advertising data
-    Daemon.UsageTrackingAgent: DaemonCategory.ANALYTICS,
-    Daemon.WifiAnalytics: DaemonCategory.ANALYTICS,
-    Daemon.AnalyticsHelper: DaemonCategory.ANALYTICS,
-    Daemon.CallAnalytics: DaemonCategory.ANALYTICS,
-    Daemon.CoreDuet: DaemonCategory.ANALYTICS,
-    Daemon.Insight: DaemonCategory.ANALYTICS,
-    Daemon.Metrics: DaemonCategory.ANALYTICS,
-    Daemon.AdPrivacy: DaemonCategory.ANALYTICS,
-    Daemon.AdServices: DaemonCategory.ANALYTICS,
-    Daemon.PromotedContent: DaemonCategory.ANALYTICS,
-    Daemon.Commerce: DaemonCategory.ANALYTICS,
-    Daemon.SettingsStats: DaemonCategory.ANALYTICS,
-    Daemon.StatusKit: DaemonCategory.ANALYTICS,
-    Daemon.MediaExperience: DaemonCategory.ANALYTICS,
-    Daemon.DataAccess: DaemonCategory.ANALYTICS,
-    Daemon.Feedback: DaemonCategory.ANALYTICS,
-    Daemon.News: DaemonCategory.ANALYTICS,
-    Daemon.VideosSubscriptions: DaemonCategory.ANALYTICS,
-    Daemon.WebBookmarks: DaemonCategory.ANALYTICS,
-    Daemon.MobileAssetd: DaemonCategory.ANALYTICS,
-    Daemon.NanoRegistry: DaemonCategory.ANALYTICS,
-    Daemon.CoreTelephonyAnalytics: DaemonCategory.ANALYTICS,
-
-    # Tracking / activity / on-device behavior & suggestions
-    Daemon.SiriInference: DaemonCategory.TRACKING,
-    Daemon.SiriActions: DaemonCategory.TRACKING,
-    Daemon.SiriIntent: DaemonCategory.TRACKING,
-    Daemon.Siri: DaemonCategory.TRACKING,
-    Daemon.FollowUp: DaemonCategory.TRACKING,
-    Daemon.Parse: DaemonCategory.TRACKING,
-    Daemon.Spotlight: DaemonCategory.TRACKING,
-    Daemon.GameCenter: DaemonCategory.TRACKING,
-    Daemon.GameKitService: DaemonCategory.TRACKING,
-    Daemon.Shazam: DaemonCategory.TRACKING,
-    Daemon.Location: DaemonCategory.TRACKING,
-    Daemon.VoiceControl: DaemonCategory.TRACKING,
-    Daemon.ScreenTime: DaemonCategory.TRACKING,
-    Daemon.AskPermissions: DaemonCategory.TRACKING,
-    Daemon.AccountSync: DaemonCategory.TRACKING,
-    Daemon.NanoMediaControl: DaemonCategory.TRACKING,
-    Daemon.NanoTimeKit: DaemonCategory.TRACKING,
-    Daemon.Ubiquityd: DaemonCategory.TRACKING,
+DAEMON_TITLES = {
+    getattr(Daemon, rec[0]): rec[3]
+    for rec in DAEMON_RECORDS
 }
 
 
@@ -233,41 +381,286 @@ def daemon_category(daemon: Daemon) -> DaemonCategory:
     return DAEMON_CATEGORY.get(daemon, DaemonCategory.OTHER)
 
 
+def daemon_title(daemon: Daemon) -> str:
+    """Return the display title for a daemon row."""
+    return DAEMON_TITLES.get(daemon, "Disable " + _humanize(daemon.name))
+
+
 class DaemonGroup(Enum):
     """Grouped selections that enable a set of daemons in one tap."""
     Recommended = auto()
 
 
-# Analytics / telemetry / tracking daemons selected by "Recommended".
-# Disabling these reduces data collection while keeping core device
-# functionality intact. Core logging/cellular/security daemons are
-# intentionally EXCLUDED to avoid boot/setup loops.
-RECOMMENDED_ANALYTICS = [
-    Daemon.CrashReports,
-    Daemon.Diagnostics,
-    Daemon.UsageTrackingAgent,
-    Daemon.WifiAnalytics,
-    Daemon.AnalyticsHelper,
-    Daemon.CallAnalytics,
-    Daemon.AdPrivacy,
-    Daemon.AdServices,
-    Daemon.PromotedContent,
-    Daemon.News,
-    Daemon.VideosSubscriptions,
-    Daemon.WebBookmarks,
-    Daemon.CoreDuet,
-    Daemon.Insight,
-    Daemon.Metrics,
-    Daemon.Feedback,
-    Daemon.SiriInference,
-    Daemon.SiriActions,
-    Daemon.FollowUp,
-    Daemon.StatusKit,
-    Daemon.MediaExperience,
-    Daemon.Commerce,
-    Daemon.DataAccess,
-    Daemon.Symptomsd,
-    Daemon.SettingsStats,
-    Daemon.GameCenter,
-    Daemon.Shazam,
+# Highlighted analytics / telemetry / tracking daemons for the "Recommended"
+# one-tap switch. Safe set only (no core logging/cellular/security/boot-critical).
+# Only daemons that live in the ANALYTICS / TRACKING categories (per DAEMON_CATEGORY)
+# can be safely grouped here; core services moved to OTHER are excluded.
+RECOMMENDED_RECORD_NAMES = [
+    "CrashReports", "Diagnostics", "UsageTrackingAgent", "WifiAnalytics",
+    "AnalyticsHelper", "CallAnalytics", "AdPrivacy", "AdServices",
+    "PromotedContent", "CoreDuet", "Insight", "Metrics", "Feedback",
+    "SiriInference", "SiriActions", "FollowUp", "MediaExperience",
+    "Symptomsd", "SettingsStats", "Shazam",
+    "StatisticalDiagnostic", "WirelessDiagnostics",
+    "DuetHeuristic", "DuetExpert", "Decisiond",
+    "Triald", "Sociald",
 ]
+
+RECOMMENDED_ANALYTICS = [
+    getattr(Daemon, name)
+    for name in RECOMMENDED_RECORD_NAMES
+    if hasattr(Daemon, name)
+    and daemon_category(getattr(Daemon, name)) in (DaemonCategory.LOGGING, DaemonCategory.ANALYTICS, DaemonCategory.TRACKING)
+]
+
+
+# Brief human-readable descriptions for tooltip display.
+# Keyed by the Daemon member name; missing entries fall back to the display title.
+DAEMON_DESCRIPTIONS = {
+    # --- LOGGING ---
+    "CrashReports": "Collects crash logs and memory exception reports from apps and system processes.",
+    "Diagnostics": "Collects diagnostic data and device analytics to send to Apple.",
+    "Symptomsd": "Monitors network connectivity symptoms and triggers diagnostic probes.",
+    "WiFiLogging": "Records Wi-Fi connection events, roaming history, and scan results.",
+    "SignpostReporter": "Streams signpost performance traces from apps and system frameworks.",
+    "StatisticalDiagnostic": "Runs periodic statistical checks for hardware and software anomalies.",
+    "WirelessDiagnostics": "Collects Wi-Fi and cellular radio diagnostics for Apple engineers.",
+    "Logd": "Unified logging system daemon; disabling breaks system-level logging entirely.",
+    "Syslogd": "Legacy syslog daemon; collects messages from daemons and apps.",
+    "SystemLogger": "System-level logger for kernel and early-boot messages.",
+    "LogdReporter": "Processes and archives logd statistics and rotation data.",
+    "HangReporter": "Detects and reports app hangs (watchdog timeouts) and UI freezes.",
+    "Spindump": "Captures CPU stack samples of unresponsive or resource-heavy processes.",
+    "Aggregated": "Aggregates network usage and data counters for system-wide reporting.",
+    "Pcapd": "Captures raw network packets for debugging (Wireshark-style).",
+    # --- ANALYTICS ---
+    "UsageTrackingAgent": "Tracks app usage duration and habits for Apple's usage analytics.",
+    "PromotedContent": "Serves promoted or suggested content in Spotlight and notifications.",
+    "WifiAnalytics": "Collects Wi-Fi telemetry (scan results, roaming stats, connection quality).",
+    "News": "Delivers Apple News content; disabling stops background article prefetching.",
+    "AdPrivacy": "Handles on-device ad personalization and private ad relevance scoring.",
+    "AdServices": "Serves Apple Search Ads and tracks ad impression/click attribution.",
+    "VideosSubscriptions": "Tracks video subscription status for Apple TV and media suggestions.",
+    "WebBookmarks": "Syncs Safari bookmarks and reading list via iCloud.",
+    "Feedback": "Submits diagnostic and usage feedback to Apple when prompted.",
+    "Commerce": "Handles App Store purchase validation and receipt checks.",
+    "CoreDuet": "Records device and app interaction patterns for Siri suggestions.",
+    "Insight": "Part of the Duet/Insight pipeline; analyzes app usage for predictions.",
+    "Metrics": "Collects system and app performance metrics for Apple's telemetry.",
+    "AnalyticsHelper": "Helper process for analyticsd; formats and batches telemetry uploads.",
+    "CallAnalytics": "Collects call duration and quality metrics for carrier analytics.",
+    "MediaExperience": "Monitors media playback quality and reports audio/video experience data.",
+    "DataAccess": "Tracks data access patterns across apps for privacy auditing.",
+    "SettingsStats": "Reports which System Settings toggles users change most often.",
+    "StatusKit": "Delivers scheduled status updates from services to apps and widgets.",
+    "DuetHeuristic": "Runs heuristic analysis on device interaction data for predictions.",
+    "DuetExpert": "Expert sub-module of Duet; refines predictions from app usage data.",
+    "Decisiond": "Decides which proactive suggestions to show based on learned habits.",
+    "Triald": "Runs A/B experiment assignments and logs experiment exposure metrics.",
+    "Sociald": "Processes social graph data for suggested contacts and sharing.",
+    "Sportskitd": "Delivers live sports scores and game schedules to widgets and Siri.",
+    "Watchlistd": "Tracks media watchlists across Apple TV, Podcasts, and TV app.",
+    "TCCd": "Manages the Transparency, Consent, and Control database for app permissions.",
+    "NPSd": "Handles notification priority scoring and interruption management.",
+    "CalendarNextd": "Analyzes calendar events for proactive Siri suggestions.",
+    "CalAccessd": "Provides calendar data access to Siri and system integrations.",
+    "AppLED": "Manages Apple ID authentication via the authkit daemon (akd).",
+    "IMETrafficCollector": "Collects keyboard input-method telemetry for Siri dictation improvements.",
+    # --- TRACKING ---
+    "GameCenter": "Handles Game Center social features, leaderboards, and friend activity.",
+    "ScreenTime": "Monitors and reports app usage limits and screen time statistics.",
+    "Location": "Core location services daemon; disabling breaks GPS for all apps.",
+    "Spotlight": "Indexes files, contacts, and app content for device-wide search.",
+    "FollowUp": "Tracks and schedules follow-up reminders and notification prompts.",
+    "VoiceControl": "Powers on-device voice commands for accessibility hands-free control.",
+    "SiriActions": "Suggests Shortcuts actions based on your routine and context.",
+    "SiriInference": "Runs on-device Siri intelligence for proactive suggestions.",
+    "SiriIntent": "Resolves and donates SiriKit intents for app integrations.",
+    "Parse": "Parses user text input for Siri and QuickType predictions.",
+    "Shazam": "Identifies music via microphone and logs song recognition events.",
+    "Siri": "Main Siri daemon; handles voice assistant queries and responses.",
+    "GameKitService": "Supports Game Kit multiplayer matchmaking and real-time challenges.",
+    "SiriKnowledge": "Indexes on-device knowledge for Siri personal answers.",
+    "SiriUnattended": "Runs Siri analytics tasks when the device is idle and charging.",
+    "SiriService": "Provides Siri background services for proactive and ambient intelligence.",
+    "SiriHearingGain": "Adjusts Siri audio levels for hearing-aid and headphone users.",
+    "VoiceServices": "Powers voice dictation, speech synthesis, and VoiceOver screen reader.",
+    "Assistantd": "Main assistant daemon; manages Siri session and on-device intelligence.",
+    "SearchPartyd": "Implements the Find My network by broadcasting and scanning BLE beacons.",
+    "Nearbyd": "Handles UWB proximity ranging and nearby-device detection.",
+    "Pasteboardd": "System clipboard daemon; records pasteboard history and syncs via Handoff.",
+    "IMAgent": "Manages iMessage and FaceTime registration and message delivery.",
+    "IMTranscodingAgent": "Transcodes photos and videos for iMessage rich media sharing.",
+    "Accountsd": "Stores and syncs iCloud, Exchange, and other account credentials.",
+    "FileProviderd": "Manages third-party file provider extensions and cloud document sync.",
+    "DeviceManagementd": "Enforces MDM (Mobile Device Management) configuration profiles.",
+    "SafetyAlertsd": "Delivers government and emergency safety alerts to the device.",
+    "Repaird": "Tracks device repair history and Apple Authorized Service Provider data.",
+    "Recalibrationd": "Runs sensor calibration routines for battery and display accuracy.",
+    # --- OTHER (everything not telemetry) ---
+    "thermalmonitord": "Supervises CPU/camera temperature sensors and throttles when hot.",
+    "OTA": "Fetches and installs over-the-air iOS software updates.",
+    "ATWAKEUP": "Wakes the system for scheduled offline Face ID / Secure Enclave checks.",
+    "Tips": "Delivers Apple's built-in Tips app content and usage hints.",
+    "VPN": "Manages VPN configuration and tunneling for the Settings app.",
+    "ChineseLAN": "Provides Chinese AULAN-style WLAN helper for carrier services.",
+    "HealthKit": "Stores and shares health data with third-party apps.",
+    "AirPrint": "Discovers printers and spools AirPrint print jobs.",
+    "AssistiveTouch": "Powers the on-screen AssistiveTouch accessibility button.",
+    "iCloud": "Syncs iCloud account data, documents, and device backups.",
+    "InternetTethering": "Enables Personal Hotspot and USB/bluetooth tethering.",
+    "PassBook": "Manages Apple Wallet passes, tickets, and loyalty cards.",
+    "NanoTimeKit": "Serves watch-face complications to the paired Apple Watch.",
+    "AskPermissions": "Handles permission prompts for app data access.",
+    "FamilyCircle": "Implements Family Sharing circles and shared subscriptions.",
+    "FamilyNotification": "Delivers Family Sharing purchase and update notifications.",
+    "NanoRegistry": "Registers paired Apple Watch devices with the phone.",
+    "NanoMediaControl": "Controls music playback from the paired Apple Watch.",
+    "NanoPreferences": "Syncs Apple Watch preference settings with the phone.",
+    "MobileAssetd": "Downloads and installs mobile asset packages, including telemetry catalog updates.",
+    "Ubiquityd": "Handles Universal Clipboard and iCloud document sync.",
+    "CoreTelephonyAnalytics": "Collects cellular network telemetry from the CoreTelephony stack.",
+    "Automount": "Auto-mounts and manages AFPS/SMB/disk images when inserted.",
+    "CloudKeychain": "Syncs passwords, keys, and Bluetooth pairings via iCloud Keychain.",
+    "NetworkExtension": "Registers VPN, DNS, and content-filter network extensions.",
+    "DeviceCheck": "Provides device integrity checks for app and Apple services.",
+    "ManagedConfiguration": "Applies MDM managed configuration profiles.",
+    "Containermanagerd": "Manages on-disk App containers and sandbox registrations.",
+    "MobileGestaltHelper": "Supplies hardware identifiers for MobileGestalt key exports.",
+    "TimeSync": "Keeps the system clock in sync via network time.",
+    "MockLocation": "Provides simulated location support for development/tools.",
+    "Persistence": "Persists iOS system state across reboots for restorative services.",
+    "Calendar": "Indexes and manages the on-device Calendar database.",
+    "Networkd": "Handles network address and DHCP configuration.",
+    "Privacy": "Manages privacy access audits and app permission tracking.",
+    "AppStore": "Fetches App Store front page content and purchase metadata.",
+    "Books": "Downloads and syncs Apple Books purchases and annotations.",
+    "Podcasts": "Downloads and syncs Apple Podcasts subscriptions.",
+    "UserNotifications": "Central NotificationCenter daemon that delivers all notifications.",
+    "Photos": "Indexes the photo library and serves iCloud photo sync.",
+    "Music": "Streams and downloads Apple Music catalog content.",
+    "AppleAccount": "Manages Apple ID account tokens and iCloud sign-in.",
+    "Bluetooth": "Enables Bluetooth pairing and audio via bluetoothd.",
+    "WiFiManager": "Coordinates Wi-Fi networking, join decisions, and scanning.",
+    "Maps": "Provides geod map tiles, routing, and location search for Maps.",
+    "HealthSync": "Syncs HealthKit records with the paired Apple Watch.",
+    "AccountSync": "Syncs Exchange, Google, and other mail/contact accounts.",
+    "DiskArbitration": "Manages disk mounting, claiming, and ejection events.",
+    "MediaRemoteControl": "Routes system-wide media playback controls across apps.",
+    "Notifications": "Manages notification bundling, alerts, and delivery.",
+    "Reminders": "Maintains the Reminders database and list notifications.",
+    "ConfigurationProfiles": "Installs and enforces device configuration profiles.",
+    "CertificateRevocation": "Checks certificate revocation lists for HTTPS/tls trust.",
+    "EAP": "Handles enterprise Wi-Fi 802.1X authentication.",
+    "AirPlay": "Streams audio/video to AirPlay receivers and speakers.",
+    "iCloudContainer": "Enables iCloud document storage container for apps.",
+    "NFC": "Powers Near Field Communication tags and Apple Pay reader mode.",
+    "UARTPairing": "Pairs accessories over physical UART debug ports.",
+    "Sidecar": "Mirrors iPad/iPhone displays to a Mac (Sidecar).",
+    "Continuity": "Handles Handoff, Universal Clipboard, and device continuity.",
+    "Sharing": "Manages AirDrop and the sharing sheet infrastructure.",
+    "FindMy": "Runs Find My network location reporting for lost devices.",
+    "NearbyInteraction": "Supports UWB device-to-device ranging (Nearby Interaction).",
+    "CoreTelephony": "Core carrier, cellular signal, and SIM management stack.",
+    "MediaSession": "Handles audio session routing and media focus.",
+    "SpeechRecognition": "Provides speech-to-text APIs to apps (SFSpeechRecognizer).",
+    "ReplayKit": "Captures and records screen / audio for screen recording.",
+    "CoreBluetooth": "Exposes Bluetooth LE APIs to apps (CoreBluetooth).",
+    "Maild": "Serves the Mail app — syncs iCloud/Exchange and fetches messages.",
+    "MediaServicesd": "Handles audio/video transcoding and playback assets.",
+    "MediaServerd": "Background media server for audio sessions and effects.",
+    "VoiceNotesd": "Manages Voice Memos recordings and sync.",
+    "VoiceMemoRecording": "Records audio for the Voice Memos app.",
+    "AvatarService": "Manages Animoji/Memoji persona data and creation.",
+    "FamilyKvs": "Stores per-family key-value data for Family Sharing.",
+    "Fams": "Family Analytics reporting (legacy family metrics collection).",
+    "Fellowd": "Tracks Apple Watch companion activity and health pairing.",
+    "Keyboardservicesd": "Provides first-generation keyboard service infrastructure.",
+    "AppIDServiced": "Validates App ID and developer entitlements for installed apps.",
+    "APSD": "Apple Push Service daemon — delivers all push notifications and raw telemetry.",
+    "CloudPhotod": "Syncs iCloud Photo Library content and storage management.",
+    "SocialNotification": "Serves social networking notification aggregation.",
+    "StoreKit": "Handles in-app purchase transactions for the App Store.",
+    "StoreBookkeeper": "Tracks App Store download and update catalogue.",
+    "Appsyncd": "Maintains the app-to-app association database for deep links.",
+    "Faced": "Face Analytics lightly tracks FaceTime/faces metadata.",
+    "HealthSyncWatch": "Syncs HealthKit metrics between iPhone and Watch.",
+    "Lifescienced": "Comm-route health/life-science analytics for clinical research apps.",
+    "Medicald": "Exposes HealthKit clinical records and medical ID.",
+    "Uninstalld": "Uninstalls apps and cleans their containers and data.",
+    "Installd": "Installs, upgrades, and manages app bundle lifecycle.",
+    "Runningboardd": "Core process manager; supervises app lifecycle and throttling.",
+    "Nsurlstoraged": "Persists URLSession cache and cookies for apps.",
+    "Cfprefsd": "Central preferences daemon all apps read/write settings through.",
+    "Filecoordinationd": "Coordinates file access between processes (NSFileCoordinator).",
+    "Fseventsd": "Tracks file system change events for backups and sync tools.",
+    "Lsdd": "Launch Services database; registers apps and URL schemes.",
+    "Backboardd": "SpringBoard's input/event daemon; touches, buttons, gestures.",
+    "SpringBoard": "Main home screen / springboard process.",
+    "CoreAnimation": "Renders UI transitions and layered view animations.",
+    "BatteryCenter": "Reports battery charge, health, and the battery graph.",
+    "Audiotoolboxd": "Routes audio through AudioToolbox HAL and codecs.",
+    "AudioD": "Core audio daemon; mixes and routes all system audio.",
+    "AudioClockSyncer": "Keeps audio clocks in sync across output devices.",
+    "Stereod": "Enables stereo/folded audio output modes.",
+    "Carkitd": "Manages CarPlay display and automotive connectivity.",
+    "AirPort": "Wi-Fi networking daemon; scanning, associations, and hotspots.",
+    "CaptiveAgent": "Detects captive Wi-Fi portals and shows login window.",
+    "CoreCaptured": "Records screen captures and system snapshots.",
+    "IPConfigd": "Configures IP addresses and DHCP leases for interfaces.",
+    "Biometrickitd": "Serves Face ID and Touch ID biometric authentication.",
+    "SecureElementd": "Manages the Secure Element for payments and SE apps.",
+    "Keybagd": "Provides keybag encryption keys for file-level data protection.",
+    "Securityd": "Keychain and code-signing trust evaluations.",
+    "CertInfo": "Evaluates certificate trust chains and revocation.",
+    "Kextd": "Loads and manages kernel extensions.",
+    "FileIntegrity": "Verifies file integrity and enforces Data Protection classes.",
+    "Runwayd": "Generatord legacy backend for software update telemetry.",
+    "ManagedMode": "Configures enterprise managed-device mode.",
+    "Accessibility": "Manages accessibility features and UI adaptations.",
+    "HearingMode": "Supports hearing device pairing and live listen.",
+    "Gaze": "Powers eye-tracking for accessibility (iOS 18+).",
+    "ARd": "ARKit daemon; handles AR sessions and world tracking.",
+    "ImageIO": "Decodes and encodes image formats for the system.",
+    "QuickLookd": "Generates thumbnails and document previews.",
+    "Geniusd": "AppleSeed feedback collection for beta programs.",
+    "Cashd": "Apple Cash / wallet payment validation.",
+    "Saled": "Samples system data for diagnostics (legacy sales log).",
+    "MobileActivation": "Activates the device with Apple's activation servers.",
+    "VehicularAccess": "Digital car key and vehicle digital access (DPad).",
+    "Airdropd": "Manages AirDrop transfer discovery and sessions.",
+    "Hidd": "Human Interface Device daemon; processes touch/keyboard input.",
+    "BluetoothStack": "Low-level Bluetooth controller stack.",
+    "SharedLock": "Multipath networking daemon for Wi-Fi/LTE bonding.",
+    "SystemConfiguration": "Monitors network state and configuration preferences.",
+    "Dnssd": "Multicast DNS and DNS-SD service discovery.",
+    "Mld": "Machine Learning daemon; manages CoreML models and analytics.",
+    "Dispatchd": "Distributed notification center (distnoted).",
+    "Emis": "Emergency services messaging infrastructure.",
+    "Barrel": "Storage barrel/pruning daemon for older logs and caches.",
+    "Crypto": "Low-level crypto engine for keychain and Secure Enclave access.",
+    "MobileBackup": "Powers iCloud device backups.",
+    "MobileStorage": "Mounts and manages external storage devices.",
+    "MobileDelete": "Purges cached/stale files when storage gets low.",
+    "MobilePatch": "Applies software patch entitlements for device updates.",
+    "MobileAccessoryUpdater": "Updates firmware on connected accessories.",
+    "USBd": "Handles USB host mode and media support.",
+    "ExFAT": "Provides exFAT filesystem support.",
+    "Bom": "Provides atomic file operations (BOM) for installers.",
+    "DPFS": "Data Protection filesystem daemon.",
+    "CipherMining": "Background machine-learning / cipher processing.",
+    "SMSOTT": "Supports OTT SMS and carrier messaging features.",
+    "Telephony": "Cellular call, carrier, and telephony stack.",
+    "Basebandd": "Communicates with the cellular baseband firmware.",
+    "StoreFilesystem": "Manages cache/installation storages and cleanup.",
+    "WatchCompaniond": "Powers Watch companion app communication (Synapse/SOS).",
+    "CalibrationData": "Stores factory sensor calibration data.",
+    "CommonUserAssetd": "Downloads shared system assets (wallpapers, fonts).",
+    "LanguageAssetd": "Downloads language models and speech recognition assets.",
+    "Otapackd": "Manages OTA update pack downloads.",
+}
+
+
+def daemon_description(daemon: Daemon) -> str:
+    """Return a brief tooltip description for a daemon, falling back to the title."""
+    return DAEMON_DESCRIPTIONS.get(daemon.name, daemon_title(daemon))

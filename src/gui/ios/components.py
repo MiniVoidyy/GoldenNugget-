@@ -1,8 +1,36 @@
-from PySide6.QtCore import Qt, QCoreApplication, Signal as pyqtSignal
+from PySide6.QtCore import Qt, QCoreApplication, QObject, QEvent, Signal as pyqtSignal
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QLabel, QPushButton, QFrame,
-    QSizePolicy,
+    QSizePolicy, QToolTip,
 )
+
+
+class _InstantToolTip(QObject):
+    """Event filter that shows a widget's tooltip immediately on hover.
+
+    Qt's built-in tooltip mechanism waits for the platform hover delay and is
+    easy to miss; this triggers QToolTip right away while still letting Qt's
+    normal tooltip handling keep it visible.
+    """
+
+    def __init__(self, watched, parent=None):
+        super().__init__(parent)
+        self._watched = watched
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.HoverMove and self._watched.isEnabled():
+            tip = self._watched.toolTip()
+            if tip:
+                QToolTip.showText(event.globalPosition().toPoint(), tip, self._watched)
+        return False
+
+
+def install_instant_tooltip(widget):
+    """Show ``widget``'s tooltip at once on hover (Qt's default is delayed)."""
+    if getattr(widget, "_instant_tip", None) is not None:
+        return
+    widget._instant_tip = _InstantToolTip(widget, widget)
+    widget.installEventFilter(widget._instant_tip)
 
 
 class IOSSectionHeader(QLabel):

@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 
 from src.gui.ios.components import (
     IOSSectionHeader, IOSCard, IOSSettingsRow,
-    IOSSwitch
+    IOSSwitch, install_instant_tooltip
 )
 from src.gui.ios.compat import is_tweak_compatible
 from src.tweaks.tweaks import tweaks, TweakID
@@ -185,7 +185,7 @@ class IOSSectionContent(QWidget):
         self.force_solarium_fallback_card = None
 
         # Helper to create a switch row for boolean tweaks
-        def make_switch(tweak_id: TweakID, title: str):
+        def make_switch(tweak_id: TweakID, title: str, help_text: str = ""):
             if tweak_id not in tweaks:
                 return
             tweak = tweaks[tweak_id]
@@ -208,8 +208,16 @@ class IOSSectionContent(QWidget):
 
             layout.addWidget(card)
 
+            if help_text:
+                card.setToolTip(help_text)
+                label.setToolTip(help_text)
+                switch.setToolTip(help_text)
+                install_instant_tooltip(card)
+                install_instant_tooltip(label)
+                install_instant_tooltip(switch)
+
         # Helper for text input tweaks
-        def make_text_input(tweak_id: TweakID, title: str):
+        def make_text_input(tweak_id: TweakID, title: str, help_text: str = ""):
             if tweak_id not in tweaks:
                 return
             if not is_compatible(tweak_id):
@@ -226,9 +234,14 @@ class IOSSectionContent(QWidget):
             row.clicked.connect(lambda: self._show_text_input_dialog(tweak_id, title, current, row))
             card_layout.addWidget(row)
             layout.addWidget(card)
+            if help_text:
+                card.setToolTip(help_text)
+                row.setToolTip(help_text)
+                install_instant_tooltip(card)
+                install_instant_tooltip(row)
 
         # Helper for number input tweaks
-        def make_number_input(tweak_id: TweakID, title: str, min_val: int = 0, max_val: int = 999):
+        def make_number_input(tweak_id: TweakID, title: str, min_val: int = 0, max_val: int = 999, help_text: str = ""):
             if tweak_id not in tweaks:
                 return
             if not is_compatible(tweak_id):
@@ -245,17 +258,25 @@ class IOSSectionContent(QWidget):
             row.clicked.connect(lambda: self._show_number_input_dialog(tweak_id, title, current, row, min_val, max_val))
             card_layout.addWidget(row)
             layout.addWidget(card)
+            if help_text:
+                card.setToolTip(help_text)
+                row.setToolTip(help_text)
+                install_instant_tooltip(card)
+                install_instant_tooltip(row)
 
         # Render sections straight from the registry. Titles are stored
         # as QT_TRANSLATE_NOOP markers and translated here, at render time.
         def tr_title(spec) -> str:
             return QCoreApplication.translate("Nugget", spec.title)
 
+        def tr_help(spec) -> str:
+            return QCoreApplication.translate("Nugget", spec.help) if spec.help else ""
+
         renderers = {
-            Kind.SWITCH: lambda spec: make_switch(spec.id, tr_title(spec)),
-            Kind.TEXT: lambda spec: make_text_input(spec.id, tr_title(spec)),
+            Kind.SWITCH: lambda spec: make_switch(spec.id, tr_title(spec), tr_help(spec)),
+            Kind.TEXT: lambda spec: make_text_input(spec.id, tr_title(spec), tr_help(spec)),
             Kind.NUMBER: lambda spec: make_number_input(
-                spec.id, tr_title(spec), spec.min_value, spec.max_value),
+                spec.id, tr_title(spec), spec.min_value, spec.max_value, tr_help(spec)),
         }
 
         sections_to_render = self.sections if self.sections is not None else list(Section)
