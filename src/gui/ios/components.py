@@ -48,9 +48,13 @@ class IOSCard(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setStyleSheet("""
             IOSCard {
-                background-color: #1C1C1E;
-                border-radius: 12px;
-                border: none;
+                background-color: #242426;
+                border-radius: 14px;
+                border: 1px solid rgba(255, 255, 255, 0.06);
+            }
+            IOSCard:hover {
+                background-color: #2C2C2E;
+                border: 1px solid rgba(255, 255, 255, 0.12);
             }
         """)
         # Don't create a default layout - let the caller decide
@@ -199,7 +203,7 @@ class IOSPrimaryButton(QPushButton):
 
 
 class IOSSwitch(QPushButton):
-    """iOS-style toggle switch"""
+    """iOS-style toggle switch with smooth animated-feel knob and polished colors."""
     def __init__(self, checked=False, parent=None):
         super().__init__(parent)
         self.setCheckable(True)
@@ -209,7 +213,13 @@ class IOSSwitch(QPushButton):
         self._knob = QLabel(self)
         self._knob.setFixedSize(27, 27)
         self._knob.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self._knob.setStyleSheet("background-color: #FFFFFF; border-radius: 13px; border: none;")
+        self._knob.setStyleSheet("""
+            QLabel {
+                background-color: #FFFFFF;
+                border-radius: 13.5px;
+                border: 1px solid rgba(0, 0, 0, 0.08);
+            }
+        """)
         self.toggled.connect(self._update_style)
         self._update_style()
 
@@ -217,12 +227,15 @@ class IOSSwitch(QPushButton):
         checked = self.isChecked()
         self.setStyleSheet(f"""
             QPushButton {{
-                background-color: {'#30D158' if checked else '#3A3A3C'};
-                border-radius: 15px;
+                background-color: {'#34C759' if checked else '#39393D'};
+                border-radius: 15.5px;
                 border: none;
             }}
+            QPushButton:hover {{
+                background-color: {'#32B753' if checked else '#48484E'};
+            }}
         """)
-        self._knob.move(22 if checked else 2, 2)
+        self._knob.move(21 if checked else 2, 2)
 
 
 class IOSValueLabel(QLabel):
