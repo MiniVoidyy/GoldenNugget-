@@ -480,7 +480,7 @@ class DeviceManager:
                 "GoldenNugget only supports iOS 26.2 and newer. "
                 "Please use the original Nugget for iOS 26.1 and earlier."))
 
-    async def start_restore(self, files_to_restore: list[FileToRestore], update_label=lambda x: None, backup_password: str = "", prepared_backup_root: str = None):
+    async def start_restore(self, files_to_restore: list[FileToRestore], update_label=lambda x: None, backup_password: str = "", prepared_backup_root: str = None, partial_mode: bool = False):
         # hard-block any restore on an unsupported (old) iOS version
         self._raise_if_unsupported()
         self.update_label = update_label
@@ -498,7 +498,8 @@ class DeviceManager:
                 lockdown_client=ld,
                 progress_callback=self.progress_callback,
                 backup_password=backup_password,
-                prepared_backup_root=prepared_backup_root
+                prepared_backup_root=prepared_backup_root,
+                partial_mode=partial_mode
             )
             tweaks[TweakID.PosterBoard].config_manager.save_staged_ids(self.get_current_device_udid())
             msg = QCoreApplication.tr("Your device will now restart.\n\nRemember to turn Find My back on!")
@@ -854,7 +855,6 @@ class DeviceManager:
             # iOS 27+: Also write ManagedPreferencesDomain and SysSharedContainerDomain plists to HomeDomain so
             # tweaks survive the Phase 3 protective backup restore.
             # ManagedPreferencesDomain and SysSharedContainerDomain are wiped by iOS 27; HomeDomain is re-injected.
-            from src.tweaks.basic_plist_locations import FileLocation
             managed_prefs_mappings = {
                 FileLocation.globalPreferences: FileLocation.globalPreferencesHomeDomain,
                 FileLocation.springboard: FileLocation.springboardHomeDomain,
@@ -932,7 +932,8 @@ class DeviceManager:
             # restore to the device
             final_alert = await self.start_restore(
                 files_to_restore, update_label, backup_password=backup_password,
-                prepared_backup_root=prepared_backup_root)
+                prepared_backup_root=prepared_backup_root,
+                partial_mode=self.pref_manager.backup_type == "partial")
             return final_alert, files_to_restore
         finally:
             if len(tmp_dirs) > 0:
