@@ -554,31 +554,37 @@ class DeviceManager:
             # Phase 0: protective backup. On NotEnoughDiskSpaceError the user
             # can choose to continue without it — tweaks still apply, but
             # there is no data protection (photos/settings get wiped).
-            try:
-                prepared_root, pb_from_cache = await self._prepare_protective_backup(
-                    update_label, needs_posterboard=needs_posterboard,
-                    prompt_password=prompt_password)
-            except Exception as e:
-                if "disk space" in str(e).lower() or "NotEnoughDiskSpace" in type(e).__name__:
-                    from PySide6.QtWidgets import QMessageBox
-                    reply = QMessageBox.question(
-                        None,
-                        QCoreApplication.tr("Not Enough Disk Space"),
-                        QCoreApplication.tr(
-                            "The protective backup failed because the device or "
-                            "computer does not have enough free disk space.\n\n"
-                            "Continue anyway WITHOUT data protection?\n"
-                            "(Photos, settings and app data may be lost.)"),
-                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                        QMessageBox.StandardButton.No)
-                    if reply == QMessageBox.StandardButton.Yes:
-                        log_warn("User chose to continue without protective backup")
-                        prepared_root = None
-                        pb_from_cache = False
+            # If backup_type is "partial", skip protective backup entirely.
+            if self.pref_manager.backup_type == "partial":
+                log_info("Partial backup mode selected — skipping protective backup")
+                prepared_root = None
+                pb_from_cache = False
+            else:
+                try:
+                    prepared_root, pb_from_cache = await self._prepare_protective_backup(
+                        update_label, needs_posterboard=needs_posterboard,
+                        prompt_password=prompt_password)
+                except Exception as e:
+                    if "disk space" in str(e).lower() or "NotEnoughDiskSpace" in type(e).__name__:
+                        from PySide6.QtWidgets import QMessageBox
+                        reply = QMessageBox.question(
+                            None,
+                            QCoreApplication.tr("Not Enough Disk Space"),
+                            QCoreApplication.tr(
+                                "The protective backup failed because the device or "
+                                "computer does not have enough free disk space.\n\n"
+                                "Continue anyway WITHOUT data protection?\n"
+                                "(Photos, settings and app data may be lost.)"),
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                            QMessageBox.StandardButton.No)
+                        if reply == QMessageBox.StandardButton.Yes:
+                            log_warn("User chose to continue without protective backup")
+                            prepared_root = None
+                            pb_from_cache = False
+                        else:
+                            return
                     else:
-                        return
-                else:
-                    raise
+                        raise
 
             # fallback: PosterBoard DB missing from the cache backup (e.g. the
             # device rejected container inclusion) -> legacy separate backup

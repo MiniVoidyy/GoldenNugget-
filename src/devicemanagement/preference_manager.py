@@ -17,6 +17,7 @@ class PreferenceManager:
         self.skip_setup = True
         self.supervised = False
         self.organization_name = ""
+        self.backup_type = "full"  # "full" or "partial"
 
     # PosterBoard Configuration Database Saving
     def get_pbconfigs_prefs() -> QSettings:

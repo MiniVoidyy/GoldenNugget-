@@ -475,6 +475,7 @@ class MainWindow(QtWidgets.QMainWindow):
             supervised = self.settings.value("supervised", False, type=bool)
             organization_name = self.settings.value("organization_name", "", type=str)
             use_encrypted_backup = self.settings.value("use_encrypted_backup", False, type=bool)
+            backup_type = self.settings.value("backup_type", "full", type=str)
 
             self.ui.autoRebootChk.setChecked(auto_reboot)
             self.ui.ignorePBFrameLimitChk.setChecked(ignore_frame_limit)
@@ -502,6 +503,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.device_manager.pref_manager.skip_setup = skip_setup
             self.device_manager.pref_manager.supervised = supervised
             self.device_manager.pref_manager.organization_name = organization_name
+            self.device_manager.pref_manager.backup_type = backup_type
         except Exception:
             pass
     

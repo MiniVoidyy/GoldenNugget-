@@ -104,6 +104,15 @@ class IOSSettingsPage(QWidget):
             lambda checked: self._on_encrypted_backup_toggled(checked, encrypted_switch),
         )
 
+        # Backup Type
+        self._make_combo_row(
+            QCoreApplication.translate("Nugget", "Backup Type"),
+            [QCoreApplication.translate("Nugget", "Full (Protective + Sparse)"),
+             QCoreApplication.translate("Nugget", "Partial (Sparse Only)")],
+            0 if pref.backup_type == "full" else 1,
+            lambda idx: self._on_backup_type_changed(idx),
+        )
+
         # Setup
         self.content_layout.addWidget(IOSSectionHeader(QCoreApplication.translate("Nugget", "Setup")))
 
@@ -243,6 +252,50 @@ class IOSSettingsPage(QWidget):
         pref = self.window.device_manager.pref_manager
         pref.organization_name = text
         self.window.settings.setValue("organization_name", text)
+        self.window._sync_settings()
+
+    def _make_combo_row(self, title: str, items: list, current_idx: int, on_change):
+        card = QWidget()
+        row = QHBoxLayout(card)
+        row.setContentsMargins(16, 10, 16, 10)
+        row.setSpacing(12)
+
+        label = QLabel(title)
+        label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
+        row.addWidget(label, 1)
+
+        combo = QComboBox()
+        combo.setStyleSheet("""
+            QComboBox {
+                background-color: #1C1C1E;
+                border: none;
+                border-radius: 10px;
+                color: #FFFFFF;
+                font-size: 14px;
+                padding: 8px 12px;
+                min-width: 180px;
+            }
+            QComboBox::drop-down { border: none; width: 24px; }
+            QComboBox::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #8E8E93; margin-right: 10px; }
+            QComboBox QAbstractItemView {
+                background-color: #2C2C2E;
+                border: 1px solid #3A3A3C;
+                border-radius: 10px;
+                color: #FFFFFF;
+                selection-background-color: #007AFF;
+            }
+        """)
+        combo.addItems(items)
+        combo.setCurrentIndex(current_idx)
+        combo.currentIndexChanged.connect(on_change)
+        row.addWidget(combo)
+
+        self.content_layout.addWidget(card)
+
+    def _on_backup_type_changed(self, idx: int):
+        pref = self.window.device_manager.pref_manager
+        pref.backup_type = "full" if idx == 0 else "partial"
+        self.window.settings.setValue("backup_type", pref.backup_type)
         self.window._sync_settings()
 
     def _make_language_row(self):
