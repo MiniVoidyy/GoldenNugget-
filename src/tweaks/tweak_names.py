@@ -53,6 +53,7 @@ class TweakID(Enum):
     NoLiquidClock = auto()
     NoLiquidDock = auto()
     DisableSpecularMotion = auto()
+    DisableIconShimmer = auto()
     DisableOuterRefraction = auto()
     DisableSolariumHDR = auto()
     # iOS 27 additions

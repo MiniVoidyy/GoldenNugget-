@@ -104,6 +104,8 @@ SPECS: tuple[TweakSpec, ...] = (
        help="Toggle ON: removes Liquid Glass from the Home Screen dock. Slightly increases performance."),
     _t(TweakID.DisableSpecularMotion, Section.LIQUID_GLASS, "Disable Specular Motion", GP, "SBDisableSpecularEverywhereUsingLSSAssertion", min_version="26.0",
        help="Toggle ON: disables the moving light reflection that sweeps across Liquid Glass surfaces. Increases performance."),
+    _t(TweakID.DisableIconShimmer, Section.LIQUID_GLASS, "Disable Icon Shimmer", GP, "SBDisableIconShimmer", min_version="26.0",
+       help="Toggle ON: removes the animated shimmer/highlight effect from Home Screen app icons. Increases performance slightly."),
     _t(TweakID.DisableOuterRefraction, Section.LIQUID_GLASS, "Disable Outer Refraction", GP, "SolariumDisableOuterRefraction", min_version="26.0",
        help="Toggle ON: removes the frosted-glass background refraction around Liquid Glass edges. Increases performance."),
     _t(TweakID.DisableSolariumHDR, Section.LIQUID_GLASS, "Disable Solarium HDR", GP, "SolariumAllowHDR", value=False, min_version="26.0",
