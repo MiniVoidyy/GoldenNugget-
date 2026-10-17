@@ -9,6 +9,8 @@ class TendieFile:
     is_container: bool
     unsafe_container: bool
     loaded: bool
+    auto_convert: bool
+    legacy_families: list
 
     def __init__(self, path: str):
         self.path = path
@@ -17,9 +19,19 @@ class TendieFile:
         self.is_container = False
         self.unsafe_container = False
         self.loaded = False
+        # Set on import: the user answered the "convert or install as is" prompt
+        # for a legacy (pre-iOS 27) package. None means the prompt never ran
+        # (iOS 26, or nothing legacy inside) and the apply path decides.
+        self.auto_convert: "bool | None" = None
+        # Legacy (pre-iOS 27) wallpaper families found in the archive, detected
+        # once on import so the tendies card can show the Convert switch without
+        # re-reading the zip. Empty means the package needs no conversion.
+        self.legacy_families: "list[str]" = []
 
         # read the contents
         with zipfile.ZipFile(path, mode="r") as archive:
+            from src.controllers.archive_safety import checked_members
+            checked_members(archive)
             for option in archive.namelist():
                 if "__macosx/" in option.lower():
                     continue
@@ -53,3 +65,4 @@ class TendieFile:
         os.makedirs(zip_output)
         with zipfile.ZipFile(self.path, 'r') as zip_ref:
             zip_ref.extractall(zip_output)
+        return zip_output

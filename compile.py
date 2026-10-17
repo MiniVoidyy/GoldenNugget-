@@ -1,20 +1,57 @@
 from sys import platform, argv
 import os
+import re
 import shutil # Added for the macOS fix
+import subprocess
+import sys
+import platform as _platform_mod
 import PyInstaller.__main__
 
 target_arch = next((arg for arg in argv if arg.startswith("--target-arch=")), None)
 if target_arch:
     print(f"[+] Target arch: {target_arch}")
 
+
+def _package_macos_app(dist_path):
+    """Zip the built .app bundle so the top-level archive entry is Nugget.app.
+
+    PyInstaller --onedir --windowed produces BOTH dist/Nugget.app and a loose
+    dist/Nugget/ folder. Zipping the wrong one makes users extract a bare
+    'Contents' folder that Finder does not treat as an app (issue #29).
+    ditto --keepParent pins Nugget.app as the archive root and preserves
+    symlinks/resource forks, so extraction yields a proper .app bundle.
+    """
+    arch = None
+    if target_arch:
+        m = re.search(r"=([^=]+)$", target_arch)
+        if m:
+            arch = m.group(1)
+    arch_label = arch or _platform_mod.machine()
+    arch_map = {"arm64": "Apple-Silicon", "x86_64": "Intel", "universal2": "Universal"}
+    arch_label = arch_map.get(arch_label, arch_label)
+
+    app_path = os.path.join(dist_path, "Nugget.app")
+    if not os.path.isdir(app_path):
+        print(f"[!] macOS packaging skipped: {app_path} not found")
+        return
+
+    zip_path = os.path.join(dist_path, f"Nugget-macOS-{arch_label}.zip")
+    subprocess.run(
+        ["ditto", "-c", "-k", "--keepParent", app_path, zip_path],
+        check=True,
+    )
+    print(f"[+] macOS app packaged: {zip_path} (extracts to Nugget.app)")
+
 # Base PyInstaller args
 args = [
-'main_app.py',
+'nugget_cli.py',
     '--name=Nugget',
     '--icon=nugget.ico',
     '--onedir',
     '--noconfirm',
     '--collect-all=pymobiledevice3',
+    '--collect-all=pillow_heif',
+    '--collect-all=PIL',
     '--add-data=files/:files',
     '--copy-metadata=pyimg4',
     '--hidden-import=zeroconf',
@@ -23,6 +60,12 @@ args = [
     '--hidden-import=zeroconf._handlers.answers',
     '--hidden-import=src.qt.resources_rc',
     '--add-data=src/qt:src/qt',
+    # Bundle the helper tool modules (imported lazily by the CLI wrapper).
+    '--hidden-import=apply_wallpaper',
+    '--hidden-import=restore_cache',
+    '--hidden-import=restore',
+    '--hidden-import=skip_setup',
+    '--hidden-import=main_app',
 ]
 
 if target_arch:
@@ -58,7 +101,62 @@ if platform == "darwin":
 elif os.name == 'nt':
     args.append('--version-file=version.txt')
     args.append('--add-data=nugget.ico;.')
-    
+
+    # --- WINDOWS abi3t COMPAT FIX ---
+    # cryptography >= 50 ships an abi3/abi3t wheel whose
+    # cryptography/hazmat/bindings/_rust.pyd links against python3t.dll (the
+    # abi3t stable-ABI stub) even on the GIL-enabled CPython 3.15 builds we ship.
+    #
+    # The official python.org Windows installer does NOT place python3t.dll next
+    # to python3XX.dll; it installs it into a sibling 'abi3t-compat' subdirectory
+    # (CPython Tools/msi/core/core_files.wxs). That directory is on no DLL search
+    # path, so PyInstaller's dependency analysis cannot resolve the import,
+    # silently drops it, and the frozen app dies at startup with:
+    #     ImportError: DLL load failed while importing _rust:
+    #     The specified module could not be found.
+    #
+    # CPython preloads the stub at runtime in _Py_CheckPython3t()
+    # (Python/dynload_win.c), which looks for 'abi3t-compat\python3t.dll' and
+    # then 'python3t.dll' next to the loaded python3XX.dll. Collecting it into
+    # the bundle root - where PyInstaller already puts python3XX.dll and
+    # python3.dll - satisfies that second lookup, so _rust.pyd resolves.
+    python3t_sources = [
+        os.path.join(sys.base_prefix, "abi3t-compat", "python3t.dll"),
+        os.path.join(sys.base_prefix, "python3t.dll"),
+        os.path.join(os.path.dirname(sys.executable), "abi3t-compat", "python3t.dll"),
+        os.path.join(os.path.dirname(sys.executable), "python3t.dll"),
+    ]
+    python3t_dll = next((p for p in python3t_sources if os.path.isfile(p)), None)
+    if python3t_dll:
+        print(f"[+] Bundling abi3t compat DLL: {python3t_dll}")
+        args.append('--add-binary')
+        args.append(f"{python3t_dll};.")
+    else:
+        # Only fatal if the installed cryptography actually needs it - the DLL
+        # name sits in _rust.pyd's import table as plain ASCII. Locate the
+        # package with find_spec so we do not execute cryptography/__init__.py.
+        needs_python3t = False
+        try:
+            import importlib.util
+            spec = importlib.util.find_spec("cryptography")
+            for base in getattr(spec, "submodule_search_locations", None) or []:
+                rust_pyd = os.path.join(base, "hazmat", "bindings", "_rust.pyd")
+                if os.path.isfile(rust_pyd):
+                    with open(rust_pyd, "rb") as fh:
+                        needs_python3t = b"python3t.dll" in fh.read()
+                    break
+        except Exception:
+            pass
+        if needs_python3t:
+            raise SystemExit(
+                "[!] cryptography requires python3t.dll (abi3t compat stub) but it was "
+                "not found next to the Python installation; the frozen app would crash "
+                "with 'DLL load failed while importing _rust'."
+            )
+        print("[!] python3t.dll not found in this Python installation; skipping "
+              "(not required by the installed cryptography).")
+    # --------------------------------
+
     try:
         import pytun_pmd3
         package_path = os.path.dirname(pytun_pmd3.__file__)
@@ -83,3 +181,19 @@ elif os.name == 'nt':
         print("[!] libimobiledevice binaries not bundled: 'idevice' folder not found")
 
 PyInstaller.__main__.run(args)
+
+if os.name == 'nt' and python3t_dll:
+    bundled_paths = [
+        os.path.join("dist", "Nugget", "_internal", "python3t.dll"),
+        os.path.join("dist", "Nugget", "python3t.dll"),
+    ]
+    landed = next((p for p in bundled_paths if os.path.isfile(p)), None)
+    if not landed:
+        raise SystemExit(
+            "[!] python3t.dll was not found in the built bundle; the Windows "
+            "release would crash with 'DLL load failed while importing _rust'."
+        )
+    print(f"[+] Verified abi3t compat DLL in bundle: {landed}")
+
+if platform == "darwin":
+    _package_macos_app("dist")

@@ -1,0 +1,108 @@
+name: Bug report
+description: Report a reproducible problem with GoldenNugget.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe what happened so we can reproduce it. For help using the app, see the [Wiki](https://github.com/GoldenNugget-Team/GoldenNugget/wiki).
+        Do not post backup files, pairing records, passwords, serial numbers, or device UDIDs.
+  - type: input
+    id: app_version
+    attributes:
+      label: GoldenNugget version
+      description: Include the commit if you run from source.
+      placeholder: "e.g. 9.6.0 or commit 822294c"
+    validations:
+      required: true
+  - type: dropdown
+    id: computer_os
+    attributes:
+      label: Computer operating system
+      options:
+        - Windows
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (x86_64)
+        - Linux (ARM64)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: os_version
+    attributes:
+      label: Operating system version
+      placeholder: "e.g. Windows 11 24H2, macOS 15.6, Ubuntu 24.04"
+    validations:
+      required: true
+  - type: input
+    id: device_model
+    attributes:
+      label: iPhone or iPad model
+      description: Enter "Not connected" if this happens without a device.
+      placeholder: "e.g. iPhone 15 Pro, iPad Air M2, Not connected"
+    validations:
+      required: true
+  - type: input
+    id: ios_version
+    attributes:
+      label: iOS / iPadOS version
+      description: Include the build number if available. Enter "Not connected" if appropriate.
+      placeholder: "e.g. iOS 27.0 (build ...), Not connected"
+    validations:
+      required: true
+  - type: dropdown
+    id: feature
+    attributes:
+      label: Affected feature
+      options:
+        - Startup or device connection
+        - Apply or reset
+        - Backup or data recovery
+        - PosterBoard or wallpapers
+        - Templates
+        - SpringBoard or Internal tweaks
+        - Status Bar
+        - Liquid Glass
+        - Daemons
+        - Presets
+        - Icon or passcode themes
+        - Settings or interface
+        - Command line
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Name the exact switches, presets, or packages involved.
+      placeholder: |
+        1. Open ...
+        2. Enable ...
+        3. Click ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result and error message
+      description: Copy the exact error text. Add a screenshot if it helps.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Logs or diagnostic report
+      description: Use Settings → About → Export Diagnostics or App Log. Review the contents and remove personal data before attaching a file or pasting relevant lines.
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Include relevant backup location, encryption state, free disk space, or whether this worked in an earlier version. Never include a backup password.

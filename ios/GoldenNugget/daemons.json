@@ -1,0 +1,2238 @@
+{
+  "generated_from": "src/tweaks/daemons_tweak.py",
+  "recommended": [
+    "CrashReports",
+    "Diagnostics",
+    "UsageTrackingAgent",
+    "WifiAnalytics",
+    "AnalyticsHelper",
+    "CallAnalytics",
+    "AdPrivacy",
+    "AdServices",
+    "PromotedContent",
+    "CoreDuet",
+    "Insight",
+    "Metrics",
+    "Feedback",
+    "SiriInference",
+    "SiriActions",
+    "FollowUp",
+    "Symptomsd",
+    "SettingsStats",
+    "Shazam",
+    "StatisticalDiagnostic",
+    "WirelessDiagnostics",
+    "DuetHeuristic",
+    "DuetExpert",
+    "Decisiond",
+    "Triald",
+    "Sociald"
+  ],
+  "daemons": [
+    {
+      "name": "thermalmonitord",
+      "labels": [
+        "com.apple.thermalmonitord"
+      ],
+      "category": "OTHER",
+      "title": "Disable thermalmonitord",
+      "description": "Supervises CPU/camera temperature sensors and throttles when hot."
+    },
+    {
+      "name": "OTA",
+      "labels": [
+        "com.apple.mobile.softwareupdated",
+        "com.apple.OTATaskingAgent",
+        "com.apple.softwareupdateservicesd",
+        "com.apple.mobile.NRDUpdated"
+      ],
+      "category": "OTHER",
+      "title": "Disable OTA",
+      "description": "Fetches and installs over-the-air iOS software updates."
+    },
+    {
+      "name": "UsageTrackingAgent",
+      "labels": [
+        "com.apple.UsageTrackingAgent"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable UsageTrackingAgent",
+      "description": "Tracks app usage duration and habits for Apple's usage analytics."
+    },
+    {
+      "name": "GameCenter",
+      "labels": [
+        "com.apple.gamed"
+      ],
+      "category": "OTHER",
+      "title": "Disable Game Center",
+      "description": "Handles Game Center social features, leaderboards, and friend activity."
+    },
+    {
+      "name": "ScreenTime",
+      "labels": [
+        "com.apple.ScreenTimeAgent",
+        "com.apple.homed",
+        "com.apple.familycircled",
+        "com.apple.familynotification",
+        "com.apple.asktod"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Screen Time Agent",
+      "description": "Monitors and reports app usage limits and screen time statistics."
+    },
+    {
+      "name": "CrashReports",
+      "labels": [
+        "com.apple.ReportCrash",
+        "com.apple.ReportCrash.Jetsam",
+        "com.apple.ReportMemoryException",
+        "com.apple.OTACrashCopier",
+        "com.apple.analyticsd",
+        "com.apple.wifianalyticsd",
+        "com.apple.aslmanager",
+        "com.apple.coresymbolicationd",
+        "com.apple.crash_mover",
+        "com.apple.crashreportcopymobile",
+        "com.apple.DumpBasebandCrash",
+        "com.apple.DumpPanic",
+        "com.apple.rtcreportingd",
+        "com.apple.pluginkit.pkreporter",
+        "com.apple.ProxiedCrashCopier",
+        "com.apple.ProxiedCrashCopier.ProxyingDevice",
+        "com.apple.ReportSystemMemory"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Logs, Dumps, and Crash Reports",
+      "description": "Collects crash logs and memory exception reports from apps and system processes."
+    },
+    {
+      "name": "Diagnostics",
+      "labels": [
+        "com.apple.diagnosticd",
+        "com.apple.diagnosticextensionsd",
+        "com.apple.diagnosticservicesd",
+        "com.apple.diagnosticspushd",
+        "com.apple.symptomsd-diag",
+        "com.apple.sysdiagnose",
+        "com.apple.sysdiagnose.darwinos",
+        "com.apple.sysdiagnose_helper"
+      ],
+      "category": "LOGGING",
+      "title": "Disable System Diagnostics",
+      "description": "Collects diagnostic data and device analytics to send to Apple."
+    },
+    {
+      "name": "ATWAKEUP",
+      "labels": [
+        "com.apple.atc.atwakeup"
+      ],
+      "category": "OTHER",
+      "title": "Disable ATWAKEUP",
+      "description": "Wakes the system for scheduled offline Face ID / Secure Enclave checks."
+    },
+    {
+      "name": "Tips",
+      "labels": [
+        "com.apple.tipsd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Tips Services",
+      "description": "Delivers Apple's built-in Tips app content and usage hints."
+    },
+    {
+      "name": "VPN",
+      "labels": [
+        "com.apple.racoon"
+      ],
+      "category": "OTHER",
+      "title": "VPN Icon",
+      "description": "Manages VPN configuration and tunneling for the Settings app."
+    },
+    {
+      "name": "Location",
+      "labels": [
+        "com.apple.locationd"
+      ],
+      "category": "TRACKING",
+      "title": "Location Services",
+      "description": "Core location services daemon; disabling breaks GPS for all apps."
+    },
+    {
+      "name": "ChineseLAN",
+      "labels": [
+        "com.apple.wapic",
+        "com.apple.wifi.wapic"
+      ],
+      "category": "OTHER",
+      "title": "Disable Chinese WLAN Service",
+      "description": "Provides Chinese AULAN-style WLAN helper for carrier services."
+    },
+    {
+      "name": "HealthKit",
+      "labels": [
+        "com.apple.healthd"
+      ],
+      "category": "OTHER",
+      "title": "Disable HealthKit",
+      "description": "Stores and shares health data with third-party apps."
+    },
+    {
+      "name": "AirPrint",
+      "labels": [
+        "com.apple.printd"
+      ],
+      "category": "OTHER",
+      "title": "Disable AirPrint",
+      "description": "Discovers printers and spools AirPrint print jobs."
+    },
+    {
+      "name": "AssistiveTouch",
+      "labels": [
+        "com.apple.assistivetouchd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Assistive Touch",
+      "description": "Powers the on-screen AssistiveTouch accessibility button."
+    },
+    {
+      "name": "iCloud",
+      "labels": [
+        "com.apple.itunescloudd"
+      ],
+      "category": "OTHER",
+      "title": "Disable iCloud",
+      "description": "Syncs iCloud account data, documents, and device backups."
+    },
+    {
+      "name": "InternetTethering",
+      "labels": [
+        "com.apple.MobileInternetSharing"
+      ],
+      "category": "OTHER",
+      "title": "Disable Internet Tethering (Hotspot)",
+      "description": "Enables Personal Hotspot and USB/bluetooth tethering."
+    },
+    {
+      "name": "PassBook",
+      "labels": [
+        "com.apple.passd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Passbook",
+      "description": "Manages Apple Wallet passes, tickets, and loyalty cards."
+    },
+    {
+      "name": "Spotlight",
+      "labels": [
+        "com.apple.searchd",
+        "com.apple.corespotlightservice",
+        "com.apple.spotlightknowledged",
+        "com.apple.spotlightknowledged.updater",
+        "com.apple.spotlight.IndexAgent"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Spotlight",
+      "description": "Indexes files, contacts, and app content for device-wide search."
+    },
+    {
+      "name": "VoiceControl",
+      "labels": [
+        "com.apple.assistant_service",
+        "com.apple.assistantd",
+        "com.apple.voiced"
+      ],
+      "category": "OTHER",
+      "title": "Voice Control Icon",
+      "description": "Powers on-device voice commands for accessibility hands-free control."
+    },
+    {
+      "name": "NanoTimeKit",
+      "labels": [
+        "com.apple.nanotimekitcompaniond"
+      ],
+      "category": "OTHER",
+      "title": "Disable NanoTimeKit (Apple Watch Face Sync)",
+      "description": "Serves watch-face complications to the paired Apple Watch."
+    },
+    {
+      "name": "FollowUp",
+      "labels": [
+        "com.apple.followupd"
+      ],
+      "category": "TRACKING",
+      "title": "Follow Up",
+      "description": "Tracks and schedules follow-up reminders and notification prompts."
+    },
+    {
+      "name": "PromotedContent",
+      "labels": [
+        "com.apple.promotedcontentd"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Promoted Content",
+      "description": "Serves promoted or suggested content in Spotlight and notifications."
+    },
+    {
+      "name": "WifiAnalytics",
+      "labels": [
+        "com.apple.wifianalyticsd"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Wi-Fi Analytics",
+      "description": "Collects Wi-Fi telemetry (scan results, roaming stats, connection quality)."
+    },
+    {
+      "name": "News",
+      "labels": [
+        "com.apple.newsd"
+      ],
+      "category": "OTHER",
+      "title": "Disable News",
+      "description": "Delivers Apple News content; disabling stops background article prefetching."
+    },
+    {
+      "name": "AskPermissions",
+      "labels": [
+        "com.apple.askpermissiond"
+      ],
+      "category": "OTHER",
+      "title": "Disable Ask Permissions",
+      "description": "Handles permission prompts for app data access."
+    },
+    {
+      "name": "FamilyCircle",
+      "labels": [
+        "com.apple.familycircled"
+      ],
+      "category": "OTHER",
+      "title": "Disable Family Circle (Family Sharing)",
+      "description": "Implements Family Sharing circles and shared subscriptions."
+    },
+    {
+      "name": "FamilyNotification",
+      "labels": [
+        "com.apple.familynotificationd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Family Notifications",
+      "description": "Delivers Family Sharing purchase and update notifications."
+    },
+    {
+      "name": "AdPrivacy",
+      "labels": [
+        "com.apple.adprivacyd"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Ad Privacy",
+      "description": "Handles on-device ad personalization and private ad relevance scoring."
+    },
+    {
+      "name": "AdServices",
+      "labels": [
+        "com.apple.adservicesd"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Ad Services",
+      "description": "Serves Apple Search Ads and tracks ad impression/click attribution."
+    },
+    {
+      "name": "VideosSubscriptions",
+      "labels": [
+        "com.apple.videosubscriptionsd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Video Subscriptions",
+      "description": "Tracks video subscription status for Apple TV and media suggestions."
+    },
+    {
+      "name": "WebBookmarks",
+      "labels": [
+        "com.apple.webbookmarksd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Web Bookmarks",
+      "description": "Syncs Safari bookmarks and reading list via iCloud."
+    },
+    {
+      "name": "NanoRegistry",
+      "labels": [
+        "com.apple.nanoregistryd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Nano Registry (Apple Watch)",
+      "description": "Registers paired Apple Watch devices with the phone."
+    },
+    {
+      "name": "NanoMediaControl",
+      "labels": [
+        "com.apple.nanomediacontrold"
+      ],
+      "category": "OTHER",
+      "title": "Disable Nano Media Control (Apple Watch)",
+      "description": "Controls music playback from the paired Apple Watch."
+    },
+    {
+      "name": "NanoPreferences",
+      "labels": [
+        "com.apple.nanopreferencesd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Nano Preferences (Apple Watch)",
+      "description": "Syncs Apple Watch preference settings with the phone."
+    },
+    {
+      "name": "SiriActions",
+      "labels": [
+        "com.apple.siriactionsd"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Siri Actions",
+      "description": "Suggests Shortcuts actions based on your routine and context."
+    },
+    {
+      "name": "SiriInference",
+      "labels": [
+        "com.apple.siriinferenced"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Siri Inference",
+      "description": "Runs on-device Siri intelligence for proactive suggestions."
+    },
+    {
+      "name": "Feedback",
+      "labels": [
+        "com.apple.feedbackd"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Feedback",
+      "description": "Submits diagnostic and usage feedback to Apple when prompted."
+    },
+    {
+      "name": "Commerce",
+      "labels": [
+        "com.apple.commerce"
+      ],
+      "category": "OTHER",
+      "title": "Disable Commerce (App Store Checks)",
+      "description": "Handles App Store purchase validation and receipt checks."
+    },
+    {
+      "name": "CoreDuet",
+      "labels": [
+        "com.apple.coreduetd"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable CoreDuet (Battery/Usage Statistics)",
+      "description": "Records device and app interaction patterns for Siri suggestions."
+    },
+    {
+      "name": "Insight",
+      "labels": [
+        "com.apple.insightd"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Insight",
+      "description": "Part of the Duet/Insight pipeline; analyzes app usage for predictions."
+    },
+    {
+      "name": "Metrics",
+      "labels": [
+        "com.apple.metricsd"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Metrics",
+      "description": "Collects system and app performance metrics for Apple's telemetry."
+    },
+    {
+      "name": "AnalyticsHelper",
+      "labels": [
+        "com.apple.analyticsd",
+        "com.apple.analyticsd.admin",
+        "com.apple.analyticsd.events"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable System Analytics",
+      "description": "Helper process for analyticsd; formats and batches telemetry uploads."
+    },
+    {
+      "name": "CallAnalytics",
+      "labels": [
+        "com.apple.rtcreportingd"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Call Analytics (RTC Reporting)",
+      "description": "Collects call duration and quality metrics for carrier analytics."
+    },
+    {
+      "name": "Symptomsd",
+      "labels": [
+        "com.apple.symptomsd",
+        "com.apple.symptomsd-app"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Symptom Diagnostics",
+      "description": "Monitors network connectivity symptoms and triggers diagnostic probes."
+    },
+    {
+      "name": "MobileAssetd",
+      "labels": [
+        "com.apple.mobileassetd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Mobile Asset Downloads (Telemetry)",
+      "description": "Downloads and installs mobile asset packages, including telemetry catalog updates."
+    },
+    {
+      "name": "Ubiquityd",
+      "labels": [
+        "com.apple.ubd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Ubiquity (iCloud Usage Sync)",
+      "description": "Handles Universal Clipboard and iCloud document sync."
+    },
+    {
+      "name": "CoreTelephonyAnalytics",
+      "labels": [
+        "com.apple.commcenter.coretelephony"
+      ],
+      "category": "OTHER",
+      "title": "Disable Core Telephony Analytics",
+      "description": "Collects cellular network telemetry from the CoreTelephony stack."
+    },
+    {
+      "name": "MediaExperience",
+      "labels": [
+        "com.apple.mediaremoted"
+      ],
+      "category": "OTHER",
+      "title": "Disable Media Experience Analytics",
+      "description": "Monitors media playback quality and reports audio/video experience data."
+    },
+    {
+      "name": "Automount",
+      "labels": [
+        "com.apple.automountd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Automount",
+      "description": "Auto-mounts and manages AFPS/SMB/disk images when inserted."
+    },
+    {
+      "name": "SiriIntent",
+      "labels": [
+        "com.apple.assistant.intentdaemon"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Siri Intent",
+      "description": "Resolves and donates SiriKit intents for app integrations."
+    },
+    {
+      "name": "CloudKeychain",
+      "labels": [
+        "com.apple.cloudkeychainproxy",
+        "com.apple.security.cloudkeychainproxy"
+      ],
+      "category": "OTHER",
+      "title": "Disable Cloud Keychain",
+      "description": "Syncs passwords, keys, and Bluetooth pairings via iCloud Keychain."
+    },
+    {
+      "name": "NetworkExtension",
+      "labels": [
+        "com.apple.networkextension"
+      ],
+      "category": "OTHER",
+      "title": "Disable Network Extensions",
+      "description": "Registers VPN, DNS, and content-filter network extensions."
+    },
+    {
+      "name": "DeviceCheck",
+      "labels": [
+        "com.apple.devicecheckd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Device Check",
+      "description": "Provides device integrity checks for app and Apple services."
+    },
+    {
+      "name": "ManagedConfiguration",
+      "labels": [
+        "com.apple.managedconfiguration",
+        "com.apple.managedconfiguration.mdm",
+        "com.apple.managedconfiguration.tesla"
+      ],
+      "category": "OTHER",
+      "title": "Disable Managed Configuration (MDM)",
+      "description": "Applies MDM managed configuration profiles."
+    },
+    {
+      "name": "Containermanagerd",
+      "labels": [
+        "com.apple.containermanagerd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Container Manager",
+      "description": "Manages on-disk App containers and sandbox registrations."
+    },
+    {
+      "name": "MobileGestaltHelper",
+      "labels": [
+        "com.apple.mobilegestalt_helper"
+      ],
+      "category": "OTHER",
+      "title": "Disable MobileGestalt Helper",
+      "description": "Supplies hardware identifiers for MobileGestalt key exports."
+    },
+    {
+      "name": "TimeSync",
+      "labels": [
+        "com.apple.timed"
+      ],
+      "category": "OTHER",
+      "title": "Disable Time Sync",
+      "description": "Keeps the system clock in sync via network time."
+    },
+    {
+      "name": "MockLocation",
+      "labels": [
+        "com.apple.mocksynclocationd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Mock Location",
+      "description": "Provides simulated location support for development/tools."
+    },
+    {
+      "name": "Persistence",
+      "labels": [
+        "com.apple.persistence-helper",
+        "com.apple.persistence-d"
+      ],
+      "category": "OTHER",
+      "title": "Disable Persistence",
+      "description": "Persists iOS system state across reboots for restorative services."
+    },
+    {
+      "name": "Calendar",
+      "labels": [
+        "com.apple.calendar.database",
+        "com.apple.CalendarAgent"
+      ],
+      "category": "OTHER",
+      "title": "Disable Calendar Database",
+      "description": "Indexes and manages the on-device Calendar database."
+    },
+    {
+      "name": "DataAccess",
+      "labels": [
+        "com.apple.dataaccess.dataaccessd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Data Access",
+      "description": "Tracks data access patterns across apps for privacy auditing."
+    },
+    {
+      "name": "Networkd",
+      "labels": [
+        "com.apple.networkd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Networkd",
+      "description": "Handles network address and DHCP configuration."
+    },
+    {
+      "name": "Privacy",
+      "labels": [
+        "com.apple.privacyd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Privacy",
+      "description": "Manages privacy access audits and app permission tracking."
+    },
+    {
+      "name": "AppStore",
+      "labels": [
+        "com.apple.appstored"
+      ],
+      "category": "OTHER",
+      "title": "Disable App Store",
+      "description": "Fetches App Store front page content and purchase metadata."
+    },
+    {
+      "name": "Books",
+      "labels": [
+        "com.apple.bookdatastored"
+      ],
+      "category": "OTHER",
+      "title": "Disable Books",
+      "description": "Downloads and syncs Apple Books purchases and annotations."
+    },
+    {
+      "name": "Podcasts",
+      "labels": [
+        "com.apple.podcasts"
+      ],
+      "category": "OTHER",
+      "title": "Disable Podcasts",
+      "description": "Downloads and syncs Apple Podcasts subscriptions."
+    },
+    {
+      "name": "UserNotifications",
+      "labels": [
+        "com.apple.usernotificationsd"
+      ],
+      "category": "OTHER",
+      "title": "Disable User Notifications",
+      "description": "Central NotificationCenter daemon that delivers all notifications."
+    },
+    {
+      "name": "Photos",
+      "labels": [
+        "com.apple.photolibraryd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Photos Library",
+      "description": "Indexes the photo library and serves iCloud photo sync."
+    },
+    {
+      "name": "Music",
+      "labels": [
+        "com.apple.itunesstored"
+      ],
+      "category": "OTHER",
+      "title": "Disable Music Store",
+      "description": "Streams and downloads Apple Music catalog content."
+    },
+    {
+      "name": "AppleAccount",
+      "labels": [
+        "com.apple.appleaccountd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Apple Account",
+      "description": "Manages Apple ID account tokens and iCloud sign-in."
+    },
+    {
+      "name": "Bluetooth",
+      "labels": [
+        "com.apple.bluetoothd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Bluetooth",
+      "description": "Enables Bluetooth pairing and audio via bluetoothd."
+    },
+    {
+      "name": "WiFiManager",
+      "labels": [
+        "com.apple.wifi_manager"
+      ],
+      "category": "OTHER",
+      "title": "Disable Wi-Fi Manager",
+      "description": "Coordinates Wi-Fi networking, join decisions, and scanning."
+    },
+    {
+      "name": "WiFiLogging",
+      "labels": [
+        "com.apple.wifilogd"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Wi-Fi Logging",
+      "description": "Records Wi-Fi connection events, roaming history, and scan results."
+    },
+    {
+      "name": "Maps",
+      "labels": [
+        "com.apple.geod"
+      ],
+      "category": "OTHER",
+      "title": "Disable Maps (Geod)",
+      "description": "Provides geod map tiles, routing, and location search for Maps."
+    },
+    {
+      "name": "HealthSync",
+      "labels": [
+        "com.apple.healthd.sync"
+      ],
+      "category": "OTHER",
+      "title": "Disable Health Sync",
+      "description": "Syncs HealthKit records with the paired Apple Watch."
+    },
+    {
+      "name": "AccountSync",
+      "labels": [
+        "com.apple.accountsd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Account Sync",
+      "description": "Syncs Exchange, Google, and other mail/contact accounts."
+    },
+    {
+      "name": "DiskArbitration",
+      "labels": [
+        "com.apple.DiskArbitrationd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Disk Arbitration",
+      "description": "Manages disk mounting, claiming, and ejection events."
+    },
+    {
+      "name": "MediaRemoteControl",
+      "labels": [
+        "com.apple.mediaremotecontrol"
+      ],
+      "category": "OTHER",
+      "title": "Disable Media Remote Control",
+      "description": "Routes system-wide media playback controls across apps."
+    },
+    {
+      "name": "Notifications",
+      "labels": [
+        "com.apple.notificationd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Notifications",
+      "description": "Manages notification bundling, alerts, and delivery."
+    },
+    {
+      "name": "Parse",
+      "labels": [
+        "com.apple.parsecd"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Parse (Safari Suggestions)",
+      "description": "Parses user text input for Siri and QuickType predictions."
+    },
+    {
+      "name": "Shazam",
+      "labels": [
+        "com.apple.shazamd"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Shazam",
+      "description": "Identifies music via microphone and logs song recognition events."
+    },
+    {
+      "name": "Siri",
+      "labels": [
+        "com.apple.siri"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Siri",
+      "description": "Main Siri daemon; handles voice assistant queries and responses."
+    },
+    {
+      "name": "SettingsStats",
+      "labels": [
+        "com.apple.settings-statsd"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Settings Stats",
+      "description": "Reports which System Settings toggles users change most often."
+    },
+    {
+      "name": "StatusKit",
+      "labels": [
+        "com.apple.statuskit"
+      ],
+      "category": "OTHER",
+      "title": "Disable Status Kit",
+      "description": "Delivers scheduled status updates from services to apps and widgets."
+    },
+    {
+      "name": "Reminders",
+      "labels": [
+        "com.apple.reminderd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Reminders",
+      "description": "Maintains the Reminders database and list notifications."
+    },
+    {
+      "name": "ConfigurationProfiles",
+      "labels": [
+        "com.apple.managedconfigurationprofiles"
+      ],
+      "category": "OTHER",
+      "title": "Disable Configuration Profiles",
+      "description": "Installs and enforces device configuration profiles."
+    },
+    {
+      "name": "CertificateRevocation",
+      "labels": [
+        "com.apple.security.certrevocation"
+      ],
+      "category": "OTHER",
+      "title": "Disable Certificate Revocation",
+      "description": "Checks certificate revocation lists for HTTPS/tls trust."
+    },
+    {
+      "name": "EAP",
+      "labels": [
+        "com.apple.eapolclient"
+      ],
+      "category": "OTHER",
+      "title": "Disable EAP (Wi-Fi Auth)",
+      "description": "Handles enterprise Wi-Fi 802.1X authentication."
+    },
+    {
+      "name": "AirPlay",
+      "labels": [
+        "com.apple.airplay"
+      ],
+      "category": "OTHER",
+      "title": "Disable AirPlay",
+      "description": "Streams audio/video to AirPlay receivers and speakers."
+    },
+    {
+      "name": "iCloudContainer",
+      "labels": [
+        "com.apple.cloudd"
+      ],
+      "category": "OTHER",
+      "title": "Disable iCloud Container",
+      "description": "Enables iCloud document storage container for apps."
+    },
+    {
+      "name": "GameKitService",
+      "labels": [
+        "com.apple.gamekitservice"
+      ],
+      "category": "OTHER",
+      "title": "Disable GameKit Service",
+      "description": "Supports Game Kit multiplayer matchmaking and real-time challenges."
+    },
+    {
+      "name": "NFC",
+      "labels": [
+        "com.apple.nfcd"
+      ],
+      "category": "OTHER",
+      "title": "Disable NFC",
+      "description": "Powers Near Field Communication tags and Apple Pay reader mode."
+    },
+    {
+      "name": "UARTPairing",
+      "labels": [
+        "com.apple.uarpairingd"
+      ],
+      "category": "OTHER",
+      "title": "Disable UART Pairing",
+      "description": "Pairs accessories over physical UART debug ports."
+    },
+    {
+      "name": "Sidecar",
+      "labels": [
+        "com.apple.sidecarcore"
+      ],
+      "category": "OTHER",
+      "title": "Disable Sidecar",
+      "description": "Mirrors iPad/iPhone displays to a Mac (Sidecar)."
+    },
+    {
+      "name": "Continuity",
+      "labels": [
+        "com.apple.continuityd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Continuity",
+      "description": "Handles Handoff, Universal Clipboard, and device continuity."
+    },
+    {
+      "name": "Sharing",
+      "labels": [
+        "com.apple.sharingd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Sharing (AirDrop)",
+      "description": "Manages AirDrop and the sharing sheet infrastructure."
+    },
+    {
+      "name": "FindMy",
+      "labels": [
+        "com.apple.findmylocate",
+        "com.apple.findmydeviced"
+      ],
+      "category": "OTHER",
+      "title": "Disable Find My",
+      "description": "Runs Find My network location reporting for lost devices."
+    },
+    {
+      "name": "NearbyInteraction",
+      "labels": [
+        "com.apple.nearbyinteractiond"
+      ],
+      "category": "OTHER",
+      "title": "Disable Nearby Interaction",
+      "description": "Supports UWB device-to-device ranging (Nearby Interaction)."
+    },
+    {
+      "name": "SignpostReporter",
+      "labels": [
+        "com.apple.signpost.signpost_reporter"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Signpost Reporter",
+      "description": "Streams signpost performance traces from apps and system frameworks."
+    },
+    {
+      "name": "CoreTelephony",
+      "labels": [
+        "com.apple.coretelephony"
+      ],
+      "category": "OTHER",
+      "title": "Disable Core Telephony",
+      "description": "Core carrier, cellular signal, and SIM management stack."
+    },
+    {
+      "name": "MediaSession",
+      "labels": [
+        "com.apple.mediasessiond"
+      ],
+      "category": "OTHER",
+      "title": "Disable Media Session",
+      "description": "Handles audio session routing and media focus."
+    },
+    {
+      "name": "SpeechRecognition",
+      "labels": [
+        "com.apple.speechrecognition"
+      ],
+      "category": "OTHER",
+      "title": "Disable Speech Recognition",
+      "description": "Provides speech-to-text APIs to apps (SFSpeechRecognizer)."
+    },
+    {
+      "name": "ReplayKit",
+      "labels": [
+        "com.apple.replayd"
+      ],
+      "category": "OTHER",
+      "title": "Disable ReplayKit",
+      "description": "Captures and records screen / audio for screen recording."
+    },
+    {
+      "name": "CoreBluetooth",
+      "labels": [
+        "com.apple.corebluetoothd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Core Bluetooth",
+      "description": "Exposes Bluetooth LE APIs to apps (CoreBluetooth)."
+    },
+    {
+      "name": "Logd",
+      "labels": [
+        "com.apple.logd",
+        "com.apple.logd.admin",
+        "com.apple.logd.events",
+        "com.apple.logd.watchdog",
+        "com.apple.logd_helper"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Logd (Unified Logging)",
+      "description": "Unified logging system daemon; disabling breaks system-level logging entirely."
+    },
+    {
+      "name": "Syslogd",
+      "labels": [
+        "com.apple.syslogd"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Syslogd",
+      "description": "Legacy syslog daemon; collects messages from daemons and apps."
+    },
+    {
+      "name": "SystemLogger",
+      "labels": [
+        "com.apple.system.logger"
+      ],
+      "category": "LOGGING",
+      "title": "Disable System Logger",
+      "description": "System-level logger for kernel and early-boot messages."
+    },
+    {
+      "name": "LogdReporter",
+      "labels": [
+        "com.apple.logd_reporter",
+        "com.apple.logd_reporter.report_statistics"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Logd Reporter",
+      "description": "Processes and archives logd statistics and rotation data."
+    },
+    {
+      "name": "HangReporter",
+      "labels": [
+        "com.apple.hangreporter",
+        "com.apple.hangtracerd"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Hang Reporter",
+      "description": "Detects and reports app hangs (watchdog timeouts) and UI freezes."
+    },
+    {
+      "name": "Spindump",
+      "labels": [
+        "com.apple.spindump",
+        "com.apple.tailspind"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Spindump (Stack Sampling)",
+      "description": "Captures CPU stack samples of unresponsive or resource-heavy processes."
+    },
+    {
+      "name": "StatisticalDiagnostic",
+      "labels": [
+        "com.apple.StatisticalDiagnosticService"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Statistical Diagnostics",
+      "description": "Runs periodic statistical checks for hardware and software anomalies."
+    },
+    {
+      "name": "Aggregated",
+      "labels": [
+        "com.apple.aggregated"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Aggregated Logging",
+      "description": "Aggregates network usage and data counters for system-wide reporting."
+    },
+    {
+      "name": "WirelessDiagnostics",
+      "labels": [
+        "com.apple.wirelessdiagnostics"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Wireless Diagnostics",
+      "description": "Collects Wi-Fi and cellular radio diagnostics for Apple engineers."
+    },
+    {
+      "name": "Pcapd",
+      "labels": [
+        "com.apple.pcapd"
+      ],
+      "category": "LOGGING",
+      "title": "Disable Pcapd (Packet Capture)",
+      "description": "Captures raw network packets for debugging (Wireshark-style)."
+    },
+    {
+      "name": "DuetHeuristic",
+      "labels": [
+        "com.apple.DuetHeuristic-BM",
+        "com.apple.DuetHeuristic-BM.Baseband"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Duet Heuristic",
+      "description": "Runs heuristic analysis on device interaction data for predictions."
+    },
+    {
+      "name": "DuetExpert",
+      "labels": [
+        "com.apple.duetexpertd"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Duet Expert",
+      "description": "Expert sub-module of Duet; refines predictions from app usage data."
+    },
+    {
+      "name": "Decisiond",
+      "labels": [
+        "com.apple.decisiond"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Decisiond",
+      "description": "Decides which proactive suggestions to show based on learned habits."
+    },
+    {
+      "name": "Triald",
+      "labels": [
+        "com.apple.triald"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Triald (A/B Experiment Telemetry)",
+      "description": "Runs A/B experiment assignments and logs experiment exposure metrics."
+    },
+    {
+      "name": "Sociald",
+      "labels": [
+        "com.apple.sociald"
+      ],
+      "category": "ANALYTICS",
+      "title": "Disable Sociald",
+      "description": "Processes social graph data for suggested contacts and sharing."
+    },
+    {
+      "name": "Sportskitd",
+      "labels": [
+        "com.apple.sportskitd"
+      ],
+      "category": "OTHER",
+      "title": "Disable SportsKit Analytics",
+      "description": "Delivers live sports scores and game schedules to widgets and Siri."
+    },
+    {
+      "name": "Watchlistd",
+      "labels": [
+        "com.apple.watchlistd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Watchlistd",
+      "description": "Tracks media watchlists across Apple TV, Podcasts, and TV app."
+    },
+    {
+      "name": "CalendarNextd",
+      "labels": [
+        "com.apple.calnextd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Calendar Nextd",
+      "description": "Analyzes calendar events for proactive Siri suggestions."
+    },
+    {
+      "name": "CalAccessd",
+      "labels": [
+        "com.apple.calaccessd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Calendar Accessd",
+      "description": "Provides calendar data access to Siri and system integrations."
+    },
+    {
+      "name": "Maild",
+      "labels": [
+        "com.apple.maild"
+      ],
+      "category": "OTHER",
+      "title": "Disable Maild",
+      "description": "Serves the Mail app — syncs iCloud/Exchange and fetches messages."
+    },
+    {
+      "name": "MediaServicesd",
+      "labels": [
+        "com.apple.mediaservicesd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Media Servicesd",
+      "description": "Handles audio/video transcoding and playback assets."
+    },
+    {
+      "name": "MediaServerd",
+      "labels": [
+        "com.apple.mediaserverd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Media Serverd",
+      "description": "Background media server for audio sessions and effects."
+    },
+    {
+      "name": "VoiceNotesd",
+      "labels": [
+        "com.apple.voicenotesd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Voice Notesd",
+      "description": "Manages Voice Memos recordings and sync."
+    },
+    {
+      "name": "VoiceMemoRecording",
+      "labels": [
+        "com.apple.voicememod"
+      ],
+      "category": "OTHER",
+      "title": "Disable Voice Memo Recording",
+      "description": "Records audio for the Voice Memos app."
+    },
+    {
+      "name": "SiriKnowledge",
+      "labels": [
+        "com.apple.siriknowledged"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Siri Knowledge",
+      "description": "Indexes on-device knowledge for Siri personal answers."
+    },
+    {
+      "name": "SiriUnattended",
+      "labels": [
+        "com.apple.siriunattended"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Siri Unattended",
+      "description": "Runs Siri analytics tasks when the device is idle and charging."
+    },
+    {
+      "name": "SiriService",
+      "labels": [
+        "com.apple.SiriService"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Siri Service",
+      "description": "Provides Siri background services for proactive and ambient intelligence."
+    },
+    {
+      "name": "SiriHearingGain",
+      "labels": [
+        "com.apple.siriHearingGainService"
+      ],
+      "category": "OTHER",
+      "title": "Disable Siri Hearing Gain",
+      "description": "Adjusts Siri audio levels for hearing-aid and headphone users."
+    },
+    {
+      "name": "VoiceServices",
+      "labels": [
+        "com.apple.VoiceServices"
+      ],
+      "category": "OTHER",
+      "title": "Disable Voice Services",
+      "description": "Powers voice dictation, speech synthesis, and VoiceOver screen reader."
+    },
+    {
+      "name": "Assistantd",
+      "labels": [
+        "com.apple.assistant_service",
+        "com.apple.assistantd"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Assistantd",
+      "description": "Main assistant daemon; manages Siri session and on-device intelligence."
+    },
+    {
+      "name": "IMAgent",
+      "labels": [
+        "com.apple.imagent",
+        "com.apple.imfoundation",
+        "com.apple.IMFoundation"
+      ],
+      "category": "OTHER",
+      "title": "Disable iMessage Agent",
+      "description": "Manages iMessage and FaceTime registration and message delivery."
+    },
+    {
+      "name": "IMTranscodingAgent",
+      "labels": [
+        "com.apple.imtranscodingagent"
+      ],
+      "category": "OTHER",
+      "title": "Disable iMessage Transcoding",
+      "description": "Transcodes photos and videos for iMessage rich media sharing."
+    },
+    {
+      "name": "IMETrafficCollector",
+      "labels": [
+        "com.apple.imetrafficcollector"
+      ],
+      "category": "OTHER",
+      "title": "Disable iMessage Traffic Collector",
+      "description": "Collects keyboard input-method telemetry for Siri dictation improvements."
+    },
+    {
+      "name": "AvatarService",
+      "labels": [
+        "com.apple.purplebrained"
+      ],
+      "category": "OTHER",
+      "title": "Disable PurpleBrained (Usage Service)",
+      "description": "Manages Animoji/Memoji persona data and creation."
+    },
+    {
+      "name": "DeviceManagementd",
+      "labels": [
+        "com.apple.devicemanagementd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Device Management",
+      "description": "Enforces MDM (Mobile Device Management) configuration profiles."
+    },
+    {
+      "name": "FamilyKvs",
+      "labels": [
+        "com.apple.fam-kvs",
+        "com.apple.fam-notification"
+      ],
+      "category": "OTHER",
+      "title": "Disable Family Key-Value Store",
+      "description": "Stores per-family key-value data for Family Sharing."
+    },
+    {
+      "name": "Fams",
+      "labels": [
+        "com.apple.fams"
+      ],
+      "category": "OTHER",
+      "title": "Disable Family Analytics",
+      "description": "Family Analytics reporting (legacy family metrics collection)."
+    },
+    {
+      "name": "Fellowd",
+      "labels": [
+        "com.apple.fellowd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Fellowd",
+      "description": "Tracks Apple Watch companion activity and health pairing."
+    },
+    {
+      "name": "Keyboardservicesd",
+      "labels": [
+        "com.apple.keyboardservicesd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Keyboard Services (Typing Data)",
+      "description": "Provides first-generation keyboard service infrastructure."
+    },
+    {
+      "name": "TCCd",
+      "labels": [
+        "com.apple.tccd"
+      ],
+      "category": "OTHER",
+      "title": "Disable TCCd (Permission Tracking)",
+      "description": "Manages the Transparency, Consent, and Control database for app permissions."
+    },
+    {
+      "name": "NPSd",
+      "labels": [
+        "com.apple.npsd"
+      ],
+      "category": "OTHER",
+      "title": "Disable NPSd",
+      "description": "Handles notification priority scoring and interruption management."
+    },
+    {
+      "name": "AppLED",
+      "labels": [
+        "com.apple.akd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Apple ID (akd)",
+      "description": "Manages Apple ID authentication via the authkit daemon (akd)."
+    },
+    {
+      "name": "AppIDServiced",
+      "labels": [
+        "com.apple.appleidservice"
+      ],
+      "category": "OTHER",
+      "title": "Disable Apple ID Service",
+      "description": "Validates App ID and developer entitlements for installed apps."
+    },
+    {
+      "name": "APSD",
+      "labels": [
+        "com.apple.apsd"
+      ],
+      "category": "OTHER",
+      "title": "Disable APSd (Push/Telemetry)",
+      "description": "Apple Push Service daemon — delivers all push notifications and raw telemetry."
+    },
+    {
+      "name": "CloudPhotod",
+      "labels": [
+        "com.apple.cloudphotod"
+      ],
+      "category": "OTHER",
+      "title": "Disable Cloud Photo Library",
+      "description": "Syncs iCloud Photo Library content and storage management."
+    },
+    {
+      "name": "Accountsd",
+      "labels": [
+        "com.apple.accountsd",
+        "com.apple.accounts.domains"
+      ],
+      "category": "OTHER",
+      "title": "Disable Accountsd",
+      "description": "Stores and syncs iCloud, Exchange, and other account credentials."
+    },
+    {
+      "name": "SocialNotification",
+      "labels": [
+        "com.apple.SocialNotification"
+      ],
+      "category": "OTHER",
+      "title": "Disable Social Notifications",
+      "description": "Serves social networking notification aggregation."
+    },
+    {
+      "name": "StoreKit",
+      "labels": [
+        "com.apple.StoreKit"
+      ],
+      "category": "OTHER",
+      "title": "Disable StoreKit",
+      "description": "Handles in-app purchase transactions for the App Store."
+    },
+    {
+      "name": "StoreBookkeeper",
+      "labels": [
+        "com.apple.StoreBookkeeper"
+      ],
+      "category": "OTHER",
+      "title": "Disable Store Bookkeeper",
+      "description": "Tracks App Store download and update catalogue."
+    },
+    {
+      "name": "Appsyncd",
+      "labels": [
+        "com.apple.app-sync"
+      ],
+      "category": "OTHER",
+      "title": "Disable App Sync",
+      "description": "Maintains the app-to-app association database for deep links."
+    },
+    {
+      "name": "FileProviderd",
+      "labels": [
+        "com.apple.fileproviderd"
+      ],
+      "category": "OTHER",
+      "title": "Disable File Provider",
+      "description": "Manages third-party file provider extensions and cloud document sync."
+    },
+    {
+      "name": "SearchPartyd",
+      "labels": [
+        "com.apple.searchpartyd"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Search Party",
+      "description": "Implements the Find My network by broadcasting and scanning BLE beacons."
+    },
+    {
+      "name": "Nearbyd",
+      "labels": [
+        "com.apple.nearbyd"
+      ],
+      "category": "TRACKING",
+      "title": "Disable Nearbyd (Location/Proximity)",
+      "description": "Handles UWB proximity ranging and nearby-device detection."
+    },
+    {
+      "name": "Faced",
+      "labels": [
+        "com.apple.faced"
+      ],
+      "category": "OTHER",
+      "title": "Disable Face Analytics",
+      "description": "Face Analytics lightly tracks FaceTime/faces metadata."
+    },
+    {
+      "name": "HealthSyncWatch",
+      "labels": [
+        "com.apple.HealthEx"
+      ],
+      "category": "OTHER",
+      "title": "Disable Health Export",
+      "description": "Syncs HealthKit metrics between iPhone and Watch."
+    },
+    {
+      "name": "Lifescienced",
+      "labels": [
+        "com.apple.lifescienced"
+      ],
+      "category": "OTHER",
+      "title": "Disable Life Science Analytics",
+      "description": "Comm-route health/life-science analytics for clinical research apps."
+    },
+    {
+      "name": "Medicald",
+      "labels": [
+        "com.apple.milld"
+      ],
+      "category": "OTHER",
+      "title": "Disable Medical Logging",
+      "description": "Exposes HealthKit clinical records and medical ID."
+    },
+    {
+      "name": "Recalibrationd",
+      "labels": [
+        "com.apple.recalibrationd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Recalibration",
+      "description": "Runs sensor calibration routines for battery and display accuracy."
+    },
+    {
+      "name": "Repaird",
+      "labels": [
+        "com.apple.repaird"
+      ],
+      "category": "OTHER",
+      "title": "Disable Repaird",
+      "description": "Tracks device repair history and Apple Authorized Service Provider data."
+    },
+    {
+      "name": "SafetyAlertsd",
+      "labels": [
+        "com.apple.safetyalertsd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Safety Alerts",
+      "description": "Delivers government and emergency safety alerts to the device."
+    },
+    {
+      "name": "Uninstalld",
+      "labels": [
+        "com.apple.uninstalld"
+      ],
+      "category": "OTHER",
+      "title": "Disable Uninstalld",
+      "description": "Uninstalls apps and cleans their containers and data."
+    },
+    {
+      "name": "Installd",
+      "labels": [
+        "com.apple.installd",
+        "com.apple.installd_os"
+      ],
+      "category": "OTHER",
+      "title": "Disable Installd",
+      "description": "Installs, upgrades, and manages app bundle lifecycle."
+    },
+    {
+      "name": "Pasteboardd",
+      "labels": [
+        "com.apple.pasteboardd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Pasteboardd (Clipboard)",
+      "description": "System clipboard daemon; records pasteboard history and syncs via Handoff."
+    },
+    {
+      "name": "Runningboardd",
+      "labels": [
+        "com.apple.runningboardd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Runningboardd",
+      "description": "Core process manager; supervises app lifecycle and throttling."
+    },
+    {
+      "name": "Nsurlstoraged",
+      "labels": [
+        "com.apple.nsurlstoraged"
+      ],
+      "category": "OTHER",
+      "title": "Disable NSURL Storage",
+      "description": "Persists URLSession cache and cookies for apps."
+    },
+    {
+      "name": "Cfprefsd",
+      "labels": [
+        "com.apple.cfnetwork"
+      ],
+      "category": "OTHER",
+      "title": "Disable CFNetwork",
+      "description": "Central preferences daemon all apps read/write settings through."
+    },
+    {
+      "name": "Filecoordinationd",
+      "labels": [
+        "com.apple.filecoordinationd"
+      ],
+      "category": "OTHER",
+      "title": "Disable File Coordination",
+      "description": "Coordinates file access between processes (NSFileCoordinator)."
+    },
+    {
+      "name": "Fseventsd",
+      "labels": [
+        "com.apple.fseventsd"
+      ],
+      "category": "OTHER",
+      "title": "Disable FSEvents",
+      "description": "Tracks file system change events for backups and sync tools."
+    },
+    {
+      "name": "Lsdd",
+      "labels": [
+        "com.apple.lsd"
+      ],
+      "category": "OTHER",
+      "title": "Disable LSD (Launch Services)",
+      "description": "Launch Services database; registers apps and URL schemes."
+    },
+    {
+      "name": "Backboardd",
+      "labels": [
+        "com.apple.backboardd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Backboardd",
+      "description": "SpringBoard's input/event daemon; touches, buttons, gestures."
+    },
+    {
+      "name": "SpringBoard",
+      "labels": [
+        "com.apple.SpringBoard"
+      ],
+      "category": "OTHER",
+      "title": "Disable SpringBoard",
+      "description": "Main home screen / springboard process."
+    },
+    {
+      "name": "CoreAnimation",
+      "labels": [
+        "com.apple.coreanimation"
+      ],
+      "category": "OTHER",
+      "title": "Disable Core Animation",
+      "description": "Renders UI transitions and layered view animations."
+    },
+    {
+      "name": "BatteryCenter",
+      "labels": [
+        "com.apple.batterycenter"
+      ],
+      "category": "OTHER",
+      "title": "Disable Battery Center",
+      "description": "Reports battery charge, health, and the battery graph."
+    },
+    {
+      "name": "Audiotoolboxd",
+      "labels": [
+        "com.apple.audiohald"
+      ],
+      "category": "OTHER",
+      "title": "Disable Audio HAL",
+      "description": "Routes audio through AudioToolbox HAL and codecs."
+    },
+    {
+      "name": "AudioD",
+      "labels": [
+        "com.apple.audioengineeringd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Audio Engineering",
+      "description": "Core audio daemon; mixes and routes all system audio."
+    },
+    {
+      "name": "AudioClockSyncer",
+      "labels": [
+        "com.apple.audioclocksyncer"
+      ],
+      "category": "OTHER",
+      "title": "Disable Audio Clock Syncer",
+      "description": "Keeps audio clocks in sync across output devices."
+    },
+    {
+      "name": "Stereod",
+      "labels": [
+        "com.apple.stereod"
+      ],
+      "category": "OTHER",
+      "title": "Disable Stereo Audio",
+      "description": "Enables stereo/folded audio output modes."
+    },
+    {
+      "name": "Carkitd",
+      "labels": [
+        "com.apple.carkitd",
+        "com.apple.carplayd"
+      ],
+      "category": "OTHER",
+      "title": "Disable CarPlay",
+      "description": "Manages CarPlay display and automotive connectivity."
+    },
+    {
+      "name": "AirPort",
+      "labels": [
+        "com.apple.AirPort",
+        "com.apple.airportd"
+      ],
+      "category": "OTHER",
+      "title": "Disable AirPort",
+      "description": "Wi-Fi networking daemon; scanning, associations, and hotspots."
+    },
+    {
+      "name": "CaptiveAgent",
+      "labels": [
+        "com.apple.captiveagent"
+      ],
+      "category": "OTHER",
+      "title": "Disable Captive Agent",
+      "description": "Detects captive Wi-Fi portals and shows login window."
+    },
+    {
+      "name": "CoreCaptured",
+      "labels": [
+        "com.apple.corecaptured"
+      ],
+      "category": "OTHER",
+      "title": "Disable Core Capture",
+      "description": "Records screen captures and system snapshots."
+    },
+    {
+      "name": "IPConfigd",
+      "labels": [
+        "com.apple.ipconfigd"
+      ],
+      "category": "OTHER",
+      "title": "Disable IP Config",
+      "description": "Configures IP addresses and DHCP leases for interfaces."
+    },
+    {
+      "name": "Biometrickitd",
+      "labels": [
+        "com.apple.biometrickitd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Biometric Kit",
+      "description": "Serves Face ID and Touch ID biometric authentication."
+    },
+    {
+      "name": "SecureElementd",
+      "labels": [
+        "com.apple.secureelementd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Secure Element",
+      "description": "Manages the Secure Element for payments and SE apps."
+    },
+    {
+      "name": "Keybagd",
+      "labels": [
+        "com.apple.MobileKeyBag"
+      ],
+      "category": "OTHER",
+      "title": "Disable Keybag (Encryption)",
+      "description": "Provides keybag encryption keys for file-level data protection."
+    },
+    {
+      "name": "Securityd",
+      "labels": [
+        "com.apple.security.cloudkeychainproxy",
+        "com.apple.security.sos"
+      ],
+      "category": "OTHER",
+      "title": "Disable Security",
+      "description": "Keychain and code-signing trust evaluations."
+    },
+    {
+      "name": "CertInfo",
+      "labels": [
+        "com.apple.CertInfo"
+      ],
+      "category": "OTHER",
+      "title": "Disable Certificate Info",
+      "description": "Evaluates certificate trust chains and revocation."
+    },
+    {
+      "name": "Kextd",
+      "labels": [
+        "com.apple.kextd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Kextd",
+      "description": "Loads and manages kernel extensions."
+    },
+    {
+      "name": "FileIntegrity",
+      "labels": [
+        "com.apple.MobileFileIntegrity"
+      ],
+      "category": "OTHER",
+      "title": "Disable File Integrity",
+      "description": "Verifies file integrity and enforces Data Protection classes."
+    },
+    {
+      "name": "Runwayd",
+      "labels": [
+        "com.apple.generatord"
+      ],
+      "category": "OTHER",
+      "title": "Disable Generatord",
+      "description": "Generatord legacy backend for software update telemetry."
+    },
+    {
+      "name": "ManagedMode",
+      "labels": [
+        "com.apple.devicectld",
+        "com.apple.devicectl_dpd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Device Control",
+      "description": "Configures enterprise managed-device mode."
+    },
+    {
+      "name": "Accessibility",
+      "labels": [
+        "com.apple.AccessibilityUI"
+      ],
+      "category": "OTHER",
+      "title": "Disable Accessibility UI",
+      "description": "Manages accessibility features and UI adaptations."
+    },
+    {
+      "name": "HearingMode",
+      "labels": [
+        "com.apple.HearingModeService"
+      ],
+      "category": "OTHER",
+      "title": "Disable Hearing Mode",
+      "description": "Supports hearing device pairing and live listen."
+    },
+    {
+      "name": "Gaze",
+      "labels": [
+        "com.apple.gaze"
+      ],
+      "category": "OTHER",
+      "title": "Disable Gaze (Eye Tracking)",
+      "description": "Powers eye-tracking for accessibility (iOS 18+)."
+    },
+    {
+      "name": "ARd",
+      "labels": [
+        "com.apple.arkitd"
+      ],
+      "category": "OTHER",
+      "title": "Disable ARKit",
+      "description": "ARKit daemon; handles AR sessions and world tracking."
+    },
+    {
+      "name": "ImageIO",
+      "labels": [
+        "com.apple.ImageIO"
+      ],
+      "category": "OTHER",
+      "title": "Disable Image IO",
+      "description": "Decodes and encodes image formats for the system."
+    },
+    {
+      "name": "QuickLookd",
+      "labels": [
+        "com.apple.quicklookd"
+      ],
+      "category": "OTHER",
+      "title": "Disable QuickLook",
+      "description": "Generates thumbnails and document previews."
+    },
+    {
+      "name": "Geniusd",
+      "labels": [
+        "com.apple.appleseedd"
+      ],
+      "category": "OTHER",
+      "title": "Disable AppleSeed Feedback",
+      "description": "AppleSeed feedback collection for beta programs."
+    },
+    {
+      "name": "Cashd",
+      "labels": [
+        "com.apple.Commerced"
+      ],
+      "category": "OTHER",
+      "title": "Disable Commerced",
+      "description": "Apple Cash / wallet payment validation."
+    },
+    {
+      "name": "Saled",
+      "labels": [
+        "com.apple.saled"
+      ],
+      "category": "OTHER",
+      "title": "Disable Saled (Sampling)",
+      "description": "Samples system data for diagnostics (legacy sales log)."
+    },
+    {
+      "name": "MobileActivation",
+      "labels": [
+        "com.apple.MobileActivation"
+      ],
+      "category": "OTHER",
+      "title": "Disable Mobile Activation",
+      "description": "Activates the device with Apple's activation servers."
+    },
+    {
+      "name": "VehicularAccess",
+      "labels": [
+        "com.apple.dpad"
+      ],
+      "category": "OTHER",
+      "title": "Disable DPad (Vehicle Digital)",
+      "description": "Digital car key and vehicle digital access (DPad)."
+    },
+    {
+      "name": "Airdropd",
+      "labels": [
+        "com.apple.sharing"
+      ],
+      "category": "OTHER",
+      "title": "Disable Sharing",
+      "description": "Manages AirDrop transfer discovery and sessions."
+    },
+    {
+      "name": "Hidd",
+      "labels": [
+        "com.apple.hid",
+        "com.apple.hidmanagerd",
+        "com.apple.HID"
+      ],
+      "category": "OTHER",
+      "title": "Disable HIDd",
+      "description": "Human Interface Device daemon; processes touch/keyboard input."
+    },
+    {
+      "name": "BluetoothStack",
+      "labels": [
+        "com.apple.BTStack",
+        "com.apple.bluetooth"
+      ],
+      "category": "OTHER",
+      "title": "Disable Bluetooth Stack",
+      "description": "Low-level Bluetooth controller stack."
+    },
+    {
+      "name": "SharedLock",
+      "labels": [
+        "com.apple.multipathd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Multipathd",
+      "description": "Multipath networking daemon for Wi-Fi/LTE bonding."
+    },
+    {
+      "name": "SystemConfiguration",
+      "labels": [
+        "com.apple.systemconfiguration"
+      ],
+      "category": "OTHER",
+      "title": "Disable System Configuration",
+      "description": "Monitors network state and configuration preferences."
+    },
+    {
+      "name": "Dnssd",
+      "labels": [
+        "com.apple.dnssd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Dnssd",
+      "description": "Multicast DNS and DNS-SD service discovery."
+    },
+    {
+      "name": "Mld",
+      "labels": [
+        "com.apple.mlt"
+      ],
+      "category": "OTHER",
+      "title": "Disable MLT (Machine Learning)",
+      "description": "Machine Learning daemon; manages CoreML models and analytics."
+    },
+    {
+      "name": "Dispatchd",
+      "labels": [
+        "com.apple.distnoted"
+      ],
+      "category": "OTHER",
+      "title": "Disable Distnoted",
+      "description": "Distributed notification center (distnoted)."
+    },
+    {
+      "name": "Emis",
+      "labels": [
+        "com.apple.emis"
+      ],
+      "category": "OTHER",
+      "title": "Disable EMIS",
+      "description": "Emergency services messaging infrastructure."
+    },
+    {
+      "name": "Barrel",
+      "labels": [
+        "com.apple.barrel"
+      ],
+      "category": "OTHER",
+      "title": "Disable Barrel",
+      "description": "Storage barrel/pruning daemon for older logs and caches."
+    },
+    {
+      "name": "Crypto",
+      "labels": [
+        "com.apple.crypto"
+      ],
+      "category": "OTHER",
+      "title": "Disable Crypto",
+      "description": "Low-level crypto engine for keychain and Secure Enclave access."
+    },
+    {
+      "name": "MobileBackup",
+      "labels": [
+        "com.apple.MobileBackup",
+        "com.apple.backupd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Backup",
+      "description": "Powers iCloud device backups."
+    },
+    {
+      "name": "MobileStorage",
+      "labels": [
+        "com.apple.MobileStorageMounter"
+      ],
+      "category": "OTHER",
+      "title": "Disable Storage Mounter",
+      "description": "Mounts and manages external storage devices."
+    },
+    {
+      "name": "MobileDelete",
+      "labels": [
+        "com.apple.MobileDelete"
+      ],
+      "category": "OTHER",
+      "title": "Disable Mobile Delete",
+      "description": "Purges cached/stale files when storage gets low."
+    },
+    {
+      "name": "MobilePatch",
+      "labels": [
+        "com.apple.MobilePatch"
+      ],
+      "category": "OTHER",
+      "title": "Disable Software Patch",
+      "description": "Applies software patch entitlements for device updates."
+    },
+    {
+      "name": "MobileAccessoryUpdater",
+      "labels": [
+        "com.apple.MobileAccessoryUpdater"
+      ],
+      "category": "OTHER",
+      "title": "Disable Accessory Updater",
+      "description": "Updates firmware on connected accessories."
+    },
+    {
+      "name": "USBd",
+      "labels": [
+        "com.apple.mediausbd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Media USB",
+      "description": "Handles USB host mode and media support."
+    },
+    {
+      "name": "ExFAT",
+      "labels": [
+        "com.apple.ExFAT"
+      ],
+      "category": "OTHER",
+      "title": "Disable ExFAT",
+      "description": "Provides exFAT filesystem support."
+    },
+    {
+      "name": "Bom",
+      "labels": [
+        "com.apple.Bom"
+      ],
+      "category": "OTHER",
+      "title": "Disable Bom (Atomic File)",
+      "description": "Provides atomic file operations (BOM) for installers."
+    },
+    {
+      "name": "DPFS",
+      "labels": [
+        "com.apple.dpfs"
+      ],
+      "category": "OTHER",
+      "title": "Disable DPFS (Data Protection Filesystem)",
+      "description": "Data Protection filesystem daemon."
+    },
+    {
+      "name": "CipherMining",
+      "labels": [
+        "com.apple.cipherminingd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Cipher Mining",
+      "description": "Background machine-learning / cipher processing."
+    },
+    {
+      "name": "SMSOTT",
+      "labels": [
+        "com.apple.smsott"
+      ],
+      "category": "OTHER",
+      "title": "Disable SMS OTT",
+      "description": "Supports OTT SMS and carrier messaging features."
+    },
+    {
+      "name": "Telephony",
+      "labels": [
+        "com.apple.coretelephony",
+        "com.apple.cmamsss"
+      ],
+      "category": "OTHER",
+      "title": "Disable Telephony",
+      "description": "Cellular call, carrier, and telephony stack."
+    },
+    {
+      "name": "Basebandd",
+      "labels": [
+        "com.apple.baseband",
+        "com.apple.basebandd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Baseband",
+      "description": "Communicates with the cellular baseband firmware."
+    },
+    {
+      "name": "StoreFilesystem",
+      "labels": [
+        "com.apple.cache_delete",
+        "com.apple.cache_installation",
+        "com.apple.cache_servicer"
+      ],
+      "category": "OTHER",
+      "title": "Disable Cache Services",
+      "description": "Manages cache/installation storages and cleanup."
+    },
+    {
+      "name": "WatchCompaniond",
+      "labels": [
+        "com.apple.synapse"
+      ],
+      "category": "OTHER",
+      "title": "Disable Synapse (SOS)",
+      "description": "Powers Watch companion app communication (Synapse/SOS)."
+    },
+    {
+      "name": "CalibrationData",
+      "labels": [
+        "com.apple.CalibrationDataService"
+      ],
+      "category": "OTHER",
+      "title": "Disable Calibration Data",
+      "description": "Stores factory sensor calibration data."
+    },
+    {
+      "name": "CommonUserAssetd",
+      "labels": [
+        "com.apple.commonuserassetd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Common User Assets",
+      "description": "Downloads shared system assets (wallpapers, fonts)."
+    },
+    {
+      "name": "LanguageAssetd",
+      "labels": [
+        "com.apple.languageassetd"
+      ],
+      "category": "OTHER",
+      "title": "Disable Language Assets",
+      "description": "Downloads language models and speech recognition assets."
+    },
+    {
+      "name": "Otapackd",
+      "labels": [
+        "com.apple.otapackd"
+      ],
+      "category": "OTHER",
+      "title": "Disable OTA Pack",
+      "description": "Manages OTA update pack downloads."
+    }
+  ]
+}

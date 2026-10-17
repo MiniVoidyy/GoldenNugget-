@@ -1,9 +1,11 @@
 from PySide6.QtCore import Qt, QCoreApplication
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea
+    QWidget, QVBoxLayout, QLabel, QScrollArea
 )
 
-from src.gui.ios.components import IOSSectionHeader, IOSCard, IOSPrimaryButton
+from src.gui.ios.components import (
+    IOSSectionHeader, IOSCard, IOSPrimaryButton, IOSDangerButton)
+from src.gui.theme import ColorThemeManager, t
 
 
 class IOSApplyPage(QWidget):
@@ -20,7 +22,9 @@ class IOSApplyPage(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("background-color: #1e1e1e; border: none;")
+        c = ColorThemeManager.instance().colors
+        scroll.setStyleSheet(f"background-color: {c.bg_primary}; border: none;")
+        self._scroll = scroll
         content = QWidget()
         scroll.setWidget(content)
         layout.addWidget(scroll)
@@ -41,20 +45,26 @@ class IOSApplyPage(QWidget):
         apply_desc = QLabel(QCoreApplication.translate(
             "Nugget",
             "Applies every enabled tweak to your device. The device reboots "
-            "when done — remember to turn Find My back on afterwards."))
+            "when done. If you turn Find My off for this apply, turn it back "
+            "on afterwards."))
         apply_desc.setWordWrap(True)
-        apply_desc.setStyleSheet("color: #8E8E93; font-size: 13px;")
+        apply_desc.setStyleSheet(f"color: {c.text_secondary}; font-size: 13px; background-color: transparent;")
+        self.apply_desc = apply_desc
         apply_layout.addWidget(apply_desc)
 
         self.apply_btn = IOSPrimaryButton(QCoreApplication.translate(
             "Nugget", "Apply Tweaks"))
-        self.apply_btn.clicked.connect(self.window.on_applyTweaksBtn_clicked)
+        self.apply_btn.setToolTip(QCoreApplication.translate(
+            "Nugget", "Apply all enabled tweaks and restart the device."))
+        self.apply_btn.setAccessibleName(QCoreApplication.translate(
+            "Nugget", "Apply enabled tweaks"))
+        self.apply_btn.clicked.connect(self.window.apply_tweaks_clicked)
         apply_layout.addWidget(self.apply_btn)
         content_layout.addWidget(apply_card)
 
         # --- Remove ---
         content_layout.addWidget(IOSSectionHeader(
-            QCoreApplication.translate("Nugget", "Remove Tweaks")))
+            QCoreApplication.translate("Nugget", "Restore Defaults")))
 
         remove_card = IOSCard()
         remove_layout = QVBoxLayout(remove_card)
@@ -65,36 +75,58 @@ class IOSApplyPage(QWidget):
             "Nugget",
             "Restores the original values for the tweak pages you pick."))
         remove_desc.setWordWrap(True)
-        remove_desc.setStyleSheet("color: #8E8E93; font-size: 13px;")
+        remove_desc.setStyleSheet(f"color: {c.text_secondary}; font-size: 13px; background-color: transparent;")
+        self.remove_desc = remove_desc
         remove_layout.addWidget(remove_desc)
 
-        self.remove_btn = IOSPrimaryButton(QCoreApplication.translate(
-            "Nugget", "Remove Tweaks"))
-        self.remove_btn.clicked.connect(self.window.on_removeTweaksBtn_clicked)
+        self.remove_btn = IOSDangerButton(QCoreApplication.translate(
+            "Nugget", "Restore Defaults"))
+        self.remove_btn.setToolTip(QCoreApplication.translate(
+            "Nugget", "Restore the stock values for the selected tweak pages."))
+        self.remove_btn.setAccessibleName(QCoreApplication.translate(
+            "Nugget", "Restore defaults for selected sections"))
+        self.remove_btn.clicked.connect(self.window.remove_tweaks_clicked)
         remove_layout.addWidget(self.remove_btn)
         content_layout.addWidget(remove_card)
 
-        # --- Progress status ---
-        content_layout.addWidget(IOSSectionHeader(
-            QCoreApplication.translate("Nugget", "Progress")))
+        from src.gui.ios.restore_progress import RestoreProgressCard
+        self.progress_card = RestoreProgressCard(self)
+        self._busy = False
+        self.status_lbl = self.progress_card.status_label
+        self.progress_bar = self.progress_card.bar
+        content_layout.addWidget(self.progress_card)
 
-        status_card = IOSCard()
-        status_layout = QVBoxLayout(status_card)
-        status_layout.setContentsMargins(16, 12, 16, 12)
-        status_layout.setSpacing(0)
-
-        self.status_lbl = QLabel("")
-        self.status_lbl.setWordWrap(True)
-        self.status_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_lbl.setStyleSheet("color: #FFFFFF; font-size: 14px;")
-        status_layout.addWidget(self.status_lbl)
-        content_layout.addWidget(status_card)
+        from src.gui.ios.operation_result import OperationResultCard
+        self.result_card = OperationResultCard(
+            self.window.ios_home.open_logs, self.window.dismiss_operation_result)
+        content_layout.addWidget(self.result_card)
 
         content_layout.addStretch()
 
     def set_status(self, text: str):
-        self.status_lbl.setText(text or "")
+        if text:
+            self.progress_card.set_status(text)
+        elif not self._busy:
+            self.progress_card.hide()
+
+    def set_stage(self, stage, category=""):
+        self.progress_card.set_stage(stage, category)
 
     def set_busy(self, busy: bool):
-        self.apply_btn.setEnabled(not busy)
-        self.remove_btn.setEnabled(not busy)
+        if busy and not self._busy:
+            protective = self.window.device_manager.get_current_device_partially_supported()
+            preferences = self.window.device_manager.pref_manager
+            self.progress_card.start(protective,
+                                     preferences.auto_reboot or preferences.skip_setup)
+            self.progress_card.show()
+        self._busy = busy
+        connected = bool(self.window.device_manager.get_current_device_udid())
+        self.apply_btn.setEnabled(not busy and connected)
+        self.remove_btn.setEnabled(not busy and connected)
+
+    def _retheme(self):
+        c = ColorThemeManager.instance().colors
+        self._scroll.setStyleSheet(f"background-color: {c.bg_primary}; border: none;")
+        self.apply_desc.setStyleSheet(f"color: {c.text_secondary}; font-size: 13px; background-color: transparent;")
+        self.remove_desc.setStyleSheet(f"color: {c.text_secondary}; font-size: 13px; background-color: transparent;")
+        self.progress_card._retheme()

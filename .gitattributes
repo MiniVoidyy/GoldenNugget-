@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Generated Qt resources are reviewed through resources.qrc and source assets.
+src/qt/resources_rc.py linguist-generated=true

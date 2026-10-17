@@ -13,7 +13,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 from .tendie_file import TendieFile
 from .template_options import OptionType, TemplateOption, ReplaceOption, RemoveOption, SetOption, PickerOption
 from src.exceptions.posterboard_exceptions import PBTemplateException
-from src.gui.custom_qt_elements.resizable_image_label import ResizableImageLabel
+from src.qt.custom_elements.resizable_image_label import ResizableImageLabel
 from src.devicemanagement.constants import Version
 
 CURRENT_FORMAT = 2
@@ -76,11 +76,11 @@ class TemplateFile(TendieFile):
                     self.min_version = data['min_version']
                     # check the device version
                     # TODO: need to make this check also happen when connected device is updated
-                    if Version(self.min_version) > Version(device_version):
+                    if device_version and Version(self.min_version) > Version(device_version):
                         raise PBTemplateException(path, QtCore.QCoreApplication.tr("This template requires iOS {0}.\nYour iOS version (iOS {1}) is too outdated!").format(self.min_version, device_version))
                 if 'max_version' in data:
                     self.max_version = data['max_version']
-                    if Version(self.max_version) < Version(device_version):
+                    if device_version and Version(self.max_version) < Version(device_version):
                         raise PBTemplateException(path, QtCore.QCoreApplication.tr("This template requires iOS {0}.\nYour iOS version (iOS {1}) is too new!").format(self.max_version, device_version))
 
                 # load the previews
@@ -155,6 +155,8 @@ class TemplateFile(TendieFile):
         parent_path = os.path.join(zip_output, os.path.dirname(self.json_path))
         for option in self.options:
             option.apply(container_path=parent_path)
+
+        return zip_output
 
     def get_chevron_icon(self, is_up: bool):
         if is_up:

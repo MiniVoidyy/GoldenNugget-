@@ -1,13 +1,37 @@
+from __future__ import annotations
+
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from uuid import uuid4
+import asyncio
+
+from cryptography import x509
+from cryptography.hazmat.primitives.serialization import Encoding
+from pymobiledevice3.ca import create_keybag_file
 from pymobiledevice3.lockdown import create_using_usbmux, LockdownClient
+
+from src.devicemanagement.session import lockdown_session
+from src.exceptions.nugget_exception import NuggetException
+
+from pymobiledevice3.exceptions import ConnectionTerminatedError
 from pymobiledevice3.services.mobile_config import MobileConfigService
 
-_SKIP_ALL_PANES = [
+# Canonical list of setup panes to mark as skipped. This is the single source of
+# truth for every skip-setup path:
+#   - the standalone CLI (skip_setup.py)
+#   - the iOS 27 Phase-4 sweep (skip_all_setup27 below)
+#   - the iOS 26 cloud-config path (device_manager.add_skip_setup)
+# It is the union of the curated iOS 27 list and the older iOS 26 list so no pane
+# is lost on either OS (an identifier that is unknown to a given iOS is a no-op).
+# Keep the list here and never fork a copy.
+SKIP_ALL_PANES = [
     'Location',
     'Restore',
     'SIMSetup',
     'Android',
     'AppleID',
     'IntendedUser',
+    'TOS',
     'Siri',
     'ScreenTime',
     'Diagnostics',
@@ -36,20 +60,134 @@ _SKIP_ALL_PANES = [
     'Safety',
     'Multitasking',
     'ActionButton',
-    'Intelligence',
-    'CameraButton',
     'TermsOfAddress',
     'AccessibilityAppearance',
     'Welcome',
     'Appearance',
     'RestoreCompleted',
     'UpdateCompleted',
+    'WiFi',
+    'Display',
+    'Tone',
+    'LanguageAndLocale',
+    'TouchID',
+    'TrueToneDisplay',
+    'FileVault',
+    'iCloudStorage',
+    'iCloudDiagnostics',
+    'Registration',
+    'DeviceToDeviceMigration',
+    'UnlockWithWatch',
+    'Accessibility',
+    'All',
+    'ExpressLanguage',
+    'Language',
+    'N/A',
+    'Region',
+    'Avatar',
+    'DeviceProtection',
+    'Key',
+    'LockdownMode',
+    'Wallpaper',
+    'PrivacySubtitle',
+    'SecuritySubtitle',
+    'DataSubtitle',
+    'AppleIDSubtitle',
+    'AppearanceSubtitle',
+    'PreferredLang',
+    'OnboardingSubtitle',
+    'AppleTVSubtitle',
+    'Intelligence',
     'WebContentFiltering',
+    'CameraButton',
+    'AdditionalPrivacySettings',
+    'EnableLockdownMode',
+    'OSShowcase',
     'SafetyAndHandling',
+    'Tips',
+    'AgeBasedSafetySettings',
 ]
 
-async def skip_all_setup27(ld: LockdownClient, udid: str | None = None):
-    async with MobileConfigService(lockdown=ld) as mcs:
-        cloud_config = await mcs.get_cloud_configuration() or {}
-        cloud_config['SkipSetup'] = list(_SKIP_ALL_PANES)
-        await mcs.set_cloud_configuration(cloud_config)
+def skip_setup_panes() -> list:
+    """Resolve the exact ``SkipSetup`` pane list: every pane is skipped,
+    Apple ID sign-in included. Keeps ``SKIP_ALL_PANES`` as the canonical list.
+    """
+    return list(SKIP_ALL_PANES)
+
+
+def build_cloud_config(existing: dict | None, supervised: bool = False,
+                       organization_name: str = "") -> dict:
+    """Build the cloud configuration dict (single source of truth).
+
+    Used by both skip-setup deliveries so they produce byte-identical config:
+      * iOS 27: ``skip_all_setup27`` pushes it natively with
+        ``MobileConfigService.set_cloud_configuration`` (Phase 5).
+      * iOS 26: ``device_manager.add_skip_setup`` embeds it into Phase 2's
+        sparse restore as ``CloudConfigurationDetails.plist``.
+    """
+    cloud_config = dict(existing or {})
+    cloud_config['SkipSetup'] = skip_setup_panes()
+    cloud_config["AllowPairing"] = True
+    cloud_config["ConfigurationWasApplied"] = True
+    cloud_config["CloudConfigurationUIComplete"] = True
+    cloud_config["IsSupervised"] = False
+    cloud_config["ConfigurationSource"] = 0
+    cloud_config["PostSetupProfileWasInstalled"] = True
+    if supervised:
+        cloud_config["IsSupervised"] = True
+        # create/add the keybag
+        if organization_name:
+            with TemporaryDirectory() as temp_dir:
+                keybag_file = Path(temp_dir) / 'keybag'
+                create_keybag_file(keybag_file, organization_name)
+                cer = x509.load_pem_x509_certificate(keybag_file.read_bytes())
+                public_key = cer.public_bytes(Encoding.DER)
+                # make sure the mdm is removable
+                cloud_config["OrganizationName"] = organization_name
+                cloud_config['OrganizationMagic'] = str(uuid4())
+                cloud_config['IsMDMUnremovable'] = False
+                cloud_config['SupervisorHostCertificates'] = [public_key]
+        else:
+            # remove keybag info
+            if 'OrganizationMagic' in cloud_config:
+                cloud_config.pop('OrganizationMagic')
+            if 'SupervisorHostCertificates' in cloud_config:
+                cloud_config.pop('SupervisorHostCertificates')
+    return cloud_config
+
+
+async def skip_all_setup27(ld: LockdownClient, udid: str | None = None,
+                           supervised: bool = False,
+                           organization_name: str = ""):
+    last_error = None
+    for attempt in range(6):
+        try:
+            if attempt == 0:
+                async with MobileConfigService(lockdown=ld) as mcs:
+                    cloud_config = build_cloud_config(
+                        await mcs.get_cloud_configuration(),
+                        supervised=supervised,
+                        organization_name=organization_name)
+                    await mcs.set_cloud_configuration(cloud_config)
+            else:
+                async with lockdown_session(udid) as fresh_ld:
+                    async with MobileConfigService(lockdown=fresh_ld) as mcs:
+                        cloud_config = build_cloud_config(
+                            await mcs.get_cloud_configuration(),
+                            supervised=supervised,
+                            organization_name=organization_name)
+                        await mcs.set_cloud_configuration(cloud_config)
+            return
+        except (ConnectionTerminatedError, ConnectionError, OSError,
+                asyncio.TimeoutError) as error:
+            last_error = error
+            if attempt == 5 or not udid:
+                break
+            await asyncio.sleep(min(2 + attempt * 3, 15))
+    raise NuggetException(
+        "The restore completed, but the device disconnected while GoldenNugget "
+        "was configuring Setup Assistant. Keep the device connected and retry "
+        "the setup step after it finishes reconnecting. The protective backup "
+        "is preserved.",
+        detailed_text=f"MobileConfigService connection closed: {last_error!r}",
+    ) from last_error

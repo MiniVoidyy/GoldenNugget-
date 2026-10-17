@@ -8,6 +8,26 @@ While AI is a great development tool, **you must thoroughly test all code on you
 
 ---
 
+## Offline checks
+
+After installing `requirements.txt`, run `python tools/run_tests.py` from the
+repository root. The runner discovers `tools/test_*.py`, runs each script in a
+separate process with an offscreen Qt platform and temporary settings/storage,
+and writes per-suite logs plus `summary.md` to `test-results/`.
+
+Use `python tools/run_tests.py --list` to see the suites, or
+`python tools/run_tests.py test_light_theme test_posterboard_backup_space` to
+run specific suites. A failure or per-suite timeout makes the command fail.
+These are offline regressions; the device-testing requirements above still
+apply to changes that interact with a real device.
+
+The **Offline tests** workflow runs on pull requests and pushes to `main` or
+`release`, using Python 3.14 and 3.15 on Linux. Its logs are uploaded even when a
+suite fails. For manual bug reports, use the **Bug report** issue form; the
+app's prefilled error-report links remain available too.
+
+---
+
 ## 2. Bug Fixes
 
 When submitting bug fixes (`[FIX]`), please ensure that:
@@ -21,7 +41,7 @@ When submitting bug fixes (`[FIX]`), please ensure that:
 ### Quality of Life (QOL) / App Features
 * Features should **not** be redundant or useless. 
 * GoldenNugget is already a large project; we want to avoid turning it into an overloaded "super-app" or bloatware ("elephant").
-* Backports (e.g Cache function from 9.0 to 8.x) is NOT ALLOWED.
+* Backports (e.g. a cache function from 9.0 to 8.x) are NOT ALLOWED.
 
 ### Customization Tweaks
 We welcome the following types of tweaks:
@@ -39,7 +59,10 @@ To keep the repository history clean and easy to read, please use the appropriat
 * **`[FIX]`** – For bug fixes and stability improvements.
 * **`[QOL]`** – For app features, UI changes, or overall GoldenNugget improvements.
 * **`[DOCS]`** – For updates to the README, documentation, or this guide.
-* **`[?]`** - For changes that does not apply to any of existing tags.
+* **`[CA]`** - For CoreAnimation preview commits
+* **`[HOTFIX]`** - For hotfixes
+* **`[REFACTOR]`** - For backend updates
+* **`[?]`** - For changes that do not apply to any existing tag.
 
 ### Examples
 
@@ -49,7 +72,7 @@ To keep the repository history clean and easy to read, please use the appropriat
 | `[FIX] Fix SEGV after restore` | `added new tweak please merge` |
 | `[QOL] Improve logging` | `update` |
 
-> ⚠️ **Note:** Any PR still will be reviewed but i recommend to follow this rules. 
+> ⚠️ **Note:** Every PR will still be reviewed, but I recommend following these rules.
 
 ---
 

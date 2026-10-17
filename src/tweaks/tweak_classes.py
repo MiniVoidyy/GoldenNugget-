@@ -75,26 +75,92 @@ class BasicPlistTweak(Tweak):
         else:
             other_tweaks[self.file_location] = {self.key: self.value}
         return other_tweaks
+
+
+class ReversibleBooleanPlistTweak(BasicPlistTweak):
+    """Write both states so disabling a previously applied key takes effect."""
+
+    def apply_tweak(self, other_tweaks: dict, force_disabled: bool = False) -> dict:
+        target = other_tweaks.get(self.file_location)
+        if not isinstance(target, dict):
+            target = {}
+            other_tweaks[self.file_location] = target
+        target[self.key] = False if force_disabled else bool(self.enabled)
+        return other_tweaks
     
+class CompanionKeyTweak(BasicPlistTweak):
+    """A plist tweak that writes companion keys alongside its main key.
+
+    Some settings only take effect once the system can see that a human
+    changed them (e.g. ``UIViewGlassEverEditedInSettings`` marks the Liquid
+    Glass tint amount as deliberately chosen; without it iOS treats the
+    amount as never set and applies its own default). Those keys are not
+    user-facing toggles, so they ride along with the real one.
+
+    Merging matches ``BasicPlistTweak``, so several tweaks can keep sharing
+    one plist (both this one and ``UseFloatingTabBar`` target the UIKit
+    Managed Preferences file).
+    """
+    def __init__(
+            self,
+            file_location: FileLocation,
+            key: str,
+            value: any = True,
+            companion_keys: Optional[dict] = None,
+            owner: int = 501, group: int = 501
+        ):
+        super().__init__(file_location=file_location, key=key, value=value,
+                         owner=owner, group=group)
+        self.companion_keys = dict(companion_keys or {})
+
+    def apply_tweak(self, other_tweaks: dict) -> dict:
+        if not self.enabled:
+            return other_tweaks
+        target = other_tweaks.get(self.file_location)
+        if not isinstance(target, dict):
+            target = {}
+            other_tweaks[self.file_location] = target
+        target[self.key] = self.value
+        target.update(self.companion_keys)
+        return other_tweaks
+
 class AdvancedPlistTweak(BasicPlistTweak):
     def __init__(
         self,
         file_location: FileLocation,
         keyValues: dict,
-        owner: int = 501, group: int = 501
+        owner: int = 501, group: int = 501,
+        never_enable: Optional[set] = None,
+        allowed_keys: Optional[set] = None
     ):
         super().__init__(file_location=file_location, key=None, value=keyValues, owner=owner, group=group)
+        self.never_enable = set(never_enable or ())
+        # If set, only keys in this set are ever applied / stored (interface-
+        # visible daemons). Keys outside it are dropped, never written.
+        self.allowed_keys = set(allowed_keys) if allowed_keys is not None else None
+
+    def _filter_keys(self, values: dict) -> dict:
+        """Drop keys that are hard-protected or not interface-visible."""
+        out = {}
+        for key, value in values.items():
+            if key in self.never_enable:
+                continue
+            if self.allowed_keys is not None and key not in self.allowed_keys:
+                continue
+            out[key] = value
+        return out
 
     def set_multiple_values(self, keys: list[str], value: any):
         for key in keys:
+            if value and value is not False and value is not None and key in self.never_enable:
+                continue  # hard-protected: this key must never be enabled
+            if self.allowed_keys is not None and key not in self.allowed_keys:
+                continue  # not exposed in the UI: never introduce it
             self.value[key] = value
         _notify_tweak_change()
 
     def apply_tweak(self, other_tweaks: dict) -> dict:
         if not self.enabled:
             return other_tweaks
-        plist = {}
-        for key in self.value:
-            plist[key] = self.value[key]
-        other_tweaks[self.file_location] = plist
+        other_tweaks[self.file_location] = self._filter_keys(self.value)
         return other_tweaks

@@ -1,0 +1,9 @@
+# Keep prefilled issue links from the app's error reporter working.
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation and troubleshooting
+    url: https://github.com/GoldenNugget-Team/GoldenNugget/wiki
+    about: Read setup guides and troubleshooting steps.
+  - name: Questions and feature ideas
+    url: https://github.com/GoldenNugget-Team/GoldenNugget/discussions
+    about: Ask for help or discuss a feature idea.

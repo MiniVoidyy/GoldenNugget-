@@ -13,11 +13,16 @@ class PreferenceManager:
         self.auto_reboot = True
         self.disable_tendies_limit = False
         self.auto_refresh_posterboard = True
+        self.use_backup_cache = True
         self.use_encrypted_backup = False
+        self.use_afc_media = True
         self.skip_setup = True
         self.supervised = False
         self.organization_name = ""
-        self.backup_type = "full"  # "full" or "partial"
+        # Write the "AutoSave" preset on every tweak change and load it back on
+        # startup. Turning it off stops both halves; the preset file itself is
+        # left alone so an existing one can still be loaded by hand.
+        self.tweak_autosave = True
 
     # PosterBoard Configuration Database Saving
     def get_pbconfigs_prefs() -> QSettings:

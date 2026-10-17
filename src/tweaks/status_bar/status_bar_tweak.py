@@ -1,6 +1,7 @@
 from .status_setter import Setter, StatusBarItem
-from ..tweak_classes import Tweak
-from src.devicemanagement.constants import Version
+from .statusbar_archive import ARCHIVE_DOMAIN, ARCHIVE_PATH, build_archive
+from ..tweak_classes import Tweak, _notify_tweak_change
+from src.utils.file_to_restore import FileToRestore
 
 from cffi import FFI
 ffi = FFI()
@@ -10,78 +11,58 @@ class StatusBarTweak(Tweak):
         super().__init__(key=None)
         self.setter = Setter()
 
-    # iOS 27: the status bar is Speakeasy, a SpringBoard feature flag — 
-    # but writing the SpeakeasyNewStatusBar flag fails due to no write permissions.
-    # The feature is disabled on iOS 27+.
-    def apply_tweak(self, flag_plist: dict = None, version: str = "27.0") -> dict:
-        if not self.enabled or flag_plist is None:
-            return flag_plist
-        if Version(version) >= Version("27.0"):
-            return flag_plist
-        category = flag_plist.setdefault("SpringBoard", {})
-        category["SpeakeasyNewStatusBar"] = self.get_speakeasy_payload()
-        return flag_plist
+    def _apply_changes(self, overrides) -> None:
+        setter = self.setter
+        setter.apply_changes(overrides)
+        _notify_tweak_change()
+        return None
 
-    def get_speakeasy_payload(self) -> dict:
-        """Translate the StatusBarOverrideData struct into the Speakeasy flag value.
+    # iOS 27+: the classic binary statusBarOverrides file is no longer read and
+    # the SpeakeasyNewStatusBar feature flag cannot be written by a restore, so
+    # the carrier overrides are delivered as the StatusBarOverrides.archive
+    # that SpringBoard unarchives itself. It lives in HomeDomain, the same
+    # domain the classic path uses, so this is an ordinary restore file -- no
+    # exploit.
+    def apply_ios27_tweak(self, files_to_restore: list) -> None:
+        """Stage StatusBarOverrides.archive (iOS 27+).
 
-        TODO(ios27): the actual dict schema is not confirmed — the keys below
-        are guesses mirroring the classic statusBarOverrides plist format
-        (override* bools + nested values dict). They must be verified on-device
-        once the real keys are extracted from SpringBoard (speakeasy strings
-        in the dyld shared cache).
+        The cellular entry carries the carrier name, its service badge and
+        its signal-bar count, so those four overrides survive. The classic
+        time/date/battery/wifi overrides and the per-item show/hide toggles
+        have no counterpart in the archive and are dropped, so the page hides
+        them (see src/gui/ios/statusbar.py).
         """
-        overrides = self.setter.get_overrides()
-        if self.setter.silly_mode:
-            # copy the struct and turn every non-overridden item on
-            overrides = ffi.new("StatusBarOverrideData *")
-            ffi.memmove(overrides, self.setter.get_overrides(), ffi.sizeof(self.setter.get_overrides()))
-            for i in range(46):
-                if overrides.overrideItemIsEnabled[i] == 0:
-                    overrides.overrideItemIsEnabled[i] = 1
-                    overrides.values.itemIsEnabled[i] = 1
+        if not self.enabled:
+            return
+        primary = self.get_carrier_override() if self.is_carrier_overridden() else None
+        secondary = self.get_secondary_carrier_override() if self.is_secondary_carrier_overridden() else None
+        badge = self.get_primary_service_badge_override() if self.is_primary_service_badge_overridden() else None
+        secondary_badge = self.get_secondary_service_badge_override() if self.is_secondary_service_badge_overridden() else None
+        bars = self.get_gsm_signal_strength_bars_override() if self.is_gsm_signal_strength_bars_overridden() else None
+        secondary_bars = self.get_secondary_gsm_signal_strength_bars_override() if self.is_secondary_gsm_signal_strength_bars_overridden() else None
+        files_to_restore.append(FileToRestore(
+            contents=build_archive(
+                primary,
+                secondary,
+                badge,
+                secondary_badge,
+                bars,
+                secondary_bars,
+            ),
+            restore_path=ARCHIVE_PATH,
+            domain=ARCHIVE_DOMAIN
+        ))
 
-        override: dict = {}
-        values: dict = {}
-        if any(overrides.overrideItemIsEnabled[i] != 0 for i in range(46)):
-            override["overrideItemIsEnabled"] = [
-                int(overrides.overrideItemIsEnabled[i]) for i in range(46)]
-            values["itemIsEnabled"] = [
-                int(overrides.values.itemIsEnabled[i]) for i in range(46)]
-
-        for flag, field in (
-            ("overrideTimeString", "timeString"),
-            ("overrideDateString", "dateString"),
-            ("overrideServiceString", "serviceString"),
-            ("overrideSecondaryServiceString", "secondaryServiceString"),
-            ("overridePrimaryServiceBadgeString", "primaryServiceBadgeString"),
-            ("overrideSecondaryServiceBadgeString", "secondaryServiceBadgeString"),
-            ("overrideBatteryDetailString", "batteryDetailString"),
-            ("overrideBreadcrumb", "breadcrumbTitle"),
-        ):
-            if getattr(overrides, flag) != 0:
-                override[flag] = 1
-                values[field] = ffi.string(getattr(overrides.values, field)).decode()
-
-        for flag, field in (
-            ("overrideGSMSignalStrengthBars", "GSMSignalStrengthBars"),
-            ("overrideSecondaryGSMSignalStrengthBars", "secondaryGSMSignalStrengthBars"),
-            ("overrideWifiSignalStrengthBars", "wifiSignalStrengthBars"),
-            ("overrideDataNetworkType", "dataNetworkType"),
-            ("overrideSecondaryDataNetworkType", "secondaryDataNetworkType"),
-            ("overrideBatteryCapacity", "batteryCapacity"),
-            ("overrideDisplayRawGSMSignal", "displayRawGSMSignal"),
-            ("overrideDisplayRawWifiSignal", "displayRawWifiSignal"),
-        ):
-            if getattr(overrides, flag) != 0:
-                override[flag] = 1
-                values[field] = getattr(overrides.values, field)
-
-        payload: dict = {"Enabled": True}
-        payload.update(override)
-        if values:
-            payload["values"] = values
-        return payload
+    # iOS 26.x (pre-27): classic binary statusBarOverrides in HomeDomain.
+    def apply_classic_tweak(self, files_to_restore: list) -> None:
+        """Stage the classic binary status bar override file (iOS 26.x)."""
+        if not self.enabled:
+            return
+        files_to_restore.append(FileToRestore(
+            contents=self.setter.get_data(),
+            restore_path="/Library/SpringBoard/statusBarOverrides",
+            domain="HomeDomain"
+        ))
 
     # --- generic helpers over the StatusBarOverrideData struct ---
 
@@ -103,12 +84,12 @@ class StatusBarTweak(Tweak):
         if field is not None:
             data = value[:max_len] if max_len is not None else value
             setattr(overrides.values, field, data.encode() if isinstance(data, str) else data)
-        self.setter.apply_changes(overrides)
+        self._apply_changes(overrides)
 
     def _unset_flag(self, flag: str) -> None:
         overrides = self._overrides()
         setattr(overrides, flag, 0)
-        self.setter.apply_changes(overrides)
+        self._apply_changes(overrides)
 
     ### PRIMARY CARRIER
     # CELLULAR SERVICE
@@ -185,12 +166,12 @@ class StatusBarTweak(Tweak):
         overrides.values.itemIsEnabled[idx] = 1 if shown else 0
         overrides.overrideSecondaryCellularConfigured = 1
         overrides.values.secondaryCellularConfigured = 1 if shown else 0
-        self.setter.apply_changes(overrides)
+        self._apply_changes(overrides)
     def unset_secondary_cellular_service(self) -> None:
         overrides = self._overrides()
         overrides.overrideItemIsEnabled[StatusBarItem.SecondaryCellularServiceStatusBarItem.value] = 0
         overrides.overrideSecondaryCellularConfigured = 0
-        self.setter.apply_changes(overrides)
+        self._apply_changes(overrides)
 
     # SERVICE STRING
     def is_secondary_carrier_overridden(self) -> bool:
@@ -277,12 +258,12 @@ class StatusBarTweak(Tweak):
         overrides.overrideBreadcrumb = 1
         new_crumb = text[:254] + " ▶" if text != "" else ""
         overrides.values.breadcrumbTitle = new_crumb.encode()
-        self.setter.apply_changes(overrides)
+        self._apply_changes(overrides)
     def unset_crumb(self) -> None:
         overrides = self._overrides()
         overrides.overrideBreadcrumb = 0
         overrides.values.breadcrumbTitle = "".encode()
-        self.setter.apply_changes(overrides)
+        self._apply_changes(overrides)
 
     # BATTERY DETAIL STRING
     def is_battery_detail_overridden(self) -> bool:
@@ -326,7 +307,7 @@ class StatusBarTweak(Tweak):
         overrides.overrideDisplayRawWifiSignal = 1 if shown else 0
         if shown:
             overrides.values.displayRawWifiSignal = 1
-        self.setter.apply_changes(overrides)
+        self._apply_changes(overrides)
     # GSM
     def is_raw_gsm_signal_shown(self) -> bool:
         return self._is_flag_overridden("overrideDisplayRawGSMSignal")
@@ -335,7 +316,7 @@ class StatusBarTweak(Tweak):
         overrides.overrideDisplayRawGSMSignal = 1 if shown else 0
         if shown:
             overrides.values.displayRawGSMSignal = 1
-        self.setter.apply_changes(overrides)
+        self._apply_changes(overrides)
 
     ## RADIO BUTTONS
     def is_item_overridden(self, item: StatusBarItem) -> bool:
@@ -346,14 +327,40 @@ class StatusBarTweak(Tweak):
         overrides = self._overrides()
         overrides.overrideItemIsEnabled[item.value] = 1
         overrides.values.itemIsEnabled[item.value] = 1 if shown else 0
-        self.setter.apply_changes(overrides)
+        self._apply_changes(overrides)
     def unset_item_override(self, item: StatusBarItem) -> None:
         overrides = self._overrides()
         overrides.overrideItemIsEnabled[item.value] = 0
-        self.setter.apply_changes(overrides)
+        self._apply_changes(overrides)
 
 
     def is_silly_mode_enabled(self) -> bool:
         return self.setter.silly_mode
     def toggle_silly_mode(self, value: bool) -> None:
         self.setter.silly_mode = value
+
+    def count_overrides(self) -> int:
+        """Number of currently-active overrides (drives the apply summary).
+
+        Counts every ``override*`` flag set to 1 plus every enabled
+        ``overrideItemIsEnabled`` entry. Approximate by design — a single
+        user change can legitimately toggle more than one override field.
+        """
+        overrides = self._overrides()
+        count = 0
+        try:
+            for i in range(len(overrides.overrideItemIsEnabled)):
+                if overrides.overrideItemIsEnabled[i]:
+                    count += 1
+        except Exception:
+            pass
+        for name in dir(overrides):
+            if not name.startswith("override") or name == "overrideItemIsEnabled":
+                continue
+            try:
+                val = getattr(overrides, name)
+            except Exception:
+                continue
+            if isinstance(val, int) and val:
+                count += 1
+        return count

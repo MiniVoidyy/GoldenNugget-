@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>appearanceAware</key>
+	<false/>
+	<key>assets</key>
+	<dict>
+		<key>lockAndHome</key>
+		<dict>
+			<key>default</key>
+			<dict>
+				<key>backgroundAnimationFileName</key>
+				<string>9183.Custom_Background-390w-844h@3x~iphone.ca</string>
+				<key>floatingAnimationFileNameKey</key>
+				<string>9183.Custom_Floating-390w-844h@3x~iphone.ca</string>
+				<key>foregroundAnimationFileName</key>
+				<string>9183.Custom_Foreground-390w-844h@3x~iphone.ca</string>
+				<key>identifier</key>
+				<integer>9183</integer>
+				<key>name</key>
+				<string>Custom</string>
+				<key>type</key>
+				<string>LayeredAnimation</string>
+			</dict>
+		</dict>
+	</dict>
+	<key>family</key>
+	<string>Custom</string>
+	<key>identifier</key>
+	<integer>9183</integer>
+	<key>logicalScreenClass</key>
+	<string>390w-844h@3x~iphone</string>
+	<key>name</key>
+	<string>Custom</string>
+	<key>version</key>
+	<integer>1</integer>
+</dict>
+</plist>

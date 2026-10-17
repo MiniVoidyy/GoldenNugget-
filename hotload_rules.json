@@ -1,0 +1,54 @@
+{
+  "version": 3,
+  "comment": "GoldenNugget HotLoad safety rules. Each rule flags a tweak (by its TweakID name) as dangerous/broken, or a whole feature with action \"hide_feature\". A rule is ACTIVE when 'disabled' is not present or is true; set 'disabled': false to temporarily remove the flag without deleting the rule. Scoping fields: 'app_versions' (exact set, e.g. [\"9.2\"]), 'min_app_version'/'max_app_version' (range) — which GoldenNugget builds the rule applies to; 'min_version'/'max_version' — iOS version range; 'only_models' — device prefixes. Rules with the special action \"kill_app\" act as a REMOTE KILL SWITCH: on matching versions/models GoldenNugget refuses to start (or, if already running, shuts itself down like a crash). Scope such rules as narrowly as possible. Rules with action \"hide_feature\" (field 'feature': one of \"Liquid Glass\", \"Springboard\", \"Internal\", \"PosterBoard\", \"Daemons\", \"Status Bar\", \"Templates\") hide the whole feature on matching setups: its tweaks disappear from the UI, the Sidebar button and iOS home card are hidden, it is never applied, and presets refuse to load it. Rules with action \"disable_daemon\" (field 'daemons': a list of Daemon enum member names, e.g. \"ScreenTime\"/\"OTA\", and/or raw launchd keys) FORCE-DISABLE those daemons on matching setups: the keys are always injected into the disabled-daemons plist at apply time regardless of UI toggles or presets, and the daemons page locks their switches ON with a warning.",
+  "rules": [
+    {
+      "tweak": "Daemons",
+      "reason": "Remove your autosave preset and disable hotload in settings if you disabled removed daemons in 9.1.1!, else just disable hotload",
+      "app_versions": ["9.3.2"],
+      "min_version": "26.0",
+      "max_version": "27.9",
+      "disabled": true
+    },
+    {
+      "tweak": "Daemons",
+      "reason": "Example rule (inert): a version-scoped daemons flag.",
+      "min_version": "27.0",
+      "max_version": "27.9",
+      "only_models": [],
+      "disabled": false
+    },
+    {
+      "action": "kill_app",
+      "reason": "Example rule (inert): GoldenNugget fully disabled on iOS 27.x until a fix ships.",
+      "min_version": "27.0",
+      "max_version": "27.9",
+      "only_models": [],
+      "disabled": false
+    },
+    {
+      "action": "hide_feature",
+      "feature": "Liquid Glass",
+      "reason": "Example rule (inert): the whole Liquid Glass feature is hidden on iPhone 15 until a fix ships.",
+      "min_version": "27.0",
+      "max_version": "27.9",
+      "only_models": ["iPhone16"],
+      "disabled": false
+    },
+    {
+      "action": "disable_daemon",
+      "daemons": ["ScreenTime", "OTA"],
+      "reason": "Example rule (inert): Screen Time and OTA daemons are force-disabled on iOS 27.x devices until a fix ships.",
+      "min_version": "27.0",
+      "max_version": "27.9",
+      "disabled": false
+    },
+    {
+      "action": "hide_feature",
+      "feature": "Daemons",
+      "reason": "9.3 / 9.3.1 bundled builds ship daemon tweaks (including ones with no UI switch) that an imported/shared preset can re-activate with no per-key whitelist — the INTERFACE_KEYS scrub landed only in 9.3.2. Hiding the whole Daemons feature on 9.3/9.3.1 keeps every daemon out of the UI, out of apply, and out of preset loads. 9.3.2+ is already safe in code.",
+      "app_versions": ["9.3", "9.3.1"],
+      "disabled": false
+    }
+  ]
+}

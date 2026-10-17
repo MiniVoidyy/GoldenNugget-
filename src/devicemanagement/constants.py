@@ -19,4 +19,9 @@ class Device:
 
 def is_supported_by_fork(version: str) -> bool:
     # this fork only supports iOS 26.2 and newer (the iOS 27 era)
-    return Version(version) > Version("26.1")
+    try:
+        return Version(str(version)) > Version("26.1")
+    except Exception:
+        # an empty or unparsable version cannot be verified, so treat it as
+        # unsupported rather than letting Version() raise into the UI
+        return False

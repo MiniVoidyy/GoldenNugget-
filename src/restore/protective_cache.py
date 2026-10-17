@@ -1,0 +1,222 @@
+"""Persistent per-device cache of the protective backup master copy.
+
+The master keeps the FULL Manifest.db (rows for drained payloads stay put)
+so mobilebackup2 can run true incremental refreshes against it: after the
+first apply, each next apply only uploads what actually changed on the
+device. Restores never mutate the master permanently — the apply snapshots
+it under ``<base>/snapshot/<udid>``, prunes and tweak-injects the master in
+place (it IS the Phase 3 restore source), then regenerates the cache from
+the snapshot, returning the master to its full-manifest state.
+
+The master always lives in the persistent app-data store (never the system
+temp dir): it is the sole copy of user data between Phase 2 (device wipe)
+and Phase 3 (restore), so it must survive reboots and crashes. A leftover
+snapshot from a crashed apply is self-healed on the next refresh.
+"""
+
+import json
+import logging
+import os
+import shutil
+import tempfile
+import time
+from pathlib import Path
+from typing import Optional
+
+from pymobiledevice3.lockdown import LockdownClient
+
+from src.restore.inject import _validate_sqlite_db
+from src.restore.storage import cache_base as _cache_base
+
+_logger = logging.getLogger("GoldenNugget.cache")
+
+
+def peek_cache_info(udid: str) -> Optional[dict]:
+    """Read the cache info JSON for a UDID without a device session.
+
+    Best-effort: returns the ``created`` timestamp and age (if any)
+    regardless of encryption/version matching — the pre-apply summary uses it
+    only to display "cache from <date>"; the real matching happens in
+    ``ProtectiveBackupCache.locate`` at apply time.
+    """
+    try:
+        temp_base = Path(tempfile.gettempdir()) / "goldennugget_protective_cache"
+        persist_base = _cache_base()
+    except Exception:
+        return None
+    now = int(time.time())
+    for base in (temp_base, persist_base):
+        try:
+            with open(base / f"{udid}.json", "r", encoding="utf-8") as f:
+                info = json.load(f)
+        except Exception:
+            continue
+        if info.get("udid") != udid:
+            continue
+        created_ts = int(info.get("created_ts", now))
+        return {"created": info.get("created", ""),
+                "created_ts": created_ts,
+                "age_secs": max(0, now - created_ts),
+                "media_afc": bool(info.get("media_afc", False))}
+    return None
+
+# The master always lives in the persistent app-data store — a temp-based
+# master is the sole copy of user data between Phase 2 (wipe) and Phase 3
+# (restore), and a reboot would destroy it.
+CACHE_PERSIST_MIN_GB = float(os.environ.get("GOLDENNUGGET_CACHE_PERSIST_MIN_GB", "1"))
+# A cache younger than this is reused without touching the device at all
+# (only when no PosterBoard work is pending); past it, an incremental
+# refresh session keeps the master in sync.
+CACHE_REFRESH_SECS = int(os.environ.get("GOLDENNUGGET_CACHE_REFRESH_SECS", "1800"))
+
+
+class ProtectiveBackupCache:
+    """Persistent per-device cache of the protective backup master copy.
+
+    The master keeps the FULL Manifest.db (rows for drained payloads stay put)
+    so mobilebackup2 can run true incremental refreshes against it: after the
+    first apply, each next apply only uploads what actually changed on the
+    device. Restores never mutate the master permanently — the apply snapshots
+    it under ``<base>/snapshot/<udid>``, prunes and tweak-injects the master in
+    place (it IS the Phase 3 restore source), then regenerates the cache from
+    the snapshot, returning the master to its full-manifest state.
+    """
+
+    def __init__(self, udid: str, product_version: str, encrypted: bool = False):
+        self.udid = udid
+        self.product_version = product_version
+        self.encrypted = encrypted
+        self._temp_base = Path(tempfile.gettempdir()) / "goldennugget_protective_cache"
+        self._persist_base = _cache_base()
+        # Always use the persistent store: the master is the sole copy of the
+        # user's data between Phase 2 (device wipe) and Phase 3 (restore).  A
+        # reboot would destroy a temp-based master, turning a recoverable
+        # failure into permanent data loss.  The old temp-based location is
+        # still searched by ``locate()`` for migration of existing caches.
+        self.base = self._persist_base
+        self.master_root = self.base / "master"
+        self.device_dir = self.master_root / self.udid
+        self.info_path = self.base / f"{self.udid}.json"
+        # Persistent per-device media store: the bulk photo trees (DCIM,
+        # PhotoStreamsData) pulled over AFC live here so a diff refresh can
+        # compare against what is already local and pull only the new/changed
+        # objects. It sits OUTSIDE ``master_root`` so working copies and the
+        # manifest prune never touch it.
+        self.media_dir = self.base / "media" / self.udid
+
+    def _read_info(self) -> dict:
+        try:
+            with open(self.info_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def locate(self) -> Optional[dict]:
+        """Find an existing master across both bases; point homes at it.
+
+        Returns dict(base, info, age_secs) or None when no usable master.
+        """
+        now = int(time.time())
+        for base in (self._temp_base, self._persist_base):
+            info_path = base / f"{self.udid}.json"
+            try:
+                with open(info_path, "r", encoding="utf-8") as f:
+                    info = json.load(f)
+            except Exception:
+                continue
+            if info.get("udid") != self.udid or info.get("product_version") != self.product_version:
+                continue
+            if bool(info.get("encrypted", False)) != self.encrypted:
+                continue
+            master = base / "master" / self.udid
+            required = ("Manifest.db", "Manifest.plist", "Status.plist")
+            if not all((master / n).is_file() for n in required):
+                continue
+            if not _validate_sqlite_db(master / "Manifest.db"):
+                continue
+            self.base = base
+            self.master_root = base / "master"
+            self.device_dir = master
+            self.info_path = info_path
+            self.media_dir = base / "media" / self.udid
+            created = int(info.get("created_ts", now))
+            return {"base": base, "info": info, "age_secs": max(0, now - created)}
+        return None
+
+    def _set_home(self, base: Path):
+        self.base = base
+        self.master_root = base / "master"
+        self.device_dir = self.master_root / self.udid
+        self.info_path = base / f"{self.udid}.json"
+        self.media_dir = base / "media" / self.udid
+
+    def relocate_by_size(self):
+        """Legacy no-op (kept for the placement test tool).
+
+        The master always lives in the persistent app-data store — moving it
+        to the system temp on size grounds made the sole copy of user data
+        volatile: a reboot between Phase 2 (wipe) and Phase 3 (restore) lost
+        it forever.  There is nothing to relocate anymore.
+        """
+
+    def has_valid_master(self) -> bool:
+        return self.locate() is not None
+
+    async def refresh(self, lockdown_client: LockdownClient, progress_callback=None,
+                      include_photos: bool = True, include_posterboard: bool = False,
+                      include_keychain: bool = False,
+                      include_afc_media: bool = False) -> str:
+        """Bring the master up to the device's current state (full or incremental).
+
+        With ``include_posterboard`` the PosterBoard container rides along, so
+        after this call ``extract_posterboard_db`` yields the live on-device
+        database — refreshed BEFORE extraction, never a stale copy.
+
+        With ``include_afc_media`` the bulk photo trees go over AFC into the
+        persistent per-device media store (``media_dir``), pulled as a diff
+        (only new/changed objects) on every refresh — the cache photo store.
+        """
+        from src.restore.protective import perform_protective_backup, regenerate_cache_from_snapshot
+
+        # Self-heal: a crashed apply leaves a modified (pruned + tweak-injected)
+        # master beside its take-before snapshot. Regenerate first so the
+        # incremental refresh below diffs against the pristine full-manifest
+        # state, never a half-applied one.
+        snap_base = self.base / "snapshot"
+        if (snap_base / self.udid).is_dir():
+            _logger.warning("Leftover cache snapshot found — regenerating master "
+                            "from it before refreshing (crashed apply?)")
+            regenerate_cache_from_snapshot(str(snap_base), str(self.master_root), self.udid)
+
+        valid = self.has_valid_master()
+        mode = "incremental" if valid else "full"
+        _logger.info(f"Protective backup cache: {mode} refresh for {self.udid}")
+        is_encrypted = await perform_protective_backup(
+            lockdown_client, str(self.master_root), progress_callback,
+            include_photos=include_photos, include_posterboard=include_posterboard,
+            include_keychain=include_keychain,
+            incremental_ok=valid,
+            include_afc_media=include_afc_media,
+            media_root=str(self.media_dir),
+            afc_media_diff=True)
+
+        self.base.mkdir(parents=True, exist_ok=True)
+        with open(self.info_path, "w", encoding="utf-8") as f:
+            json.dump({"udid": self.udid,
+                       "product_version": self.product_version,
+                       "encrypted": is_encrypted,
+                       "media_afc": include_afc_media,
+                       "created_ts": int(time.time()),
+                       "created": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
+        return str(self.master_root)
+
+    def make_working_copy(self) -> str:
+        """Build a throwaway hardlink copy of the master for prune + injection."""
+        from src.restore.protective import make_protective_working_copy
+        return make_protective_working_copy(str(self.master_root), self.udid)
+
+    def purge(self):
+        shutil.rmtree(self.master_root, ignore_errors=True)
+        shutil.rmtree(self.media_dir, ignore_errors=True)
+        shutil.rmtree(self.base / "snapshot", ignore_errors=True)
+        self.info_path.unlink(missing_ok=True)

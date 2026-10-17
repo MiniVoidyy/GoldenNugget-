@@ -2,6 +2,7 @@ from .tweaks import tweaks, TweakID
 from .registry import SPECS
 from .basic_plist_locations import FileLocation
 from .tweak_classes import BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak
+from .daemons_tweak import DANGEROUS_KEYS, INTERFACE_KEYS
 
 
 def _build_spec(spec):
@@ -11,34 +12,29 @@ def _build_spec(spec):
 
 
 def load_plist_tweaks():
-    """Register every registry-defined tweak that isn't loaded yet (idempotent)."""
-    tweaks.update({spec.id: _build_spec(spec) for spec in SPECS if spec.id not in tweaks})
+    """Register every registry-defined tweak that isn't loaded yet (idempotent).
 
-
-# Kept as thin aliases — classic pages and preset_manager call the per-group names.
-def load_internal():
-    load_plist_tweaks()
-def load_liquidglass():
-    load_plist_tweaks()
-def load_springboard():
-    load_plist_tweaks()
+    Specs marked ``disabled`` are cut off entirely: they are never registered,
+    so they neither render nor apply.
+    """
+    tweaks.update({spec.id: _build_spec(spec) for spec in SPECS
+                   if spec.id not in tweaks and not spec.disabled})
 
 
 def load_daemons():
     if TweakID.Daemons in tweaks:
         return
+    # Daemons start empty; each interface toggle adds its own keys. Only
+    # interface-visible keys (INTERFACE_KEYS) survive filtering, so unrelated
+    # or hidden daemons can never leak into the apply pass or a stored preset.
+    defaults = {}
     tweaks.update({
         TweakID.Daemons: AdvancedPlistTweak(
             FileLocation.disabledDaemons,
-            {
-                "com.apple.magicswitchd.companion": True,
-                "com.apple.security.otpaird": True,
-                "com.apple.dhcp6d": True,
-                "com.apple.bootpd": True,
-                "com.apple.ftp-proxy-embedded": False,
-                "com.apple.relevanced": True
-            },
-            owner=0, group=0
+            defaults,
+            owner=0, group=0,
+            never_enable=DANGEROUS_KEYS,
+            allowed_keys=INTERFACE_KEYS,
         ),
         TweakID.ClearScreenTimeAgentPlist: NullifyFileTweak(FileLocation.screentime),
     })

@@ -11,6 +11,12 @@ permissions:
   contents: write
   pull-requests: write
 
+# Two dispatches can arrive seconds apart (a push and the merged PR that
+# triggered it). Let the first one finish instead of racing it to the push.
+concurrency:
+  group: sync-translations
+  cancel-in-progress: false
+
 jobs:
   sync-translations:
     runs-on: ubuntu-latest
@@ -23,6 +29,13 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      # Every git write below (submodule checkout, commit) needs an identity,
+      # and actions/checkout configures none.
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
@@ -34,14 +47,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyside6
 
+      # gNugget-i18n force-pushes (translators rebase/amend), so the commit
+      # recorded in this repo is regularly unreachable upstream. Do NOT use
+      # `git submodule update --remote --merge` here: it tries to *merge* in
+      # that case, which needs a committer identity and fails the whole run.
+      # A detached checkout of the upstream tip is what a translations mirror
+      # wants anyway — local submodule commits are never kept.
       - name: Update i18n submodule to latest
         run: |
-          git submodule update --remote --merge i18n
+          git -C i18n fetch --no-tags origin main
+          git -C i18n checkout --detach FETCH_HEAD
 
-      - name: Sync translations
-        id: sync
+      # gNugget-i18n is the single source of truth: mirror its .ts files
+      # exactly, so a language dropped upstream also disappears here.
+      - name: Refresh translation sources from submodule
         run: |
-          python scripts/sync_translations.py i18n src/qt/translations
+          mkdir -p src/qt/translations
+          rm -f src/qt/translations/Nugget_*.ts src/qt/translations/Nugget_*.qm
+          cp -f i18n/Nugget_*.ts src/qt/translations/
 
       - name: Compile translations
         run: |
@@ -51,22 +74,67 @@ jobs:
             pyside6-lrelease "$f" -qm "${f%.ts}.qm"
           done
 
+      # A new (or removed) language upstream must reach the embedded
+      # resources, and pyside6-rcc hard-fails on a listed file that is gone.
+      # Keep the /translations block in sync with the .qm files on disk.
+      - name: Sync translation file list in resources.qrc
+        run: |
+          python - <<'PY'
+          import pathlib
+          import re
+
+          qrc = pathlib.Path("src/qt/resources.qrc")
+          names = sorted(
+              p.name for p in pathlib.Path("src/qt/translations").glob("Nugget_*.qm")
+          )
+          if not names:
+              raise SystemExit("no compiled translations found")
+          block = "\n".join(f"        <file>translations/{n}</file>" for n in names)
+          text = qrc.read_text(encoding="utf-8")
+          patched, count = re.subn(
+              r'(<qresource prefix="/translations">).*?(</qresource>)',
+              lambda m: f"{m.group(1)}\n{block}\n    {m.group(2)}",
+              text,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit("could not find the /translations qresource block")
+          qrc.write_text(patched, encoding="utf-8")
+          print(f"{len(names)} translation(s) listed in resources.qrc")
+          PY
+
       - name: Regenerate resources_rc.py
         run: |
           cd src/qt
           pyside6-rcc resources.qrc -o resources_rc.py
 
+      # The .ts/.qm copies are committed on purpose: PyInstaller ships
+      # src/qt/translations on disk (--add-data=src/qt:src/qt) and the
+      # Translator prefers that folder over the embedded :/translations
+      # resource, so stale copies here mean stale translations in the app.
       - name: Check for changes
         id: changes
         run: |
-          if ! git diff --quiet; then
+          if [ -n "$(git status --porcelain -- i18n src/qt/resources.qrc src/qt/resources_rc.py src/qt/translations)" ]; then
             echo "changed=true" >> $GITHUB_OUTPUT
-            # Commit and push directly
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src/qt/translations/*.ts src/qt/translations/*.qm src/qt/resources_rc.py
-            git commit -m "chore(i18n): sync translations from gNugget-i18n submodule"
-            git push origin HEAD:main
+            git status --porcelain -- i18n src/qt/resources.qrc src/qt/resources_rc.py src/qt/translations
           else
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Commit and push
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git add i18n src/qt/resources.qrc src/qt/resources_rc.py src/qt/translations
+          git commit -m "chore: sync translations and bump i18n submodule"
+          for i in 1 2 3; do
+            # A failed rebase leaves rebase-merge/ in .git; without the abort
+            # the next iteration just fails again on the leftover state.
+            git rebase --abort || true
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1

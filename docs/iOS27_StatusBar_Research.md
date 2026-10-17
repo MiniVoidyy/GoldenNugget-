@@ -5,6 +5,12 @@
 **Period:** ~13 runs across multiple sessions  
 **Status:** **BLOCKED** - Requires exploit/jailbreak to proceed
 
+> **Superseded in part — see [Update](#update-superseded-carrier-name-restored-without-an-exploit)
+> at the end of this document.** The FeatureFlags analysis below still holds,
+> but the status bar is *not* gated by it on iOS 27: SpringBoard unarchives
+> `StatusBarOverrides.archive`, a plain HomeDomain file that a normal backup
+> restore can deliver. The carrier name now works without an exploit.
+
 ---
 
 ## Executive Summary
@@ -268,3 +274,45 @@ All 13 runs confirm: **every data-volume write path is closed**. The classic sta
 ---
 
 *Document compiled from 13 runs across multiple sessions. All raw logs, backups, and RE artifacts in `/tmp/opencode/` (ephemeral) and `/home/awesomenull/projects/GoldenNugget/`.*
+---
+
+## Update: superseded (carrier name restored without an exploit)
+
+The conclusion above is correct **for the FeatureFlags/Speakeasy route** — that
+store really is a dead end, and nothing in this document changes that. It is
+wrong about the conclusion, because it never looked at what SpringBoard
+*actually reads* on iOS 27.
+
+SpringBoard does not gate the modern status bar on the flag at all. It
+unarchives its own file at startup:
+
+    /var/mobile/Library/SpringBoard/StatusBarOverrides.archive
+    _SBSystemStatusStatusBarOverridesArchiveRecord
+      +-- statusBarData : STStatusBarData
+      |     +-- cellularEntry          : STStatusBarDataCellularEntry
+      |     +-- secondaryCellularEntry : STStatusBarDataCellularEntry
+      +-- suppressedBackgroundActivityIdentifiers : NSSet (empty)
+
+`NSKeyedArchiver` binary plist, no exploit, no jailbreak. It sits in
+**HomeDomain**, the very domain the iOS 26 classic `statusBarOverrides` uses, so
+a backup restore delivers it like any other file. The FeatureFlags gate blocks
+the *old* status bar engine, which is simply not the one running on 27.
+
+Two behaviours worth knowing:
+
+- If the record decodes empty or invalid, SpringBoard calls `removeItemAtURL:`
+  itself, so a bad archive degrades to "no override" instead of a broken
+  status bar. Writing a valid empty record is therefore the correct *reset*.
+- `systemstatusd` caches publisher records in memory; the apply path ends in a
+  reboot, which covers this.
+
+What is implemented (`src/tweaks/status_bar/statusbar_archive.py`): the carrier
+name, primary and secondary. The other overrides have no representation in this
+record and are hidden on the iOS 27 page. Signal bars, network type and badges
+are written with fixed verified values rather than exposed, since none of them
+has been seen to render correctly outside the simulator.
+
+**Verified end-to-end by me and other users**
+
+Format reference (reverse engineering, not device-verified end to end):
+<https://github.com/Prognosticate-X/ios27-carrier-lockscreen-research>

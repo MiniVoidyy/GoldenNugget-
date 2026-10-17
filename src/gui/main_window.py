@@ -1,26 +1,43 @@
-from PySide6 import QtCore, QtWidgets
+from typing import TYPE_CHECKING
+
+from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import QCoreApplication
-from typing import Optional
+
+try:
+    from shiboken6 import isValid as _shiboken_is_valid
+except Exception:
+    # Non-*/shiboken-less environments (some frozen builds) always report valid.
+    _shiboken_is_valid = lambda _obj: True
+
+
+def _still_running(worker) -> bool:
+    """True when ``worker`` is a live QThread still executing.
+
+    These workers all wire ``finished -> deleteLater``, which frees the C++
+    object before the window ever drops its stored reference — so a saved
+    worker can already be a dead shiboken wrapper. Probing that wrapper
+    raises ``RuntimeError`` ("Internal C++ object already deleted"), which
+    must never escape from a closeEvent.
+    """
+    if worker is None:
+        return False
+    try:
+        if not _shiboken_is_valid(worker):
+            return False
+        return worker.isRunning()
+    except RuntimeError:
+        return False
 
 from src.qt.mainwindow_ui import Ui_Nugget
 import src.gui.pages as Pages
 
-from src.controllers.web_request_handler import is_update_available
 from src.controllers.translator import Translator
-import src.controllers.video_handler as video_handler
 from src.controllers.preset_manager import PresetManager
 
-from src.devicemanagement.constants import Version
-from src.devicemanagement.device_manager import DeviceManager
-
-from src.gui.dialogs import UpdateAppDialog, AboutProgramDialog
-from src.gui.dialogs.reset_dialog import ResetDialog
-from src.gui.thread_workers.apply_worker import ApplyThread, ApplyAlertMessage, RefreshDevicesThread, set_sudo_pwd, get_sudo_pwd
 from src.gui.pages.pages_list import Page
 
-from src.tweaks.tweaks import tweaks, TweakID
-from src.tweaks.tweak_classes import set_tweak_change_callback
-from src.gui.version import App_Version, App_Build
+if TYPE_CHECKING:
+    from src.devicemanagement.device_manager import DeviceManager
 
 from src.gui.ios.theme_manager import ThemeManager
 from src.gui.ios.home import IOSHomePage
@@ -29,11 +46,60 @@ from src.gui.ios.posterboard import IOSPosterboardPage
 from src.gui.ios.daemons import IOSDaemonsPage
 from src.gui.ios.apply import IOSApplyPage
 from src.gui.ios.settings import IOSSettingsPage
+from src.gui.ios.presets import IOSPresetsPage
 from src.gui.ios.statusbar import IOSStatusBarPage
+from src.gui.ios.icon_themes import IOSIconThemesPage
+from src.gui.ios.passcode_theme import IOSPasscodeThemePage
+from src.gui.ios.connect_placeholder import ConnectDevicePlaceholder
+from src.gui.thread_workers.apply_worker import DeviceMonitorThread
 from src.tweaks.registry import Section
 
-class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, device_manager: DeviceManager, translator: Translator):
+from src.gui.theme import ColorThemeManager, t, theme_icon, themed_stylesheet
+
+from src.gui.main_window_mixins import (
+    ApplyMixin,
+    DeviceBarMixin,
+    NavigationMixin,
+    SettingsMixin,
+)
+
+# Classic chrome (device bar + sidebar + home toolbar) uses monochrome white
+# bootstrap SVGs; they must be recolored on every theme change.
+_CLASSIC_THEMED_ICONS = {
+    "phoneIconBtn": ":/icon/phone.svg",
+    "refreshBtn": ":/icon/arrow-clockwise.svg",
+    "homePageBtn": ":/icon/house.svg",
+    "gestaltPageBtn": ":/icon/iphone-island.svg",
+    "euEnablerPageBtn": ":/icon/geo-alt.svg",
+    "statusBarPageBtn": ":/icon/wifi.svg",
+    "passcodePageBtn": ":/icon/lock.svg",
+    "springboardOptionsPageBtn": ":/icon/app-indicator.svg",
+    "internalOptionsPageBtn": ":/icon/hdd.svg",
+    "liquidGlassPageBtn": ":/icon/liquid-glass.svg",
+    "daemonsPageBtn": ":/icon/toggles.svg",
+    "iconThemesPageBtn": ":/icon/brush.svg",
+    "presetsPageBtn": ":/icon/folder.svg",
+    "applyPageBtn": ":/icon/check-circle.svg",
+    "posterboardPageBtn": ":/icon/wallpaper.svg",
+    "settingsPageBtn": ":/icon/gear.svg",
+    "mainDevBtn": ":/icon/github.svg",
+    "discordBtn": ":/icon/discord.svg",
+    "starOnGithubBtn": ":/icon/star.svg",
+    "leminGithubBtn": ":/icon/github.svg",
+    "leminTwitterBtn": ":/icon/twitter.svg",
+    "leminKoFiBtn": ":/icon/currency-dollar.svg",
+}
+
+# Classic home "credits" buttons that hardcode dark borders in the .ui.
+_CLASSIC_BORDERED_BTNS = [
+    "helpFromBtn", "posterRestoreBtn", "snoolieBtn", "disfordottieBtn",
+    "mikasaBtn", "wind0ws11AeroBtn", "translatorsBtn", "libiBtn",
+    "duyBtn", "jjtechBtn", "qtBtn",
+]
+
+class MainWindow(QtWidgets.QMainWindow, DeviceBarMixin, SettingsMixin,
+                 NavigationMixin, ApplyMixin):
+    def __init__(self, device_manager: "DeviceManager", translator: Translator):
         super(MainWindow, self).__init__()
         self.device_manager = device_manager
         self.translator = translator
@@ -43,6 +109,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.noneText = self.tr("None")
         self.apply_in_progress = False
         self.refresh_in_progress = False
+        self._device_change_refresh_pending = False
+        self._device_refresh_timer = QtCore.QTimer(self)
+        self._device_refresh_timer.setSingleShot(True)
+        self._device_refresh_timer.timeout.connect(self._refresh_after_device_event)
+        # False until the first device scan resolves; the connect placeholder
+        # must not be shown while that scan is still running (the device list
+        # is empty then, even with a phone plugged in).
+        self.device_scan_completed = False
+        self._cache_restore_in_progress = False
+        self._cache_restore_thread = None
         self.threadpool = QtCore.QThreadPool()
 
         self.preset_manager = PresetManager()
@@ -56,15 +132,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # hide every page
         self.ui.posterboardPageBtn.hide()
-        self.ui.templatePageBtn.hide()
         self.ui.euEnablerPageBtn.hide()
-        self.ui.enableiPadOSChk.hide()
-        self.ui.ipadOSAlphaWarningLbl.hide()
         self.ui.statusBarPageBtn.hide()
         self.ui.springboardOptionsPageBtn.hide()
         self.ui.internalOptionsPageBtn.hide()
         self.ui.liquidGlassPageBtn.hide()
         self.ui.daemonsPageBtn.hide()
+        self.ui.iconThemesPageBtn.hide()
         self.ui.passcodePageBtn.hide()
         self.ui.applyPageBtn.hide()
         self.ui.sidebarDiv1.hide()
@@ -73,35 +147,36 @@ class MainWindow(QtWidgets.QMainWindow):
         # pre-load the pages
         self.pages = {
             Page.Home: Pages.Home(window=self, ui=self.ui),
-            Page.Posterboard: Pages.Posterboard(window=self, ui=self.ui),
-            Page.StatusBar: Pages.StatusBar(ui=self.ui),
-            Page.Springboard: Pages.Springboard(ui=self.ui),
-            Page.InternalOptions: Pages.Internal(ui=self.ui),
-            Page.LiquidGlass: Pages.LiquidGlass(ui=self.ui),
-            Page.Daemons: Pages.Daemons(ui=self.ui, window=self),
-            Page.Templates: Pages.Templates(window=self, ui=self.ui),
-            Page.Settings: Pages.Settings(window=self, ui=self.ui)
+            Page.Daemons: Pages.Daemons(ui=self.ui, window=self)
         }
 
         # theme manager stores the active UI mode (classic sidebar shell vs
         # full-screen iOS); apply_theme() below applies it
         self.theme_manager = ThemeManager(self)
 
+        # Color theme manager (dark/light + accent)
+        self._color_theme = ColorThemeManager.instance()
+        self._color_theme.theme_changed.connect(self._on_color_theme_changed)
+
         # build the iOS-style pages stack
         # 0 = home, 1 = tweaks, 2 = posterboard, 3 = daemons, 4 = settings,
-        # 5 = statusbar, 6 = apply, 7 = springboard, 8 = internal, 9 = liquidglass
+        # 5 = statusbar, 6 = apply, 7 = springboard, 8 = internal, 9 = liquidglass,
+        # 10 = icon themes, 11 = passcode themes, 12 = presets
         self.ios_pages = QtWidgets.QStackedWidget(self)
-        self.ios_pages.setStyleSheet("background-color: #1e1e1e;")
+        self.ios_pages.setStyleSheet(t("page_bg"))
         self.ios_home = IOSHomePage(self)
         self.ios_tweaks = IOSTweaksPage(self)
         self.ios_posterboard = IOSPosterboardPage(self)
         self.ios_daemons = IOSDaemonsPage(self)
         self.ios_settings = IOSSettingsPage(self)
+        self.ios_presets = IOSPresetsPage(self)
         self.ios_statusbar = IOSStatusBarPage(self)
         self.ios_apply = IOSApplyPage(self)
         self.ios_springboard = IOSSectionPage(self, Section.SPRINGBOARD)
         self.ios_internal = IOSSectionPage(self, Section.INTERNAL)
         self.ios_liquidglass = IOSSectionPage(self, Section.LIQUID_GLASS)
+        self.ios_iconthemes = IOSIconThemesPage(self)
+        self.ios_passthemes = IOSPasscodeThemePage(self)
         self.ios_pages.addWidget(self.ios_home)
         self.ios_pages.addWidget(self.ios_tweaks)
         self.ios_pages.addWidget(self.ios_posterboard)
@@ -112,6 +187,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ios_pages.addWidget(self.ios_springboard)
         self.ios_pages.addWidget(self.ios_internal)
         self.ios_pages.addWidget(self.ios_liquidglass)
+        self.ios_pages.addWidget(self.ios_iconthemes)
+        self.ios_pages.addWidget(self.ios_passthemes)
+        self.ios_pages.addWidget(self.ios_presets)
 
         # Shared reusable header: one instance for every iOS subpage,
         # reconfigured on page change (title / back / right action).
@@ -128,9 +206,14 @@ class MainWindow(QtWidgets.QMainWindow):
             7: QtCore.QCoreApplication.translate("Nugget", "SpringBoard"),
             8: QtCore.QCoreApplication.translate("Nugget", "Internal"),
             9: QtCore.QCoreApplication.translate("Nugget", "Liquid Glass"),
+            10: QtCore.QCoreApplication.translate("Nugget", "Icon Themes"),
+            11: QCoreApplication.translate("Nugget", "Passcode Themes"),
+            12: QCoreApplication.translate("Nugget", "Presets"),
         }
         self._nav_right_actions = {
             2: ("+ Add Tendies", self.ios_posterboard.show_add_tendies_dialog),
+            11: (QCoreApplication.translate("Nugget", "+ Theme"),
+                 self.ios_passthemes.choose_theme_dialog),
         }
         self.ios_pages.currentChanged.connect(self._update_shared_nav)
 
@@ -138,7 +221,16 @@ class MainWindow(QtWidgets.QMainWindow):
         ios_root_layout = QtWidgets.QVBoxLayout(ios_root)
         ios_root_layout.setContentsMargins(0, 0, 0, 0)
         ios_root_layout.setSpacing(0)
-        ios_root_layout.addWidget(self.ios_nav)
+        # Keep the shared navigation bar visually distinct from the page:
+        # the inset wrapper gives its rounded corners room to show against
+        # the surrounding dark surface.
+        nav_wrap = QtWidgets.QWidget(ios_root)
+        nav_wrap.setObjectName("iosNavWrap")
+        nav_wrap_layout = QtWidgets.QVBoxLayout(nav_wrap)
+        nav_wrap_layout.setContentsMargins(8, 8, 8, 0)
+        nav_wrap_layout.setSpacing(0)
+        nav_wrap_layout.addWidget(self.ios_nav)
+        ios_root_layout.addWidget(nav_wrap)
         ios_root_layout.addWidget(self.ios_pages)
 
         # Unified shell: classic sidebar + [classic home | iOS root | classic daemons].
@@ -159,6 +251,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.content_stack.addWidget(self.ui.homePage)   # 0 = classic home
         self.content_stack.addWidget(ios_root)           # 1 = iOS pages
         self.content_stack.addWidget(self.ui.daemonsPage)  # 2 = classic daemons
+        # 3 = no-device placeholder (shown while no iPhone is connected)
+        self.connect_placeholder = ConnectDevicePlaceholder(self)
+        self.content_stack.addWidget(self.connect_placeholder)
         shell = QtWidgets.QWidget(self)
         shell.setProperty("cls", "central")  # picks up the global #1e1e1e background
         self.shell_layout = QtWidgets.QVBoxLayout(shell)
@@ -173,60 +268,43 @@ class MainWindow(QtWidgets.QMainWindow):
         self.shell_layout.addLayout(self.body_row)
         self.setCentralWidget(shell)
 
-        # First launch: ask user which interface they prefer
-        if not self.theme_manager.settings.contains("ui/theme"):
-            from src.gui.interface_picker import InterfacePickerDialog
-            dlg = InterfacePickerDialog(self)
-            if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted and dlg.choice == "ios":
-                self.theme_manager.save_theme(ThemeManager.IOS)
-            else:
-                self.theme_manager.save_theme(ThemeManager.CLASSIC)
+        # Presets are a first-class page, separate from Settings.  The
+        # generated Designer UI predates this page, so add its sidebar item
+        # here instead of editing the generated file.
+        self.ui.presetsPageBtn = QtWidgets.QToolButton(self.ui.sidebar)
+        self.ui.presetsPageBtn.setObjectName("presetsPageBtn")
+        self.ui.presetsPageBtn.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.ui.presetsPageBtn.setIcon(QtGui.QIcon(":/icon/folder.svg"))
+        self.ui.presetsPageBtn.setText(QCoreApplication.translate("Nugget", "Presets"))
+        self.ui.presetsPageBtn.setCheckable(True)
+        self.ui.presetsPageBtn.setAutoExclusive(True)
+        self.ui.presetsPageBtn.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.ui.presetsPageBtn.setProperty("cls", "sidebarBtn")
+        self.ui.verticalLayout.insertWidget(self.ui.verticalLayout.indexOf(self.ui.sidebarDiv2), self.ui.presetsPageBtn)
 
         self.apply_theme(self.theme_manager.current_theme)
 
         # Back navigation: ESC key and mouse back button go to the home page
         QtWidgets.QApplication.instance().installEventFilter(self)
 
-        # Check for an update
-        if is_update_available(App_Version, App_Build):
-            # notify with prompt to download the new version from github
-            UpdateAppDialog().exec()
         # Update the app version/build number label
         self.updateAppVersionLabel()
         self.pages[Page.Home].load()
         
-        # Add About button next to title
-        self.aboutBtn = QtWidgets.QToolButton()
-        self.aboutBtn.setText(self.tr("About"))
-        self.aboutBtn.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
-        self.aboutBtn.setStyleSheet("""
-            QToolButton {
-                color: #8E8E93;
-                font-size: 13px;
-                background: none;
-                border: none;
-                padding: 4px 8px;
-            }
-            QToolButton:hover {
-                color: #007AFF;
-            }
-        """)
-        self.aboutBtn.setToolButtonStyle(QtCore.Qt.ToolButtonTextOnly)
-        self.aboutBtn.clicked.connect(self.show_about_dialog)
-        
-        # Add to the title bar layout
-        title_layout = self.ui.horizontalLayout_15
-        title_layout.addWidget(self.aboutBtn)
-        
         ## DEVICE BAR
-        self.refresh_devices()
-
         self.ui.refreshBtn.clicked.connect(self.refresh_devices)
+        self.ui.refreshBtn.setToolTip(QCoreApplication.translate("Nugget", "Refresh connected devices"))
         self.ui.devicePicker.currentIndexChanged.connect(self.change_selected_device)
-
-        # disable video features if OpenCV isn't working properly
-        if not video_handler.cv2_successful:
-            self.ui.videoPageBtn.hide()
+        self._device_monitor_thread = DeviceMonitorThread(self)
+        self._device_monitor_thread.devices_changed.connect(self.on_device_connection_changed)
+        self._device_monitor_thread.start()
+        self.refresh_devices()
+        # The refresh above runs on a worker thread, so the device list is still
+        # empty here. _update_device_gate() deliberately does NOT show the
+        # connect placeholder until that first scan finishes — otherwise the
+        # "No device connected" screen stayed up for the whole scan (seconds)
+        # even when a supported phone was already plugged in.
+        self._update_device_gate()
 
         ## SIDE BAR ACTIONS
         self.ui.homePageBtn.clicked.connect(self.on_homePageBtn_clicked)
@@ -235,611 +313,177 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.internalOptionsPageBtn.clicked.connect(self.on_internalOptionsPageBtn_clicked)
         self.ui.liquidGlassPageBtn.clicked.connect(self.on_liquidGlassPageBtn_clicked)
         self.ui.daemonsPageBtn.clicked.connect(self.on_daemonsPageBtn_clicked)
+        self.ui.iconThemesPageBtn.clicked.connect(self.on_iconThemesPageBtn_clicked)
         self.ui.posterboardPageBtn.clicked.connect(self.on_posterboardPageBtn_clicked)
         self.ui.applyPageBtn.clicked.connect(self.on_applyPageBtn_clicked)
         self.ui.settingsPageBtn.clicked.connect(self.on_settingsPageBtn_clicked)
 
-        ## APPLY PAGE ACTIONS
-        self.ui.applyTweaksBtn.clicked.connect(self.on_applyTweaksBtn_clicked)
-        self.ui.removeTweaksBtn.clicked.connect(self.on_removeTweaksBtn_clicked)
+        self.ui.presetsPageBtn.clicked.connect(self.on_presetsPageBtn_clicked)
 
+        # Apply the initial themed global stylesheet
+        self._apply_global_stylesheet()
 
-    ## GENERAL INTERFACE FUNCTIONS
-    def updateInterfaceForNewDevice(self):
-        # update the home page
-        self.pages[Page.Home].updatePhoneInfo()
-    
-    def updateAppVersionLabel(self):
-        new_text: str = self.ui.appVersionLbl.text()
-        new_text = new_text.replace("%VERSION", App_Version)
-        if App_Build > 0:
-            new_text = new_text.replace("%BETATAG", f"(beta {App_Build})")
-        else:
-            new_text = new_text.replace("%BETATAG", "")
-        self.ui.appVersionLbl.setText(new_text)
+    def run_first_launch_prompts(self):
+        """Present the first-launch dialogs AFTER the window is on screen.
 
-
-    ## DEVICE BAR FUNCTIONS
-    @QtCore.Slot()
-    def refresh_devices(self):
-        if not self.refresh_in_progress:
-            self.refresh_in_progress = True
-            self.ui.refreshBtn.setDisabled(True)
-            self.refresh_worker_thread = RefreshDevicesThread(manager=self.device_manager, settings=self.settings)
-            self.refresh_worker_thread.alert.connect(self.alert_message)
-            self.refresh_worker_thread.finished.connect(self.refresh_devices_finished)
-            self.refresh_worker_thread.finished.connect(self.refresh_worker_thread.deleteLater)
-            self.refresh_worker_thread.start()
-
-    def warn_for_dev_beta(self):
-        ver = self.device_manager.get_current_device_version()
-        if ver == "":
-            return
-        if Version(ver) > Version("26.0") and not self.device_manager.get_current_device_build()[-1].isdigit():
-            self.alert_message(ApplyAlertMessage(
-                txt=self.tr("Warning: You are on iOS 26 beta.\n\nThis has been known to cause problems and potentially lead to bootloops.\n\nUse at your own risk!"),
-                title="Warning", icon=QtWidgets.QMessageBox.Warning
-            ), log_to_console=False)
-
-    def update_pb_saved_ids_list(self):
-        # update PosterBoard saved ids list
-        self.ui.savedConfigIdsList.clear()
-        saved_ids = tweaks[TweakID.PosterBoard].config_manager.saved_items
-        if len(saved_ids) == 0:
-            self.ui.savedConfigIdsList.setDisabled(True)
-            self.ui.savedConfigIdsList.addItem("None")
-        else:
-            self.ui.savedConfigIdsList.setDisabled(False)
-            self.ui.savedConfigIdsList.addItems([id.to_str() for id in saved_ids])
-
-    def refresh_devices_finished(self):
-        self.refresh_in_progress = False
-        self.toggle_thread_btns(disabled=False)
-        # clear the picker
-        self.ui.devicePicker.clear()
-        self.ui.restoreProgressBar.hide()
-
-        if len(self.device_manager.devices) == 0:
-            self.ui.devicePicker.setEnabled(False)
-            self.ui.devicePicker.addItem(self.noneText)
-            self.show_home()
-
-            # hide all pages
-            self.ui.sidebarDiv1.hide()
-
-            self.ui.gestaltPageBtn.hide()
-            self.ui.statusBarPageBtn.hide()
-            self.ui.springboardOptionsPageBtn.hide()
-            self.ui.internalOptionsPageBtn.hide()
-            self.ui.liquidGlassPageBtn.hide()
-            self.ui.daemonsPageBtn.hide()
-            self.ui.passcodePageBtn.hide()
-            self.ui.posterboardPageBtn.hide()
-
-            self.ui.sidebarDiv2.hide()
-            self.ui.applyPageBtn.hide()
-            self.ui.jjtechBtn.hide()
-            self.ui.duyBtn.show()
-
-            self.ui.resetPairBtn.hide()
-            # mirror in the iOS UI: no device → no status bar card
-            if hasattr(self, "ios_home"):
-                self.ios_home.set_statusbar_visible(False)
-        else:
-            self.ui.devicePicker.setEnabled(True)
-            # populate the ComboBox with device names
-            for device in self.device_manager.devices:
-                tag = " (@ USB)" if device.connected_via_usb else " (@ WiFi)"
-                self.ui.devicePicker.addItem(f"{device.name}{tag}")
-
-            # show all pages
-            self.ui.sidebarDiv1.show()
-            self.ui.statusBarPageBtn.show()
-            self.ui.springboardOptionsPageBtn.show()
-            self.ui.internalOptionsPageBtn.show()
-            self.ui.liquidGlassPageBtn.show()
-            self.ui.daemonsPageBtn.show()
-            self.ui.passcodePageBtn.hide()
-            self.ui.posterboardPageBtn.show()
-
-            self.ui.sidebarDiv2.show()
-            self.ui.applyPageBtn.show()
-
-            self.ui.springboardOptionsPageContent.setDisabled(False)
-            self.ui.internalOptionsPageContent.setDisabled(False)
-            self.ui.advancedOptionsPageContent.setDisabled(False)
-            self.ui.liquidGlassPageContent.setDisabled(False)
-            self.ui.pbPages.setDisabled(False)
-
-            self.ui.resetPairBtn.show()
-        
-        # update the selected device
-        self.ui.devicePicker.setCurrentIndex(0)
-        # keep the iOS home in sync
-        self.ios_home.refresh_device_combo()
-        self.ios_home.update_device_info()
-        self.ios_home.update_status()
-
-    def change_selected_device(self, index):
-        if len(self.device_manager.devices) > 0:
-            self.device_manager.set_current_device(index=index)
-            # hide options that are for newer versions
-            MinTweakVersions = {
-                "no_patch": [self.ui.chooseGestaltBtn, self.ui.gestaltPageBtn, self.ui.gestaltLocationLbl, self.ui.gestaltLocationTitleLbl],
-                "17.4": [self.ui.supportsDIChk],
-                "18.0": [self.ui.aodChk, self.ui.aodVibrancyChk, self.ui.iphone16SettingsChk],
-                "26.0": [self.ui.liquidGlassPageBtn]
-            }
-
-            device_ver = Version(self.device_manager.data_singleton.current_device.version)
-            # toggle option visibility for the minimum versions
-            for version in MinTweakVersions.keys():
-                if version == "exploit":
-                    # disable if the exploit is not available
-                    for pair in MinTweakVersions[version]:
-                        if device_ver >= Version(pair[0]):
-                            pair[1].show()
-                        else:
-                            pair[1].hide()
-                elif version == "no_patch":
-                    # these items only apply to unpatched devices, which do not exist on this fork
-                    for view in MinTweakVersions[version]:
-                        view.hide()
-                else:
-                    # show views if the version is higher
-                    parsed_ver = Version(version)
-                    for view in MinTweakVersions[version]:
-                        if device_ver >= parsed_ver:
-                            view.show()
-                        else:
-                            view.hide()
-            # The Status Bar override file is dropped by the iOS 27
-            # safe-state-recovery wipe, so the whole feature is hidden on iOS 27+.
-            # Force Solarium Fallback is now supported on iOS 27 as well, so it is
-            # kept visible across all supported versions.
-            if device_ver >= Version("27.0"):
-                self.ui.statusBarPageBtn.hide()
-            else:
-                self.ui.statusBarPageBtn.show()
-            self.ui.forceSolariumFallbackContent.show()
-            if hasattr(self, "ios_tweaks"):
-                self.ios_tweaks.set_force_solarium_fallback_visible(True)
-            # mirror the Status Bar gating in the iOS UI
-            if hasattr(self, "ios_home"):
-                self.ios_home.set_statusbar_visible(device_ver < Version("27.0"))
-
-            # hide posterboard .aar video option on ipads
-            is_iphone = self.device_manager.get_current_device_model().startswith("iPhone")
-            if not is_iphone:
-                # force looping
-                tweaks[TweakID.PosterBoard].loop_video = True
-            is_looping = tweaks[TweakID.PosterBoard].loop_video
-            self.ui.pbVideoThumbLbl.setVisible(is_iphone and not is_looping)
-            self.ui.chooseThumbBtn.setVisible(is_iphone and not is_looping)
-            self.ui.caVideoChk.setVisible(is_iphone)
-            self.ui.exportPBVideoBtn.setVisible(is_looping and tweaks[TweakID.PosterBoard].videoFile != None)
-            # show status bar date on ipads
-            self.ui.dateChk.setVisible(not is_iphone)
-            self.ui.dateTxt.setVisible(not is_iphone)
-            # show floating tab bar on ipads
-            self.ui.floatingTabBarContent.setVisible(not is_iphone)
-            # iPadOS stuff
-            self.ui.stageManagerChk.setVisible(not is_iphone)
-            # liquid glass low performance mode stuff
-            supports_lg = device_ver >= Version("26.0")
-            # show the disable toggle on iPhone 12s and below (iPhone13,*)
-            is_lglpm = self.device_manager.get_current_device_model().removeprefix("iPhone") < "14"
-            self.ui.enableLGLPMChk.setVisible(supports_lg and not is_lglpm)
-            self.ui.disableLGLPMChk.setVisible(supports_lg and is_lglpm)
-
-            # sparse-restore book credits do not apply to this fork
-            self.ui.jjtechBtn.hide()
-            # swap out the current posterboard file
-            if tweaks[TweakID.PosterBoard].config_manager.update_for_saved_database(self.device_manager.get_current_device_udid()):
-                self.ui.pbDBLbl.setText("sqlite: Selected")
-            else:
-                self.ui.pbDBLbl.setText("sqlite: None")
-            self.update_pb_saved_ids_list()
-            # wallpapers are always applied as configurations (iOS 26+ data
-            # store layout); the descriptors method is gone, so hide the toggle
-            self.ui.pbApplyMethods.setVisible(False)
-
-            # show the PB if initial load is true
-            if self.initial_load:
-                self.initial_load = False
-                if len(tweaks[TweakID.PosterBoard].tendies) > 0:
-                    self.show_ios_page(2)
-                elif len(tweaks[TweakID.Templates].templates) > 0:
-                    # templates have no dedicated page in the unified shell
-                    self.show_ios_page(2)
-                self._sync_sidebar_selection()
-        else:
-            self.device_manager.set_current_device(index=None)
-
-        # update the interface
-        self.updateInterfaceForNewDevice()
-        self.ios_home.update_device_info()
-        self.ios_home.update_status()
-        if index > -1:
-            self.warn_for_dev_beta()
-
-    def loadSettings(self):
-        try:
-            # load the settings
-            auto_reboot = self.settings.value("auto_reboot", True, type=bool)
-            ignore_frame_limit = self.settings.value("ignore_pb_frame_limit", False, type=bool)
-            disable_tendies_limit = self.settings.value("disable_tendies_limit", False, type=bool)
-            auto_refresh_posterboard = self.settings.value("auto_refresh_posterboard", True, type=bool)
-
-            skip_setup = self.settings.value("skip_setup", True, type=bool)
-            supervised = self.settings.value("supervised", False, type=bool)
-            organization_name = self.settings.value("organization_name", "", type=str)
-            use_encrypted_backup = self.settings.value("use_encrypted_backup", False, type=bool)
-            backup_type = self.settings.value("backup_type", "full", type=str)
-
-            self.ui.autoRebootChk.setChecked(auto_reboot)
-            self.ui.ignorePBFrameLimitChk.setChecked(ignore_frame_limit)
-            self.ui.disableTendiesLimitChk.setChecked(disable_tendies_limit)
-            self.ui.forcePBRefreshChk.setChecked(auto_refresh_posterboard)
-            # Experimental encrypted backup option
-            if hasattr(self.ui, 'encryptedBackupChk'):
-                self.ui.encryptedBackupChk.setChecked(use_encrypted_backup)
-            
-            self.ui.skipSetupChk.setChecked(skip_setup)
-            self.ui.supervisionChk.setChecked(supervised)
-            self.ui.supervisionOrganization.setText(organization_name)
-
-            # hide/show the warning label
-            if skip_setup:
-                self.ui.skipSetupOnLbl.show()
-            else:
-                self.ui.skipSetupOnLbl.hide()
-
-            self.device_manager.pref_manager.auto_reboot = auto_reboot
-            video_handler.set_ignore_frame_limit(ignore_frame_limit)
-            self.device_manager.pref_manager.disable_tendies_limit = disable_tendies_limit
-            self.device_manager.pref_manager.auto_refresh_posterboard = auto_refresh_posterboard
-            self.device_manager.pref_manager.use_encrypted_backup = use_encrypted_backup
-            self.device_manager.pref_manager.skip_setup = skip_setup
-            self.device_manager.pref_manager.supervised = supervised
-            self.device_manager.pref_manager.organization_name = organization_name
-            self.device_manager.pref_manager.backup_type = backup_type
-        except Exception:
-            pass
-    
-    def _load_last_preset(self):
-        """Load the latest autosaved preset on startup.
-
-        Prefers the AutoSave preset (written on every tweak change) so the UI
-        restores the most recent configuration. Falls back to the last
-        manually-loaded preset when no autosave exists.
+        Running them inside __init__ (before show()) opens them over an
+        unmapped parent, which on several platforms renders them transparent
+        and stuttering. Called from main_app right after widget.show().
         """
-        if "AutoSave" in self.preset_manager.list_presets():
-            self.preset_manager.load_preset("AutoSave")
-            return
-        last_preset = self.settings.value("last_loaded_preset", "", type=str)
-        if last_preset:
-            self.preset_manager.load_preset(last_preset)
+        # First launch: ask user which interface they prefer.
+        # TEMP: Classic UI removed — skip the picker, stay on iOS-style.
+        if not self.theme_manager.settings.contains("ui/theme"):
+            self.theme_manager.save_theme(ThemeManager.IOS)
+            self.apply_theme(ThemeManager.IOS)
 
-    def _register_tweak_autosave(self):
-        """Register callback to auto-save preset when tweaks change."""
-        set_tweak_change_callback(self._on_tweak_changed)
+        # First launch: choose the home top-bar widget (storage vs presets).
+        if not self.settings.contains("home_widget"):
+            from src.gui.interface_picker import HomeWidgetPickerDialog
+            picker = HomeWidgetPickerDialog(self)
+            picker.exec()
+            self.settings.setValue("home_widget", picker.choice or "presets")
+            self._sync_settings()
+            self.ios_home.set_home_widget(picker.choice or "presets")
 
-    def _on_tweak_changed(self):
-        """Called when any tweak value changes - schedule autosave."""
-        if self._preset_autosave_pending:
-            return
-        self._preset_autosave_pending = True
-        # Debounce: save after 500ms of no changes
-        QtCore.QTimer.singleShot(500, self._save_autosave_preset)
+        # First launch: remind the user to back up the device before tweaking
+        # (keeps asking until they confirm a backup was made)
+        if not self.settings.value("backup_prompt_done", False, type=bool):
+            if self.prompt_first_launch_backup():
+                self.settings.setValue("backup_prompt_done", True)
+                self._sync_settings()
 
-    def _save_autosave_preset(self):
-        """Save current tweak state to AutoSave preset."""
-        self._preset_autosave_pending = False
-        try:
-            self.preset_manager.save_preset(
-                "AutoSave", "Automatic save of last tweak configuration", tags=["auto"],
-                device_model=self.device_manager.get_current_device_model() or "",
-                ios_version=self.device_manager.get_current_device_version() or "")
-        except Exception:
-            pass  # Silent fail - autosave is best-effort
-     
-    
-    ## SIDE BAR FUNCTIONS
-    def apply_theme(self, theme: int):
-        """Apply the UI mode WITHOUT navigating away.
+    # ---- Color theme reactivity ------------------------------------------
 
-        CLASSIC: sidebar + classic home; iOS-style pages open as actions.
-        IOS: full-screen iOS UI with the shared header providing back
-        navigation. Only the chrome changes — the current page stays put.
+    def _apply_global_stylesheet(self):
+        """Re-apply the global stylesheet using the current color theme."""
+        self.setStyleSheet(t("global"))
+        self._applied_color_mode = self._color_theme.mode
+        # Also update the QPalette so native widgets pick up the colors
+        QtWidgets.QApplication.instance().setPalette(self._color_theme.build_palette())
+        # Re-style the ios_pages stack
+        self.ios_pages.setStyleSheet(t("page_bg"))
+        if self.theme_manager.current_theme == ThemeManager.CLASSIC:
+            self._retheme_classic()
+
+    def _retheme_classic(self):
+        """Re-color the classic shell: chrome icons, device picker, version
+        link and the hardcoded-dark credit buttons."""
+        c = self._color_theme.colors
+
+        # Recolor white SVG chrome icons to the current text color
+        for obj_name, res in _CLASSIC_THEMED_ICONS.items():
+            widget = getattr(self.ui, obj_name, None)
+            if widget is not None:
+                widget.setIcon(theme_icon(res, c.text_primary))
+
+        # Device picker keeps its Designer stylesheet untouched (classic look).
+
+        # Version link inherits white from the .ui — restyle to text_secondary
+        self.ui.phoneNameLbl.setStyleSheet(f"color: {c.text_primary};")
+        self.ui.phoneVersionLbl.setText(
+            f'<a style="text-decoration:none; color:{c.text_secondary}" href="#">Version</a>')
+
+        # Always-visible shell chrome: the sidebar and device bar are shown on
+        # every page/tab, so their text color must be themed explicitly
+        # (otherwise it falls back to whatever the .ui bundled).
+        chrome = f"""
+            QToolButton {{
+                color: {c.text_primary};
+                background: transparent;
+            }}
+            QToolButton:hover {{
+                color: {c.text_primary};
+                background-color: {c.surface_hover};
+            }}
+            QToolButton:checked {{
+                color: {c.text_inverse};
+                background-color: {c.accent};
+            }}
+            QLabel {{ color: {c.text_primary}; }}
         """
-        self.theme_manager.save_theme(theme)
-        is_ios = theme == ThemeManager.IOS
-        self.ui.sidebar.setVisible(not is_ios)
-        self.ui.deviceBar.setVisible(not is_ios)
-        if is_ios:
-            # iOS mode: full-screen, no padding
-            self.shell_layout.setContentsMargins(0, 0, 0, 0)
-            self.shell_layout.setSpacing(0)
-            self.body_row.setSpacing(0)
-            # entering the new UI: land on its home unless already inside it
-            if self.content_stack.currentIndex() != 1:
-                self.content_stack.setCurrentIndex(1)
-                self.ios_pages.setCurrentIndex(0)
-            self._update_shared_nav(self.ios_pages.currentIndex())
-        else:
-            # Classic mode: add padding around the shell
-            self.shell_layout.setContentsMargins(16, 16, 16, 16)
-            self.shell_layout.setSpacing(12)
-            self.body_row.setSpacing(16)
-            # classic UI never shows the shared header
-            self.ios_nav.setVisible(False)
-            if self.ios_pages.currentIndex() == 0:
-                # the iOS home has no meaning inside the classic shell
-                self.show_home()
-        self._sync_sidebar_selection()
+        self.ui.sidebar.setStyleSheet(chrome)
 
-    def _update_shared_nav(self, index: int):
+        # Credit buttons hardcode #3b3b3b borders in the generated .ui
+        bordered_style = themed_stylesheet("classic_bordered_btn")
+        for obj_name in _CLASSIC_BORDERED_BTNS:
+            widget = getattr(self.ui, obj_name, None)
+            if widget is not None:
+                widget.setStyleSheet(bordered_style)
+
+    def _on_color_theme_changed(self):
+        """Called when the color theme (dark/light or accent) changes."""
         if self.theme_manager.current_theme == ThemeManager.CLASSIC:
-            self.ios_nav.setVisible(False)
+            self._apply_global_stylesheet()
             return
-        # the iOS home page is full-screen — no header at all
-        self.ios_nav.setVisible(index != 0)
-        if index == 0:
-            self.ios_nav.clear_right_action()
-            return
-        title = self._ios_page_titles.get(index, "")
-        self.ios_nav.set_title(title)
-        self.ios_nav.set_back_visible(True)
-        right = self._nav_right_actions.get(index)
-        if right:
-            self.ios_nav.set_right_action(right[0], right[1])
-        else:
-            self.ios_nav.clear_right_action()
+        if getattr(self, '_applied_color_mode', None) != self._color_theme.mode:
+            self._apply_global_stylesheet()
+        page = self.ios_pages.currentWidget()
+        if page is not None and hasattr(page, "_retheme"):
+            page._retheme()
+            page._applied_theme_revision = self._color_theme.revision
 
-    def _sync_sidebar_selection(self):
-        """Move the checked highlight of the sidebar to the active view."""
-        btns = (self.ui.homePageBtn, self.ui.posterboardPageBtn,
-                self.ui.springboardOptionsPageBtn, self.ui.internalOptionsPageBtn,
-                self.ui.liquidGlassPageBtn, self.ui.daemonsPageBtn,
-                self.ui.applyPageBtn, self.ui.settingsPageBtn,
-                self.ui.statusBarPageBtn)
-        page_to_btn = {
-            0: 0,   # home
-            2: 1,   # posterboard
-            7: 2,   # springboard
-            8: 3,   # internal
-            9: 4,   # liquid glass
-            3: 5,   # daemons
-            6: 6,   # apply
-            4: 7,   # settings
-            5: 8,   # status bar
-        }
-        idx = None
-        if self.theme_manager.current_theme == ThemeManager.CLASSIC:
-            if self.content_stack.currentIndex() == 0:
-                idx = 0
-            elif self.content_stack.currentIndex() == 1:
-                idx = page_to_btn.get(self.ios_pages.currentIndex())
-            elif self.content_stack.currentIndex() == 2:
-                idx = 5
-        else:
-            idx = page_to_btn.get(self.ios_pages.currentIndex())
-        target = btns[idx] if idx is not None else None
-        for b in btns:
-            b.setChecked(b is target)
+    def closeEvent(self, event):
+        """Guard window close so device threads never get destroyed mid-run.
 
-    def show_home(self):
-        """Open the home page of the ACTIVE UI mode."""
-        if self.theme_manager.current_theme == ThemeManager.IOS:
-            self.content_stack.setCurrentIndex(1)
-            self.ios_pages.setCurrentIndex(0)
-            self._update_shared_nav(0)
-        else:
-            self.content_stack.setCurrentIndex(0)
-        self._sync_sidebar_selection()
-
-    def show_ios_page(self, index: int):
-        self.content_stack.setCurrentIndex(1)
-        self.ios_pages.setCurrentIndex(index)
-
-    def eventFilter(self, obj, event):
-        """Handle ESC and the mouse back button as navigation-back."""
-        if QtWidgets.QApplication.activeModalWidget() is not None:
-            return False
-        try:
-            etype = event.type()
-        except (AttributeError, TypeError):
-            return False
-        if etype == QtCore.QEvent.Type.KeyPress and event.key() == QtCore.Qt.Key.Key_Escape:
-            return self._go_back()
-        if etype == QtCore.QEvent.Type.MouseButtonPress and event.button() in (
-                QtCore.Qt.MouseButton.BackButton, QtCore.Qt.MouseButton.ExtraButton1):
-            return self._go_back()
-        return False
-
-    def _go_back(self) -> bool:
-        """Navigate back.
-
-        IOS mode: subpage -> iOS home (stay there).
-        CLASSIC mode: any action page backs out to the classic home.
+        Destroying a QThread object while its native thread is still running
+        is what produces the "QThread: Destroyed while thread '' is still
+        running" crash — and for a restore/apply it can cut the device
+        operation short right in the middle of a Manifest.db write, leaving
+        the backup corrupted (the reported MBErrorDomain/205 fallout).
         """
-        if self.content_stack.currentIndex() == 1:
-            if self.theme_manager.current_theme == ThemeManager.IOS:
-                if self.ios_pages.currentIndex() != 0:
-                    self.ios_pages.setCurrentIndex(0)
-                    return True
-                return False
-            # classic shell: action pages back out straight to classic home
-            self.content_stack.setCurrentIndex(0)
-            self._sync_sidebar_selection()
-            return True
-        if self.content_stack.currentIndex() == 2:
-            # classic daemons page -> classic home
-            self.content_stack.setCurrentIndex(0)
-            self._sync_sidebar_selection()
-            return True
-        return False
-
-    def on_homePageBtn_clicked(self):
-        self.show_home()
-
-    def on_statusBarPageBtn_clicked(self):
-        self.show_ios_page(5)
-        self._sync_sidebar_selection()
-
-    def on_springboardOptionsPageBtn_clicked(self):
-        self.show_ios_page(7)
-        self._sync_sidebar_selection()
-
-    def on_internalOptionsPageBtn_clicked(self):
-        self.show_ios_page(8)
-        self._sync_sidebar_selection()
-
-    def on_liquidGlassPageBtn_clicked(self):
-        self.show_ios_page(9)
-        self._sync_sidebar_selection()
-
-    def on_daemonsPageBtn_clicked(self):
-        if self.theme_manager.current_theme == ThemeManager.CLASSIC:
-            self.pages[Page.Daemons].load()
-            self.pages[Page.Daemons].refresh()
-            self.content_stack.setCurrentIndex(2)
-        else:
-            self.ios_daemons.refresh_from_tweaks()
-            self.show_ios_page(3)
-        self._sync_sidebar_selection()
-
-    def on_posterboardPageBtn_clicked(self):
-        self.show_ios_page(2)
-        self._sync_sidebar_selection()
-
-    def on_applyPageBtn_clicked(self):
-        self.show_ios_page(6)
-        self._sync_sidebar_selection()
-
-    def on_settingsPageBtn_clicked(self):
-        self.show_ios_page(4)
-        self._sync_sidebar_selection()
-
-    ## APPLY PAGE
-
-    def show_about_dialog(self):
-        dialog = AboutProgramDialog(self)
-        dialog.exec()
-
-    def update_label(self, txt: str):
-        self.ui.statusLbl.setText(txt)
-        # Mirror progress into the iOS surfaces (home indicator + Apply page)
-        try:
-            if txt:
-                self.ios_home.show_process_status(txt)
-                self.ios_apply.set_status(txt)
-        except Exception:
-            pass
-    def on_removeTweaksBtn_clicked(self):
-        dialog = ResetDialog(device_manager=self.device_manager, apply_reset=self.apply_changes)
-        dialog.exec()
-
-    @QtCore.Slot()
-    def on_applyTweaksBtn_clicked(self):
-        self.apply_changes()
-
-    def apply_changes(self, reset_pages: list=None):
-        if not self.apply_in_progress:
-            self.apply_in_progress = True
-            self.toggle_thread_btns(disabled=True)
-            self.worker_thread = ApplyThread(manager=self.device_manager, settings=self.settings, reset_pages=reset_pages)
-            self.worker_thread.progress.connect(self.update_label)
-            self.worker_thread.alert.connect(self.alert_message)
-            self.worker_thread.request_text.connect(self.on_password_request)
-            self.worker_thread.finished_with_result.connect(self.finish_apply_thread)
-            self.worker_thread.finished.connect(self.worker_thread.deleteLater)
-            self.worker_thread.start()
-    def alert_message(self, alert: Optional[ApplyAlertMessage], log_to_console: bool = True):
-        if alert is None:
-            # do sudo dialog input
-            get_sudo_pwd() # clear if it is already there
-            pwd, ok = QtWidgets.QInputDialog.getText(None, "Enter Sudo Password", "Enter Your Computer's Password:", QtWidgets.QLineEdit.Password, "")
-            if ok and pwd:
-                set_sudo_pwd(pwd)
-            return
-        if log_to_console:
-            print(alert.txt)
-        detailsBox = QtWidgets.QMessageBox()
-        detailsBox.setIcon(alert.icon)
-        detailsBox.setWindowTitle(alert.title)
-        detailsBox.setText(alert.txt)
-        if alert.detailed_txt != None:
-            detailsBox.setDetailedText(alert.detailed_txt)
-        detailsBox.exec()
-
-    def on_password_request(self, title: str, label: str, box):
-        try:
-            password, ok = QtWidgets.QInputDialog.getText(
-                self, title, label, QtWidgets.QLineEdit.Password)
-            box.put(password if (ok and password) else None)
-        except Exception:
+        terminating = []
+        if getattr(self, "apply_in_progress", False):
+            terminating.append("apply/reset")
+        if getattr(self, "_cache_restore_in_progress", False):
+            terminating.append("data restore")
+        pt_worker = getattr(getattr(self, "ios_passthemes", None), "_worker", None)
+        if _still_running(pt_worker):
+            terminating.append("passcode theme write")
+        pairing_worker = getattr(
+            getattr(self, "ios_settings", None), "_reset_pairing_thread", None)
+        if _still_running(pairing_worker):
+            terminating.append("pairing reset")
+        if terminating:
+            reply = QtWidgets.QMessageBox.question(
+                self,
+                QCoreApplication.tr("Background device operation"),
+                QCoreApplication.translate(
+                    "Nugget",
+                    "A device %1 is running. Closing now can interrupt it "
+                    "mid-write and leave the protective backup corrupted.\n\n"
+                    "Close anyway?").replace(
+                        "%1", " and ".join(terminating)),
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel,
+                QtWidgets.QMessageBox.StandardButton.Cancel,
+            )
+            if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+                event.ignore()
+                return
+            # User insisted: let the operation wind down on its own so the
+            # thread is not destroyed mid-run. Device loops all have bounded
+            # timeouts, so this terminates.
+            for worker in (
+                getattr(self, "worker_thread", None),
+                getattr(self, "_cache_restore_thread", None),
+                pairing_worker,
+                pt_worker,
+            ):
+                if _still_running(worker):
+                    try:
+                        worker.wait()
+                    except RuntimeError:
+                        pass
+        scan_worker = getattr(self, "refresh_worker_thread", None)
+        if _still_running(scan_worker):
             try:
-                box.put(None)
-            except Exception:
+                scan_worker.wait(8000)
+            except RuntimeError:
                 pass
-
-    def finish_apply_thread(self, success: bool = False, error_msg: str = ""):
-        self.apply_in_progress = False
-        self.toggle_thread_btns(disabled=False)
-        self.update_pb_saved_ids_list()
-        worker = getattr(self, 'worker_thread', None)
-        is_reset = worker is not None and worker.reset_pages is not None
-        # Show completion indicator on the iOS home page
-        try:
-            if True:
-                if success:
-                    self.ios_home.show_process_status(
-                        QCoreApplication.tr("Reset complete!") if is_reset else QCoreApplication.tr("Apply complete!"),
-                        success=True)
-                else:
-                    self.ios_home.show_process_status(
-                        QCoreApplication.tr("Operation failed"), success=False)
-        except Exception:
-            pass
-        if success:
-            if worker is not None and not is_reset:
-                self.prompt_star_on_github()
-        else:
-            # Show error notification if not already shown via alert
-            if error_msg and "timed out" not in error_msg.lower():
-                self.alert_message(ApplyAlertMessage(
-                    txt=f"Operation failed: {error_msg}",
-                    title="Error",
-                    icon=QtWidgets.QMessageBox.Critical
-                ), log_to_console=False)
-    def prompt_star_on_github(self):
-        if self.settings.value("star_prompt_done", False, type=bool):
-            return
-        self.settings.setValue("star_prompt_done", True)
-        self._sync_settings()
-        box = QtWidgets.QMessageBox(self)
-        box.setIcon(QtWidgets.QMessageBox.Question)
-        box.setWindowTitle(self.tr("Enjoying GoldenNugget?"))
-        box.setText(self.tr("If you like GoldenNugget, please consider giving it a star on GitHub!"))
-        star_btn = box.addButton(self.tr("Star on GitHub"), QtWidgets.QMessageBox.AcceptRole)
-        box.addButton(self.tr("Not now"), QtWidgets.QMessageBox.RejectRole)
-        box.exec()
-        if box.clickedButton() == star_btn:
-            from PySide6.QtGui import QDesktopServices
-            QDesktopServices.openUrl(QtCore.QUrl("https://github.com/MiniVoidyy/GoldenNugget-"))
-
-    def _sync_settings(self):
-        """Sync settings to disk immediately after critical changes."""
-        try:
-            self.settings.sync()
-        except Exception:
-            pass  # Best effort
-    def toggle_thread_btns(self, disabled: bool):
-        if disabled or not self.apply_in_progress:
-            self.ui.applyTweaksBtn.setDisabled(disabled)
-            self.ui.removeTweaksBtn.setDisabled(disabled)
-            self.ios_apply.set_busy(disabled)
-        if disabled or not self.refresh_in_progress:
-            self.ui.refreshBtn.setDisabled(disabled)
+        monitor_worker = getattr(self, "_device_monitor_thread", None)
+        if _still_running(monitor_worker):
+            monitor_worker.request_stop()
+            try:
+                monitor_worker.wait(10000)
+            except RuntimeError:
+                pass
+        super().closeEvent(event)

@@ -8,6 +8,7 @@ on:
         required: false
         default: true
         type: boolean
+
       build_for_macos_arm:
         description: 'Build macOS ARM'
         required: false
@@ -47,7 +48,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: '3.15'
 
       - name: Create venv and install requirements
         run: |
@@ -61,17 +62,15 @@ jobs:
           source .env/bin/activate
           python3 compile.py
 
-      - name: Zip Nugget.app Intel
-        run: |
-          cd dist
-          ditto -c -k --sequesterRsrc --keepParent Nugget.app Nugget_macOS_intel.zip
-
-      - name: Upload ZIP Intel
+      - name: Upload macOS Intel
         uses: actions/upload-artifact@v6
         with:
           name: Nugget_macOS_intel
-          path: dist/Nugget_macOS_intel.zip
+          path: dist/Nugget-macOS-*.zip
           if-no-files-found: error
+          archive: false
+
+
 
   build-macos-arm:
     if: ${{ github.event_name == 'push' || github.event.inputs.build_for_macos_arm == 'true' }}
@@ -84,7 +83,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: '3.15'
 
       - name: Install OpenSSL
         run: |
@@ -108,17 +107,13 @@ jobs:
           source .env/bin/activate
           python3 compile.py
 
-      - name: Zip Nugget.app ARM
-        run: |
-          cd dist
-          ditto -c -k --sequesterRsrc --keepParent Nugget.app Nugget_macOS_arm.zip
-
-      - name: Upload ZIP ARM
+      - name: Upload macOS ARM
         uses: actions/upload-artifact@v6
         with:
           name: Nugget_macOS_arm
-          path: dist/Nugget_macOS_arm.zip
+          path: dist/Nugget-macOS-*.zip
           if-no-files-found: error
+          archive: false
 
   build-windows:
     if: ${{ github.event_name == 'push' || github.event.inputs.build_for_windows == 'true' }}
@@ -131,7 +126,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: '3.15'
 
       - name: Install dependencies
         run: |
@@ -142,16 +137,11 @@ jobs:
       - name: Build Windows
         run: python compile.py
 
-      - name: Zip Nugget Windows
-        run: |
-          cd dist
-          Compress-Archive -Path Nugget -DestinationPath Nugget_Windows.zip -Force
-
-      - name: Upload ZIP Windows
+      - name: Upload Windows
         uses: actions/upload-artifact@v6
         with:
           name: Nugget_Windows
-          path: dist/Nugget_Windows.zip
+          path: dist/Nugget
           if-no-files-found: error
 
   build-linux:
@@ -165,7 +155,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: '3.15'
 
       - name: Install system dependencies
         run: |
@@ -174,22 +164,31 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install -U pip setuptools wheel
-          pip install -r requirements.txt
+          set -uo pipefail
+          installed=0
+          for attempt in 1 2 3 4; do
+            if python -m pip install -U pip setuptools wheel \
+              && pip install --retries 5 --timeout 60 -r requirements.txt; then
+              installed=1
+              break
+            fi
+            echo "::warning::dependency install failed (attempt $attempt/4) - retrying in 30s"
+            sleep 30
+          done
+          if [ "$installed" -ne 1 ]; then
+            echo "::error::requirements.txt still not installable after 4 attempts"
+            exit 1
+          fi
+          pip check
 
       - name: Build Linux
         run: python compile.py
 
-      - name: Tar Nugget Linux
-        run: |
-          cd dist
-          tar -cJf Nugget_Linux.tar.xz Nugget
-
-      - name: Upload TAR Linux
+      - name: Upload Linux
         uses: actions/upload-artifact@v6
         with:
           name: Nugget_Linux
-          path: dist/Nugget_Linux.tar.xz
+          path: dist/Nugget
           if-no-files-found: error
 
   build-linux-arm:
@@ -203,7 +202,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: '3.15'
 
       - name: Install system dependencies
         run: |
@@ -212,20 +211,29 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install -U pip setuptools wheel
-          pip install -r requirements.txt
+          set -uo pipefail
+          installed=0
+          for attempt in 1 2 3 4; do
+            if python -m pip install -U pip setuptools wheel \
+              && pip install --retries 5 --timeout 60 -r requirements.txt; then
+              installed=1
+              break
+            fi
+            echo "::warning::dependency install failed (attempt $attempt/4) - retrying in 30s"
+            sleep 30
+          done
+          if [ "$installed" -ne 1 ]; then
+            echo "::error::requirements.txt still not installable after 4 attempts"
+            exit 1
+          fi
+          pip check
 
       - name: Build Linux ARM
         run: python compile.py
 
-      - name: Tar Nugget Linux ARM
-        run: |
-          cd dist
-          tar -cJf Nugget_Linux_aarch64.tar.xz Nugget
-
-      - name: Upload TAR Linux ARM
+      - name: Upload Linux ARM
         uses: actions/upload-artifact@v6
         with:
           name: Nugget_Linux_aarch64
-          path: dist/Nugget_Linux_aarch64.tar.xz
+          path: dist/Nugget
           if-no-files-found: error

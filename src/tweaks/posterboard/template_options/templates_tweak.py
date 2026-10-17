@@ -8,7 +8,7 @@ from PySide6.QtCore import QCoreApplication
 from ...tweak_classes import Tweak
 from ..template_file import TemplateFile
 
-from src.restore.restore import FileToRestore
+from src.utils.file_to_restore import FileToRestore
 
 class TemplatesTweak(Tweak):
     def __init__(self):
@@ -95,6 +95,13 @@ class TemplatesTweak(Tweak):
         update_label("Extracting templates...")
         # extract templates
         for template in self.templates:
+            # A preset may be loaded before any device is connected. Check its
+            # stored constraints against the actual target before restoring.
+            from src.devicemanagement.constants import Version
+            if ((template.min_version and Version(version) < Version(template.min_version))
+                    or (template.max_version and Version(version) > Version(template.max_version))):
+                raise ValueError(QCoreApplication.translate(
+                    'Nugget', 'Template {0} does not support iOS {1}.').format(template.name, version))
             # ignore PosterBoard templates since that is handled in PosterBoard tweaks
             if template.domain != 'com.apple.PosterBoard' and template.domain != 'AppDomain-com.apple.PosterBoard':
                 temp_dir = os.path.join(output_dir, str(uuid.uuid4()))
