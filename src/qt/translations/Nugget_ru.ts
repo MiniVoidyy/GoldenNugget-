@@ -3364,18 +3364,6 @@ Close anyway?</source>
         <translation>Акцентный цвет</translation>
     </message>
     <message>
-        <source>Color Theme</source>
-        <translation>Цветовая тема</translation>
-    </message>
-    <message>
-        <source>Dark</source>
-        <translation>Тёмная</translation>
-    </message>
-    <message>
-        <source>Light</source>
-        <translation>Светлая</translation>
-    </message>
-    <message>
         <location filename="../src/tweaks/registry.py" line="288"/>
         <source>Adaptive glass hysteresis dark range — list of floating-point thresholds. Type inferred as Array&lt;Number&gt;; written as text for this test UI, so may be ignored by the framework. Unverified on-device.</source>
         <translation>Диапазон гистерезиса адаптивного стекла для тёмной темы — список порогов с плавающей точкой. Тип определён как Array&lt;Number&gt;; записывается как текст для этого тестового интерфейса, поэтому фреймворк может его проигнорировать. Не проверено на устройстве.</translation>
