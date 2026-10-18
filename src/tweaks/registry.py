@@ -154,6 +154,9 @@ SPECS: tuple[TweakSpec, ...] = (
     _t(TweakID.DisableSolariumHDR, Section.LIQUID_GLASS, "Disable Solarium HDR", GP, "SolariumAllowHDR", value=False,
        description=QT_TRANSLATE_NOOP("Nugget", "Disables HDR tone-mapping in the Solarium renderer. Can fix washed-out or over-bright Liquid Glass areas. Select this tweak to disable HDR."),
        min_version="26.0"),
+    _t(TweakID.DisableIconShimmer, Section.LIQUID_GLASS, "Disable Icon Shimmer", GP, "SBNoIconShimmer",
+       description=QT_TRANSLATE_NOOP("Nugget", "Disables the animated shimmer/highlight effect on Home Screen app icons. The shiny sweeping light that moves across icons in Liquid Glass."),
+       min_version="26.0"),
     # Home Screen glass family. These sit in the same accessor/key table as the
     # SB* keys above — the one SpringBoard itself persists into
     # com.apple.springboard — and SpringBoard reads them through the standard

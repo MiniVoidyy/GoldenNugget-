@@ -53,6 +53,7 @@ def load_prefs(dm, settings: Settings):
         pm.use_backup_cache = settings.value("use_backup_cache", True, type=bool)
         pm.use_encrypted_backup = settings.value("use_encrypted_backup", False, type=bool)
         pm.use_afc_media = settings.value("use_afc_media", True, type=bool)
+        pm.use_partial_backup = settings.value("use_partial_backup", False, type=bool)
         pm.skip_setup = settings.value("skip_setup", True, type=bool)
         pm.supervised = settings.value("supervised", False, type=bool)
         pm.organization_name = settings.value("organization_name", "", type=str)

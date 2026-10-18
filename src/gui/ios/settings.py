@@ -187,6 +187,17 @@ class IOSSettingsPage(QWidget):
             lambda checked: self._on_afc_media_toggled(checked, afc_media_switch),
         )
 
+        partial_switch = self._make_switch(
+            QCoreApplication.translate("Nugget", "Partial Backup (Exclude Photos/Videos)"),
+            pref.use_partial_backup,
+            lambda checked: self._on_partial_backup_toggled(checked, partial_switch),
+        )
+        partial_switch.setToolTip(QCoreApplication.translate(
+            "Nugget",
+            "Partial backup excludes photos and videos from the protective backup, "
+            "making it smaller and faster. Settings, contacts and messages are still "
+            "backed up. Full backup includes everything."))
+
         self.content_layout = standard_layout
         self._make_backup_location_row()
 
@@ -643,6 +654,12 @@ class IOSSettingsPage(QWidget):
             )
         pref.use_afc_media = checked
         self.window.settings.setValue("use_afc_media", checked)
+        self.window._sync_settings()
+
+    def _on_partial_backup_toggled(self, checked: bool, switch):
+        pref = self.window.device_manager.pref_manager
+        pref.use_partial_backup = checked
+        self.window.settings.setValue("use_partial_backup", checked)
         self.window._sync_settings()
 
     def _custom_backup_dir_value(self) -> str:
