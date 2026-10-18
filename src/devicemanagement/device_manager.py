@@ -452,6 +452,7 @@ class DeviceManager:
                 prepared_backup_root=prepared_backup_root,
                 skip_protective_backup=skip_protective_backup,
                 include_keychain=include_keychain,
+                include_photos=not self.pref_manager.use_partial_backup,
                 prompt_choice=prompt_choice,
                 afc_media=afc_media_enabled(self.pref_manager.use_afc_media),
                 supervised=supervised,
