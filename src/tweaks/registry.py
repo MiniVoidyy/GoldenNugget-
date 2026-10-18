@@ -157,6 +157,9 @@ SPECS: tuple[TweakSpec, ...] = (
     _t(TweakID.DisableIconShimmer, Section.LIQUID_GLASS, "Disable Icon Shimmer", GP, "SBNoIconShimmer",
        description=QT_TRANSLATE_NOOP("Nugget", "Disables the animated shimmer/highlight effect on Home Screen app icons. The shiny sweeping light that moves across icons in Liquid Glass. [Increases performance]"),
        min_version="26.0"),
+    _t(TweakID.DisableIconGlassOutline, Section.LIQUID_GLASS, "Disable Icon Glass Outline", GP, "SBDisableIconOutline",
+       description=QT_TRANSLATE_NOOP("Nugget", "Removes the thin glass outline drawn around Home Screen app icons in the Liquid Glass icon style. Best-guess SpringBoard key (unverified on-device; may have no effect). [Increases performance]"),
+       min_version="26.0"),
     # Home Screen glass family. These sit in the same accessor/key table as the
     # SB* keys above — the one SpringBoard itself persists into
     # com.apple.springboard — and SpringBoard reads them through the standard
