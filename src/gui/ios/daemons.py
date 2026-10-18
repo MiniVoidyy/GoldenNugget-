@@ -53,7 +53,7 @@ _DAEMON_DESCRIPTIONS = {
     "Translate": "Apple Translate app service. Disabling breaks the Translate app.",
     "MockLocation": "Mock location sync service for development. Safe to disable.",
     "DeviceCheck": "DeviceCheck / App Attest fraud prevention. Disabling may break some app security features.",
-    "ScreenTime": "Screen Time, Family Controls, and Downtime scheduling. Disabling breaks all Screen Time restrictions.",
+    "ScreenTime": "Screen Time, Family Controls and Downtime. Disabling stops the Screen Time daemons and clears the ScreenTimeAgent configuration.",
     "BatteryUsage": "Battery usage logging and power statistics collection. Disabling stops battery usage tracking.",
     "CrashReports": "Crash log collection, symbolication, and reporting. Disabling stops crash reports from being saved.",
     "WifiAnalytics": "Wi-Fi connection quality analytics. Disabling stops Wi-Fi performance data collection.",
@@ -649,6 +649,8 @@ class IOSDaemonsContent(QWidget):
             self.master_switch.setChecked(True)
             if daemon is Daemon.Location:
                 self._warn_location_daemon()
+        if daemon is Daemon.ScreenTime:
+            self._mirror_screen_time_plist(checked)
 
     def _on_screen_time_toggled(self, checked: bool):
         if not self.daemons_tweak.enabled:
@@ -662,6 +664,29 @@ class IOSDaemonsContent(QWidget):
             self.screen_time_switch.blockSignals(False)
             return
         self.screen_time_tweak.set_enabled(checked)
+        # Keep the "Disable Screen Time" daemon toggle in lockstep.
+        self.daemons_tweak.set_multiple_values(Daemon.ScreenTime.value, value=checked)
+        self._set_switch(Daemon.ScreenTime, checked)
+        if checked:
+            self.master_switch.setChecked(True)
+
+    def _mirror_screen_time_plist(self, checked: bool):
+        """Disabling Screen Time must also clear the ScreenTimeAgent.plist.
+
+        The Screen Time agent runs as a per-user launchd agent, which the
+        system disabled-daemons plist does NOT shut down, so the daemon keys
+        alone leave Screen Time fully working. Nullifying
+        /var/mobile/Library/Preferences/com.apple.ScreenTimeAgent.plist (the
+        same file method as the dedicated "Clear ScreenTimeAgent.plist file"
+        row) is what actually removes the Screen Time configuration, so both
+        controls are kept in lockstep.
+        """
+        if self.screen_time_tweak is None:
+            return
+        self.screen_time_tweak.set_enabled(checked)
+        self.screen_time_switch.blockSignals(True)
+        self.screen_time_switch.setChecked(checked)
+        self.screen_time_switch.blockSignals(False)
 
     def _set_switch(self, daemon: Daemon, value: bool):
         for d, switch in self.daemon_switches:

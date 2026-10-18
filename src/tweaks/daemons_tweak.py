@@ -19,7 +19,7 @@ class Daemon(Enum):
         "com.apple.ScreenTimeAgent",
         "com.apple.homed",
         "com.apple.familycircled",
-        "com.apple.familynotification",
+        "com.apple.familynotificationd",
         "com.apple.asktod"
     ]
     CrashReports = [
@@ -161,9 +161,8 @@ class Daemon(Enum):
     Triald = ["com.apple.triald"]
     Sociald = ["com.apple.sociald"]
     BatteryUsage = [
-        "com.apple.powerlog",
-        "com.apple.batteryisinitialized",
-        "com.apple.mobile.battery"
+        "com.apple.powerlogd",
+        "com.apple.powerlogHelperd"
     ]
     # --- Extended analytics / tracking / telemetry set (50 additional) ---
     # Analytics & telemetry reporting daemons.
@@ -222,24 +221,41 @@ class Daemon(Enum):
 
 
 # Safe one-tap analytics/telemetry disable set — the "Recommended" switch in
-# the daemons UI. Analytics/tracking/logging only; verified safe to disable.
+# the daemons UI. This is EVERY analytics / tracking / telemetry / logging
+# daemon the app exposes: the analytics/telemetry entries from the main
+# "System & App Services" section PLUS the whole "Analytics & Diagnostics"
+# section of src/gui/ios/daemons.py. Keep it in sync with that page — the
+# Recommended switch must be able to toggle everything analytics-related.
 RECOMMENDED_ANALYTICS = [
+    # Main-section analytics/telemetry entries.
     Daemon.Diagnostics, Daemon.UsageTrackingAgent,
     Daemon.AppleAds, Daemon.FollowUp, Daemon.Feedback, Daemon.Shazam,
-    Daemon.SettingsStats, Daemon.WifiAnalytics, Daemon.AnalyticsHelper,
+    Daemon.SettingsStats,
+    # Analytics & Diagnostics section (base set).
+    Daemon.CrashReports, Daemon.WifiAnalytics, Daemon.AnalyticsHelper,
     Daemon.AudioAnalytics, Daemon.EcosystemAnalytics,
     Daemon.CallAnalytics, Daemon.CoreDuet, Daemon.Insight, Daemon.Metrics,
     Daemon.MediaExperience, Daemon.Symptomsd, Daemon.StatisticalDiagnostic,
     Daemon.WirelessDiagnostics, Daemon.DuetHeuristic, Daemon.DuetExpert,
     Daemon.Decisiond, Daemon.Triald, Daemon.Sociald,
-    # Extended telemetry / analytics set
-    Daemon.Aggregated, Daemon.Geniusd, Daemon.CoreCaptured, Daemon.Pcapd,
+    # Analytics & Diagnostics section (extended set).
+    Daemon.Aggregated, Daemon.Geniusd, Daemon.MobileAssetd, Daemon.OTAPackd,
+    Daemon.CoreCaptured, Daemon.Pcapd,
     Daemon.IMETrafficCollector, Daemon.CoreTelephonyAnalytics,
-    Daemon.Runwayd, Daemon.Mld, Daemon.PrivacyAnalytics,
-    Daemon.CipherMining, Daemon.AppStoreAnalytics, Daemon.CommerceAnalytics,
-    Daemon.SaleAnalytics, Daemon.Recalibration, Daemon.LifeScienceAnalytics,
-    Daemon.Osanalyticsd, Daemon.Microstackshots, Daemon.StackshotServer,
-    Daemon.CrashReporterSupport, Daemon.AccountAnalytics, Daemon.SystemLogger,
+    Daemon.CoreTelephony, Daemon.Runwayd, Daemon.Mld,
+    Daemon.AppStoreAnalytics, Daemon.CommerceAnalytics,
+    Daemon.SaleAnalytics, Daemon.RepairAnalytics, Daemon.Recalibration,
+    Daemon.PrivacyAnalytics, Daemon.SafetyAlerts, Daemon.CipherMining,
+    Daemon.LifeScienceAnalytics, Daemon.SiriKnowledge, Daemon.SiriUnattended,
+    Daemon.SiriService, Daemon.SiriCore, Daemon.SearchPartyd, Daemon.Nearbyd,
+    Daemon.NearbyInteraction, Daemon.FindMyDevice, Daemon.FindMyLocate,
+    Daemon.GazeTracking, Daemon.Sportskitd, Daemon.Watchlistd,
+    Daemon.ARKitTracking, Daemon.FaceTracking, Daemon.MediaTracking,
+    Daemon.MediaRemoteControl, Daemon.IMessageTracking, Daemon.IMFoundation,
+    Daemon.IMTranscoding, Daemon.ContinuityTracking, Daemon.Osanalyticsd,
+    Daemon.Microstackshots, Daemon.StackshotServer, Daemon.CrashReporterSupport,
+    Daemon.AccountAnalytics, Daemon.SystemLogger, Daemon.AppleIDServiced,
+    Daemon.CloudPhotoAnalytics, Daemon.CloudStorage, Daemon.CloudKeychain,
 ]
 
 # Interface-visible daemons: the switches on the Daemons page plus the
