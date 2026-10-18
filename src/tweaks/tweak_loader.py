@@ -1,7 +1,7 @@
 from .tweaks import tweaks, TweakID
 from .registry import SPECS
 from .basic_plist_locations import FileLocation
-from .tweak_classes import BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak
+from .tweak_classes import BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak, EmptyPlistTweak
 from .daemons_tweak import DANGEROUS_KEYS, INTERFACE_KEYS
 
 
@@ -36,5 +36,5 @@ def load_daemons():
             never_enable=DANGEROUS_KEYS,
             allowed_keys=INTERFACE_KEYS,
         ),
-        TweakID.ClearScreenTimeAgentPlist: NullifyFileTweak(FileLocation.screentime),
+        TweakID.ClearScreenTimeAgentPlist: EmptyPlistTweak(FileLocation.screentime),
     })

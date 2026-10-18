@@ -1,3 +1,4 @@
+import plistlib
 from typing import Optional, Callable
 
 from .basic_plist_locations import FileLocation
@@ -54,6 +55,21 @@ class NullifyFileTweak(Tweak):
     def apply_tweak(self, other_tweaks: dict):
         if self.enabled:
             other_tweaks[self.file_location] = b""
+    
+
+class EmptyPlistTweak(NullifyFileTweak):
+    """Clear a preferences file by writing a valid, empty plist.
+
+    Unlike ``NullifyFileTweak`` (a zero-byte file, which cfprefsd can treat as
+    corrupt and skip), an empty ``{}`` plist parses cleanly and makes the
+    owning process fall back to its defaults -- the same "no configuration"
+    outcome lara reaches by deleting the file, but expressible through a
+    restore. Used to clear ``com.apple.ScreenTimeAgent.plist``.
+    """
+
+    def apply_tweak(self, other_tweaks: dict):
+        if self.enabled:
+            other_tweaks[self.file_location] = plistlib.dumps({})
     
 
 class BasicPlistTweak(Tweak):

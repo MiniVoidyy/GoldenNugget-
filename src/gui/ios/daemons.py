@@ -650,7 +650,21 @@ class IOSDaemonsContent(QWidget):
             if daemon is Daemon.Location:
                 self._warn_location_daemon()
         if daemon is Daemon.ScreenTime:
+            self._apply_screen_time_group(checked)
             self._mirror_screen_time_plist(checked)
+
+    def _apply_screen_time_group(self, checked: bool):
+        """Toggle the full Screen Time daemon set, UsageTrackingAgent included.
+
+        lara's proven Screen Time disable covers ScreenTimeAgent +
+        UsageTrackingAgent (+ homed + familycircled); UsageTrackingAgent is
+        the piece that keeps Screen Time usage bookkeeping alive on its own,
+        so it rides along with the ScreenTime group and its dedicated switch
+        is kept in lockstep.
+        """
+        self.daemons_tweak.set_multiple_values(Daemon.UsageTrackingAgent.value,
+                                               value=checked)
+        self._set_switch(Daemon.UsageTrackingAgent, checked)
 
     def _on_screen_time_toggled(self, checked: bool):
         if not self.daemons_tweak.enabled:
@@ -667,6 +681,7 @@ class IOSDaemonsContent(QWidget):
         # Keep the "Disable Screen Time" daemon toggle in lockstep.
         self.daemons_tweak.set_multiple_values(Daemon.ScreenTime.value, value=checked)
         self._set_switch(Daemon.ScreenTime, checked)
+        self._apply_screen_time_group(checked)
         if checked:
             self.master_switch.setChecked(True)
 
@@ -675,7 +690,7 @@ class IOSDaemonsContent(QWidget):
 
         The Screen Time agent runs as a per-user launchd agent, which the
         system disabled-daemons plist does NOT shut down, so the daemon keys
-        alone leave Screen Time fully working. Nullifying
+        alone leave Screen Time fully working. Writing an empty valid plist to
         /var/mobile/Library/Preferences/com.apple.ScreenTimeAgent.plist (the
         same file method as the dedicated "Clear ScreenTimeAgent.plist file"
         row) is what actually removes the Screen Time configuration, so both
