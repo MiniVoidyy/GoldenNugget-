@@ -29,3 +29,8 @@ class FileLocation(Enum):
     # Daemons
     disabledDaemons = "/var/db/com.apple.xpc.launchd/disabled.plist"
     screentime = "/var/mobile/Library/Preferences/com.apple.ScreenTimeAgent.plist"
+
+    # Accessibility
+    # Managed so the single key is merged on top of the user's own AX prefs
+    # instead of replacing com.apple.Accessibility wholesale.
+    accessibility = "/var/Managed Preferences/mobile/com.apple.Accessibility.plist"
