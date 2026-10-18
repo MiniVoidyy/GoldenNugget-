@@ -16,6 +16,67 @@ from src.controllers.hotload import HotLoad, confirm_flagged
 # QWIDGETSIZE_MAX — PySide6 does not export the C macro, this is its value.
 _NO_MAX_HEIGHT = 16777215
 
+# Short hover descriptions for every daemon toggle.
+_DAEMON_DESCRIPTIONS = {
+    "thermalmonitord": "Monitors device temperature and throttles CPU/GPU when overheating. Disabling may cause overheating on heavy loads.",
+    "OTA": "Over-the-air software update service. Disabling prevents iOS update notifications and downloads.",
+    "UsageTrackingAgent": "Tracks app usage statistics for Apple. Disabling stops usage data collection.",
+    "GameCenter": "Apple's Game Center service for leaderboards, achievements, and multiplayer. Disabling breaks Game Center features.",
+    "ATWAKEUP": "Always-on display wake-up service. Disabling may affect always-on display functionality.",
+    "Tips": "Apple's Tips app service that sends tips notifications. Disabling stops tip pop-ups.",
+    "VPN": "VPN configuration daemon (racoon). Disabling breaks VPN connections.",
+    "ChineseLAN": "Chinese WLAN security service (wapic). Only needed in China; safe to disable elsewhere.",
+    "HealthKit": "Apple Health data service. Disabling breaks the Health app and health data sync.",
+    "AirPrint": "AirPrint printing service. Disabling breaks wireless printing.",
+    "AssistiveTouch": "Accessibility AssistiveTouch feature daemon. Disabling breaks the on-screen touch assistant.",
+    "iCloud": "iCloud sync and backup service (itunescloudd). Disabling breaks iCloud Photo Library and backups.",
+    "InternetTethering": "Personal Hotspot / USB tethering service. Disabling breaks tethering.",
+    "PassBook": "Apple Wallet / Passbook service. Disabling breaks Apple Pay and wallet passes.",
+    "Spotlight": "System-wide search indexing and suggestions. Disabling breaks Spotlight search and Siri suggestions.",
+    "VoiceControl": "Voice Control and Siri assistant daemon. Disabling breaks Voice Control and 'Hey Siri'.",
+    "NanoTimeKit": "Apple Watch face sync service. Disabling breaks watch face complications on paired Apple Watch.",
+    "AppleAds": "Apple's advertising framework (promotedcontentd, adprivacyd, adservicesd). Disabling stops targeted ads.",
+    "News": "Apple News app content service. Disabling breaks the News app.",
+    "FamilySharing": "Family Sharing and family notifications. Disabling breaks Family Sharing features.",
+    "VideoSubscriptions": "Video subscription management service. Disabling may break TV app subscriptions.",
+    "WebBookmarks": "iCloud Safari bookmarks sync. Disabling breaks Safari bookmark sync across devices.",
+    "AppleWatchNano": "Apple Watch pairing and media control services. Disabling breaks Apple Watch connectivity.",
+    "SiriServices": "Siri backend inference and action services. Disabling breaks Siri intelligence features.",
+    "WifiLogging": "Wi-Fi diagnostic logging service. Disabling stops Wi-Fi connection logging.",
+    "Maps": "Apple Maps geolocation daemon (geod). Disabling breaks Maps location services.",
+    "SafariSuggestions": "Safari search suggestion service (parsecd). Disabling stops Safari search suggestions.",
+    "Reminders": "Reminders app sync service. Disabling breaks Reminders iCloud sync.",
+    "AirPlay": "AirPlay screen/audio mirroring service. Disabling breaks AirPlay.",
+    "GameKitService": "Game Kit networking for multiplayer games. Disabling breaks multiplayer gaming.",
+    "Sidecar": "Sidecar (iPad as second display) service. Disabling breaks Sidecar.",
+    "SpeechRecognition": "On-device speech recognition engine. Disabling breaks dictation and voice features.",
+    "Translate": "Apple Translate app service. Disabling breaks the Translate app.",
+    "MockLocation": "Mock location sync service for development. Safe to disable.",
+    "DeviceCheck": "DeviceCheck / App Attest fraud prevention. Disabling may break some app security features.",
+    "ScreenTime": "Screen Time, Family Controls, and Downtime scheduling. Disabling breaks all Screen Time restrictions.",
+    "BatteryUsage": "Battery usage logging and power statistics collection. Disabling stops battery usage tracking.",
+    "CrashReports": "Crash log collection, symbolication, and reporting. Disabling stops crash reports from being saved.",
+    "WifiAnalytics": "Wi-Fi connection quality analytics. Disabling stops Wi-Fi performance data collection.",
+    "AnalyticsHelper": "System analytics and diagnostics data collection (analyticsd). Disabling stops usage analytics sent to Apple.",
+    "AudioAnalytics": "Audio subsystem performance analytics. Disabling stops audio diagnostics collection.",
+    "EcosystemAnalytics": "Cross-device ecosystem usage analytics. Disabling stops multi-device data collection.",
+    "CallAnalytics": "Call quality reporting (rtcreportingd). Disabling stops call quality data sent to Apple.",
+    "CoreDuet": "CoreDuet daemon for battery and usage pattern learning. Disabling stops predictive suggestions.",
+    "Insight": "On-device intelligence insights service. Disabling stops usage pattern analysis.",
+    "Metrics": "System performance metrics collection. Disabling stops performance data logging.",
+    "MediaExperience": "Media playback analytics (mediaremoted). Disabling stops media usage tracking.",
+    "Symptomsd": "Network symptom diagnostics. Disabling stops network problem detection and reporting.",
+    "StatisticalDiagnostic": "Statistical diagnostic data collection. Disabling stops statistical analysis data.",
+    "WirelessDiagnostics": "Wireless (Wi-Fi/cellular) diagnostic logging. Disabling stops wireless troubleshooting data.",
+    "DuetHeuristic": "Duet heuristic engine for battery/baseband predictions. Disabling stops predictive battery optimization.",
+    "DuetExpert": "Duet expert system for contextual suggestions. Disabling stops smart suggestions.",
+    "Decisiond": "Decision daemon for on-device ML predictions. Disabling stops intelligent device behavior.",
+    "Triald": "Apple's A/B testing and feature flag daemon (triald). Disabling stops experimental feature enrollment.",
+    "Sociald": "Social framework daemon for social media integration. Disabling breaks social sharing features.",
+    "FollowUp": "Follow-up suggestions (e.g. return a call, answer a message). Disabling stops follow-up notifications.",
+    "Location": "Core Location services daemon. Disabling breaks ALL location services including Find My, Maps, and Camera geotagging.",
+}
+
 
 class _DaemonRows(QWidget):
     """The daemon rows, revealed as one block by the master switch.
@@ -263,6 +324,8 @@ class IOSDaemonsContent(QWidget):
             (QCoreApplication.translate("Nugget", "Disable DeviceCheck"), Daemon.DeviceCheck),
             (QCoreApplication.translate("Nugget", "Follow Up"), Daemon.FollowUp),
             (QCoreApplication.translate("Nugget", "Location Services"), Daemon.Location),
+            (QCoreApplication.translate("Nugget", "Disable Screen Time"), Daemon.ScreenTime),
+            (QCoreApplication.translate("Nugget", "Disable Battery Usage Tracking"), Daemon.BatteryUsage),
         ]:
             card, switch = self._make_daemon_switch(title, daemon)
             self.daemon_cards.append(card)
@@ -355,6 +418,9 @@ class IOSDaemonsContent(QWidget):
     def _make_daemon_switch(self, title: str, daemon: Daemon):
         card = IOSCard()
         card.setProperty("searchText", " ".join([title, daemon.name, *daemon.value]))
+        desc = _DAEMON_DESCRIPTIONS.get(daemon.name, "")
+        if desc:
+            card.setToolTip(desc)
         row_layout = QHBoxLayout(card)
         row_layout.setContentsMargins(16, 12, 16, 12)
         row_layout.setSpacing(12)
@@ -363,6 +429,8 @@ class IOSDaemonsContent(QWidget):
         label = QLabel(title)
         label.setWordWrap(True)
         label.setStyleSheet(f"color: {c.text_primary}; font-size: 15px; background-color: transparent;")
+        if desc:
+            label.setToolTip(desc)
         self._daemon_labels.append(label)
         row_layout.addWidget(label, 1)
 
@@ -371,6 +439,8 @@ class IOSDaemonsContent(QWidget):
         if dangerous:
             value = False
         switch = IOSSwitch(value)
+        if desc:
+            switch.setToolTip(desc)
         switch.toggled.connect(
             lambda checked, d=daemon: self._on_daemon_toggled(d, checked)
         )

@@ -160,6 +160,11 @@ class Daemon(Enum):
     Decisiond = ["com.apple.decisiond"]
     Triald = ["com.apple.triald"]
     Sociald = ["com.apple.sociald"]
+    BatteryUsage = [
+        "com.apple.powerlog",
+        "com.apple.batteryisinitialized",
+        "com.apple.mobile.battery"
+    ]
 
 
 # Safe one-tap analytics/telemetry disable set — the "Recommended" switch in
@@ -192,6 +197,7 @@ INTERFACE_DAEMONS: frozenset["Daemon"] = frozenset({
     Daemon.Reminders, Daemon.AirPlay, Daemon.GameKitService,
     Daemon.Sidecar, Daemon.SpeechRecognition, Daemon.Translate,
     Daemon.MockLocation, Daemon.DeviceCheck,
+    Daemon.ScreenTime, Daemon.BatteryUsage,
     # analytics / telemetry section
     Daemon.CrashReports, Daemon.WifiAnalytics, Daemon.AnalyticsHelper, Daemon.CallAnalytics,
     Daemon.AudioAnalytics, Daemon.EcosystemAnalytics,
