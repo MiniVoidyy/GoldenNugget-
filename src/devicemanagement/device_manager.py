@@ -452,7 +452,7 @@ class DeviceManager:
                 prepared_backup_root=prepared_backup_root,
                 skip_protective_backup=skip_protective_backup,
                 include_keychain=include_keychain,
-                include_photos=not self.pref_manager.use_partial_backup,
+                include_photos=not self.pref_manager.use_partial_restore,
                 prompt_choice=prompt_choice,
                 afc_media=afc_media_enabled(self.pref_manager.use_afc_media),
                 supervised=supervised,
@@ -864,7 +864,7 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
             try:
                 is_encrypted = await perform_protective_backup(
                     lc, backup_root, progress_callback=self._backup_progress(update_label, backup_root),
-                    include_photos=not self.pref_manager.use_partial_backup,
+                    include_photos=not self.pref_manager.use_partial_restore,
                     include_posterboard=needs_posterboard,
                     include_keychain=None, include_afc_media=use_afc_media)
             except Exception:
@@ -939,7 +939,7 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
                 update_label(QCoreApplication.tr("Backing up device (cached)..."))
                 master_root = await cache.refresh(
                     lc, progress_callback=self._backup_progress(update_label, str(cache.master_root)),
-                    include_photos=not self.pref_manager.use_partial_backup,
+                    include_photos=not self.pref_manager.use_partial_restore,
                     include_posterboard=needs_posterboard,
                     include_keychain=encrypted,
                     include_afc_media=use_afc_media)
@@ -983,7 +983,7 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
             update_label(QCoreApplication.tr("Updating backup cache..."))
             master_root = await cache.refresh(
                 lc, progress_callback=self._backup_progress(update_label, str(cache.master_root)),
-                include_photos=not self.pref_manager.use_partial_backup,
+                include_photos=not self.pref_manager.use_partial_restore,
                 include_posterboard=False,
                 include_keychain=encrypted,
                 include_afc_media=use_afc_media)

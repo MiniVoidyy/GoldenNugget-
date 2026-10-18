@@ -16,7 +16,7 @@ class PreferenceManager:
         self.use_backup_cache = True
         self.use_encrypted_backup = False
         self.use_afc_media = True
-        self.use_partial_backup = False
+        self.use_partial_restore = False
         self.skip_setup = True
         self.supervised = False
         self.organization_name = ""

@@ -395,7 +395,7 @@ class SettingsMixin:
             organization_name = self.settings.value("organization_name", "", type=str)
             use_encrypted_backup = self.settings.value("use_encrypted_backup", False, type=bool)
             use_afc_media = self.settings.value("use_afc_media", True, type=bool)
-            use_partial_backup = self.settings.value("use_partial_backup", False, type=bool)
+            use_partial_restore = self.settings.value("use_partial_restore", False, type=bool)
             tweak_autosave = self.settings.value("tweak_autosave", True, type=bool)
 
             self.device_manager.pref_manager.auto_reboot = auto_reboot
@@ -405,7 +405,7 @@ class SettingsMixin:
             self.device_manager.pref_manager.use_backup_cache = use_backup_cache
             self.device_manager.pref_manager.use_encrypted_backup = use_encrypted_backup
             self.device_manager.pref_manager.use_afc_media = use_afc_media
-            self.device_manager.pref_manager.use_partial_backup = use_partial_backup
+            self.device_manager.pref_manager.use_partial_restore = use_partial_restore
             self.device_manager.pref_manager.skip_setup = skip_setup
             self.device_manager.pref_manager.supervised = supervised
             self.device_manager.pref_manager.organization_name = organization_name
