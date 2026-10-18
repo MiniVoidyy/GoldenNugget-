@@ -110,7 +110,7 @@ GP = FileLocation.globalPreferences
 SPECS: tuple[TweakSpec, ...] = (
     # --- Liquid Glass ---
     _t(TweakID.ForceSolariumFallback, Section.LIQUID_GLASS, "Force Solarium Fallback", GP, "SolariumForceFallback",
-       description=QT_TRANSLATE_NOOP("Nugget", "Forces the older Solarium rendering path instead of the newer one. Useful for troubleshooting or for devices where the current Solarium engine misbehaves on iOS 26."),
+       description=QT_TRANSLATE_NOOP("Nugget", "Forces the older Solarium rendering path instead of the newer one. Useful for troubleshooting or for devices where the current Solarium engine misbehaves on iOS 26. [Increases performance]"),
        min_version="26.0", max_version="26.99"),
     _t(TweakID.IgnoreSolariumLinkedOnCheck, Section.LIQUID_GLASS, "Ignore Solarium Linked-On Check", GP, "com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck",
        description=QT_TRANSLATE_NOOP("Nugget", "Ignores the compile-time (linked-on) SDK version check for Solarium, allowing Liquid Glass features to run that would otherwise be gated by the SDK an app was built with."),
