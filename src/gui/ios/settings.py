@@ -9,7 +9,8 @@ from pathlib import Path
 
 from src.exceptions.nugget_exception import NuggetException
 from src.gui.ios.components import (
-    IOSCard, IOSSectionHeader, IOSSwitch, IOSSettingsAction, IOSSearchField, IOSSearchEmpty, IOSCollapsibleSection
+    IOSCard, IOSSectionHeader, IOSSwitch, IOSSettingsAction, IOSSearchField, IOSSearchEmpty,
+    IOSCollapsibleSection, IOSSegmentedFilter
 )
 from src.gui.pages.main.settings import available_languages
 from src.controllers.video_handler import set_ignore_frame_limit
@@ -187,16 +188,20 @@ class IOSSettingsPage(QWidget):
             lambda checked: self._on_afc_media_toggled(checked, afc_media_switch),
         )
 
-        partial_switch = self._make_switch(
-            QCoreApplication.translate("Nugget", "Partial Restore (Exclude Photos/Videos)"),
+        self.backup_scope = self._make_segmented_choice(
+            QCoreApplication.translate("Nugget", "Backup Type"),
+            [
+                (QCoreApplication.translate("Nugget", "Full Backup"), False),
+                (QCoreApplication.translate("Nugget", "Partial Restore"), True),
+            ],
             pref.use_partial_restore,
-            lambda checked: self._on_partial_restore_toggled(checked, partial_switch),
+            self._on_backup_scope_changed,
         )
-        partial_switch.setToolTip(QCoreApplication.translate(
+        self.backup_scope.setToolTip(QCoreApplication.translate(
             "Nugget",
-            "Partial restore excludes photos and videos from the protective backup, "
-            "making it smaller and faster. Settings, contacts and messages are still "
-            "backed up. Full restore includes everything."))
+            "Full Backup includes photos and videos. Partial Restore excludes "
+            "photos and videos, making the backup smaller and faster; settings, "
+            "contacts and messages are still included."))
 
         self.content_layout = standard_layout
         self._make_backup_location_row()
@@ -498,6 +503,29 @@ class IOSSettingsPage(QWidget):
         self.content_layout.addWidget(card)
         return switch
 
+    def _make_segmented_choice(self, title: str, items, current_data, on_changed) -> IOSSegmentedFilter:
+        """A titled card holding a segmented control (two-or-more options).
+
+        ``items`` is a list of ``(title, data)``; the option whose data equals
+        ``current_data`` is preselected without firing ``on_changed``.
+        """
+        card = IOSCard()
+        col = QVBoxLayout(card)
+        col.setContentsMargins(16, 12, 16, 12)
+        col.setSpacing(10)
+
+        label = QLabel(title)
+        self._style_label(label, 'row_title')
+        label.setWordWrap(True)
+        col.addWidget(label)
+
+        segment = IOSSegmentedFilter(items)
+        segment.setCurrentData(current_data)
+        segment.currentIndexChanged.connect(on_changed)
+        col.addWidget(segment)
+        self.content_layout.addWidget(card)
+        return segment
+
     def _make_setting_handler(self, pref_attr: str):
         pref = self.window.device_manager.pref_manager
         def handler(checked: bool):
@@ -656,10 +684,11 @@ class IOSSettingsPage(QWidget):
         self.window.settings.setValue("use_afc_media", checked)
         self.window._sync_settings()
 
-    def _on_partial_restore_toggled(self, checked: bool, switch):
+    def _on_backup_scope_changed(self, _index: int):
         pref = self.window.device_manager.pref_manager
-        pref.use_partial_restore = checked
-        self.window.settings.setValue("use_partial_restore", checked)
+        partial = bool(self.backup_scope.currentData())
+        pref.use_partial_restore = partial
+        self.window.settings.setValue("use_partial_restore", partial)
         self.window._sync_settings()
 
     def _custom_backup_dir_value(self) -> str:

@@ -317,6 +317,14 @@ class IOSSegmentedFilter(QWidget):
     def currentIndex(self):
         return self._index
 
+    def setCurrentData(self, data):
+        """Select the item whose data matches, without emitting a signal."""
+        for index, (_, item_data) in enumerate(self._items):
+            if item_data == data:
+                self._index = index
+                self._group.button(index).setChecked(True)
+                return
+
     def setCurrentIndex(self, index):
         if index == self._index or not 0 <= index < len(self._items):
             return
