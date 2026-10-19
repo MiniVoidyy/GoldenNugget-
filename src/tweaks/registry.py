@@ -13,6 +13,44 @@ from PySide6.QtCore import QT_TRANSLATE_NOOP
 
 from .basic_plist_locations import FileLocation
 from .tweak_names import TweakID
+from .tweak_classes import BasicPlistTweak
+
+
+def _dual_shimmer_factory() -> BasicPlistTweak:
+    """Writes both the Accessibility 'Reduce Bright Effects' key and the
+    SpringBoard 'SBNoIconShimmer' fallback so the icon shimmer is killed
+    even on iOS 26.6.1 where the AX key alone is ignored."""
+    from .basic_plist_locations import FileLocation
+    return _DualShimmerTweak(
+        FileLocation.accessibility, "ReduceHighlightingEffectsEnabled",
+        companion={FileLocation.springboardPrefs: "SBNoIconShimmer"})
+
+
+class _DualShimmerTweak(BasicPlistTweak):
+    """Tweak that writes its main key to one location and a companion key
+    to a second location when enabled."""
+    def __init__(self, location: FileLocation, key: str, value=True,
+                 owner=501, group=501, companion: dict = None):
+        super().__init__(location, key, value, owner, group)
+        self._companion = companion or {}
+
+    def apply_tweak(self, other_tweaks: dict) -> dict:
+        if not self.enabled:
+            return other_tweaks
+        # Main location
+        target = other_tweaks.get(self.file_location)
+        if not isinstance(target, dict):
+            target = {}
+            other_tweaks[self.file_location] = target
+        target[self.key] = self.value
+        # Companion location(s)
+        for loc, companion_key in self._companion.items():
+            t2 = other_tweaks.get(loc)
+            if not isinstance(t2, dict):
+                t2 = {}
+                other_tweaks[loc] = t2
+            t2[companion_key] = self.value
+        return other_tweaks
 
 
 class Section(Enum):
@@ -155,8 +193,8 @@ SPECS: tuple[TweakSpec, ...] = (
        description=QT_TRANSLATE_NOOP("Nugget", "Disables HDR tone-mapping in the Solarium renderer. Can fix washed-out or over-bright Liquid Glass areas. Select this tweak to disable HDR. [Increases performance]"),
        min_version="26.0"),
     _t(TweakID.DisableIconShimmer, Section.LIQUID_GLASS, "Disable Icon Shimmer", FileLocation.accessibility, "ReduceHighlightingEffectsEnabled",
-       description=QT_TRANSLATE_NOOP("Nugget", "Turns on the system 'Reduce Bright Effects' accessibility setting (iOS 26.4+), which tones down the Liquid Glass shimmer: the sweeping bright highlight that runs across Home Screen app icons and the flash on onscreen elements when you tap them. [Increases performance]"),
-       min_version="26.4"),
+       description=QT_TRANSLATE_NOOP("Nugget", "Turns on the system 'Reduce Bright Effects' accessibility setting (iOS 26.4+) and also writes SpringBoard's SBNoIconShimmer fallback, so the sweeping icon shimmer is disabled even on iOS 26.6.1 where the AX key alone is ignored. [Increases performance]"),
+       min_version="26.4", factory=_dual_shimmer_factory),
     _t(TweakID.DisableIconGlassOutline, Section.LIQUID_GLASS, "Disable Icon Glass Outline", GP, "SBDisableIconOutline",
        description=QT_TRANSLATE_NOOP("Nugget", "Removes the thin glass outline drawn around Home Screen app icons in the Liquid Glass icon style. Best-guess SpringBoard key (unverified on-device; may have no effect). [Increases performance]"),
        min_version="26.0"),

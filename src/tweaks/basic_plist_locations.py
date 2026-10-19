@@ -34,3 +34,5 @@ class FileLocation(Enum):
     # Managed so the single key is merged on top of the user's own AX prefs
     # instead of replacing com.apple.Accessibility wholesale.
     accessibility = "/var/Managed Preferences/mobile/com.apple.Accessibility.plist"
+    # SpringBoard prefs (non-managed mobile domain) as fallback for SBNoIconShimmer
+    springboardPrefs = "/var/mobile/Library/Preferences/com.apple.springboard.plist"
