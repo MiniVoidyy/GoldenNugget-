@@ -87,15 +87,27 @@ class TweakSpec:
     kind: Kind = Kind.SWITCH
     min_value: float = 0       # NUMBER kind only
     max_value: float = 999     # NUMBER kind only
+    reset_value: Optional[float] = None
     step: float = 1.0          # NUMBER kind only; not integral = decimal input
     min_version: Optional[str] = None
     max_version: Optional[str] = None
     iphone_only: bool = False
     ipad_only: bool = False
     requires_dynamic_island: bool = False
+    requires_camera_control: bool = False
+    requires_action_button: bool = False
+    requires_home_button: bool = False
+    requires_always_on: bool = False
+    bundle_identifier: bool = False
+    unavailable_reason: Optional[str] = None
     factory: Optional[Callable[[], object]] = None  # overrides BasicPlistTweak
     description: Optional[str] = None  # detailed "what it does" tooltip
+    experimental: bool = False
+    warning: Optional[str] = None
+    requires: tuple[TweakID, ...] = ()
+    exclusive_with: Optional[TweakID] = None
     disabled: bool = False  # True = tweak is cut off: never loaded, never applied, never rendered
+    supported_models: tuple[str, ...] = ()
 
 
 def _t(id_: TweakID, section: Section, title: str, location: FileLocation,
@@ -144,9 +156,30 @@ def _reversible_bool(location, key):
     return ReversibleBooleanPlistTweak(location, key)
 
 
+def _siri_ai(action):
+    from .siri_ai import SiriAITweak
+    return SiriAITweak(action)
+
+
 GP = FileLocation.globalPreferences
 
 SPECS: tuple[TweakSpec, ...] = (
+    # --- Siri AI (iOS 27) ---
+    _t(TweakID.SiriAI, Section.INTERNAL, "Siri AI (Ineligible Regions)",
+       FileLocation.siriAIOverrides, "SiriAI",
+       description=QT_TRANSLATE_NOOP("Nugget", "Experimental eligibility override by Project Linwood (mattisklein). Verified on iPhone 16 Pro, iOS 27.0 build 24A437 only."),
+       min_version="27.0", max_version="27.0", iphone_only=True,
+       experimental=True,
+       factory=lambda: _siri_ai("enable"), exclusive_with=TweakID.ResetSiriAIOverrides,
+       warning=QT_TRANSLATE_NOOP("Nugget", "Requires an unencrypted protective backup and a reboot. Set Siri language to English (US), then complete consent in Settings. This replaces ALL existing eligibility overrides. Other builds are untested. Turning this switch off does not undo an applied override; use Reset Siri AI Overrides and apply.")),
+    _t(TweakID.ResetSiriAIOverrides, Section.INTERNAL, "Reset Siri AI Overrides",
+       FileLocation.siriAIOverrides, "ResetSiriAIOverrides",
+       description=QT_TRANSLATE_NOOP("Nugget", "Writes a valid empty eligibility override archive. This clears ALL eligibility overrides, including overrides installed by other tools."),
+       min_version="27.0", max_version="27.0", iphone_only=True,
+       experimental=True,
+       factory=lambda: _siri_ai("reset"), exclusive_with=TweakID.SiriAI,
+       warning=QT_TRANSLATE_NOOP("Nugget", "This clears ALL eligibility overrides, not just Siri AI. It cannot recover a previous override map. Requires an unencrypted protective backup; apply and reboot.")),
+
     # --- Liquid Glass ---
     _t(TweakID.ForceSolariumFallback, Section.LIQUID_GLASS, "Force Solarium Fallback", GP, "SolariumForceFallback",
        description=QT_TRANSLATE_NOOP("Nugget", "Forces the older Solarium rendering path instead of the newer one. Useful for troubleshooting or for devices where the current Solarium engine misbehaves on iOS 26. [Increases performance]"),
