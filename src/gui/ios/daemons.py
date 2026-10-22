@@ -1,139 +1,32 @@
 from PySide6.QtCore import (
-    QTimer, QCoreApplication, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup,
+    Qt, QTimer, QCoreApplication, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup,
 )
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel, QMessageBox,
-    QGraphicsOpacityEffect, QSizePolicy,
+    QGraphicsOpacityEffect, QSizePolicy, QFrame, QPushButton,
 )
 
-from src.gui.ios.components import IOSCard, IOSSectionHeader, IOSSwitch, IOSSearchField, IOSSearchEmpty
-from src.gui.theme import ColorThemeManager
+from src.gui.ios.components import IOSCard, IOSSectionHeader, IOSSwitch, IOSSearchField, IOSSearchEmpty, IOSSegmentedFilter, IOSSettingsAction
+from src.gui.theme import ColorThemeManager, theme_pixmap, theme_icon, t
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.tweak_loader import load_daemons
-from src.tweaks.daemons_tweak import Daemon, RECOMMENDED_ANALYTICS
+from src.tweaks.daemons_tweak import Daemon, NOTIFICATION_RECOVERY_DAEMONS
+
+ANALYTICS_DAEMONS = (Daemon.AnalyticsHelper, Daemon.WifiAnalytics, Daemon.UsageTrackingAgent,
+                     Daemon.AppleAds, Daemon.SettingsStats, Daemon.AudioAnalytics,
+                     Daemon.EcosystemAnalytics, Daemon.CallAnalytics, Daemon.Feedback, Daemon.Metrics)
 from src.controllers.hotload import HotLoad, confirm_flagged
+from src.controllers.favorites import TweakFavorites
 
 # QWIDGETSIZE_MAX — PySide6 does not export the C macro, this is its value.
 _NO_MAX_HEIGHT = 16777215
 
-# Short hover descriptions for every daemon toggle.
-_DAEMON_DESCRIPTIONS = {
-    "thermalmonitord": "Monitors device temperature and throttles CPU/GPU when overheating. Disabling may cause overheating on heavy loads.",
-    "OTA": "Over-the-air software update service. Disabling prevents iOS update notifications and downloads.",
-    "UsageTrackingAgent": "Tracks app usage statistics for Apple. Disabling stops usage data collection.",
-    "GameCenter": "Apple's Game Center service for leaderboards, achievements, and multiplayer. Disabling breaks Game Center features.",
-    "ATWAKEUP": "Always-on display wake-up service. Disabling may affect always-on display functionality.",
-    "Tips": "Apple's Tips app service that sends tips notifications. Disabling stops tip pop-ups.",
-    "VPN": "VPN configuration daemon (racoon). Disabling breaks VPN connections.",
-    "ChineseLAN": "Chinese WLAN security service (wapic). Only needed in China; safe to disable elsewhere.",
-    "HealthKit": "Apple Health data service. Disabling breaks the Health app and health data sync.",
-    "AirPrint": "AirPrint printing service. Disabling breaks wireless printing.",
-    "AssistiveTouch": "Accessibility AssistiveTouch feature daemon. Disabling breaks the on-screen touch assistant.",
-    "iCloud": "iCloud sync and backup service (itunescloudd). Disabling breaks iCloud Photo Library and backups.",
-    "InternetTethering": "Personal Hotspot / USB tethering service. Disabling breaks tethering.",
-    "PassBook": "Apple Wallet / Passbook service. Disabling breaks Apple Pay and wallet passes.",
-    "Spotlight": "System-wide search indexing and suggestions. Disabling breaks Spotlight search and Siri suggestions.",
-    "VoiceControl": "Voice Control and Siri assistant daemon. Disabling breaks Voice Control and 'Hey Siri'.",
-    "NanoTimeKit": "Apple Watch face sync service. Disabling breaks watch face complications on paired Apple Watch.",
-    "AppleAds": "Apple's advertising framework (promotedcontentd, adprivacyd, adservicesd). Disabling stops targeted ads.",
-    "News": "Apple News app content service. Disabling breaks the News app.",
-    "FamilySharing": "Family Sharing and family notifications. Disabling breaks Family Sharing features.",
-    "VideoSubscriptions": "Video subscription management service. Disabling may break TV app subscriptions.",
-    "WebBookmarks": "iCloud Safari bookmarks sync. Disabling breaks Safari bookmark sync across devices.",
-    "AppleWatchNano": "Apple Watch pairing and media control services. Disabling breaks Apple Watch connectivity.",
-    "SiriServices": "Siri backend inference and action services. Disabling breaks Siri intelligence features.",
-    "WifiLogging": "Wi-Fi diagnostic logging service. Disabling stops Wi-Fi connection logging.",
-    "Maps": "Apple Maps geolocation daemon (geod). Disabling breaks Maps location services.",
-    "SafariSuggestions": "Safari search suggestion service (parsecd). Disabling stops Safari search suggestions.",
-    "Reminders": "Reminders app sync service. Disabling breaks Reminders iCloud sync.",
-    "AirPlay": "AirPlay screen/audio mirroring service. Disabling breaks AirPlay.",
-    "GameKitService": "Game Kit networking for multiplayer games. Disabling breaks multiplayer gaming.",
-    "Sidecar": "Sidecar (iPad as second display) service. Disabling breaks Sidecar.",
-    "SpeechRecognition": "On-device speech recognition engine. Disabling breaks dictation and voice features.",
-    "Translate": "Apple Translate app service. Disabling breaks the Translate app.",
-    "MockLocation": "Mock location sync service for development. Safe to disable.",
-    "DeviceCheck": "DeviceCheck / App Attest fraud prevention. Disabling may break some app security features.",
-    "ScreenTime": "Screen Time, Family Controls and Downtime. Disabling stops the Screen Time daemons and clears the ScreenTimeAgent configuration.",
-    "BatteryUsage": "Battery usage logging and power statistics collection. Disabling stops battery usage tracking.",
-    "CrashReports": "Crash log collection, symbolication, and reporting. Disabling stops crash reports from being saved.",
-    "WifiAnalytics": "Wi-Fi connection quality analytics. Disabling stops Wi-Fi performance data collection.",
-    "AnalyticsHelper": "System analytics and diagnostics data collection (analyticsd). Disabling stops usage analytics sent to Apple.",
-    "AudioAnalytics": "Audio subsystem performance analytics. Disabling stops audio diagnostics collection.",
-    "EcosystemAnalytics": "Cross-device ecosystem usage analytics. Disabling stops multi-device data collection.",
-    "CallAnalytics": "Call quality reporting (rtcreportingd). Disabling stops call quality data sent to Apple.",
-    "CoreDuet": "CoreDuet daemon for battery and usage pattern learning. Disabling stops predictive suggestions.",
-    "Insight": "On-device intelligence insights service. Disabling stops usage pattern analysis.",
-    "Metrics": "System performance metrics collection. Disabling stops performance data logging.",
-    "MediaExperience": "Media playback analytics (mediaremoted). Disabling stops media usage tracking.",
-    "Symptomsd": "Network symptom diagnostics. Disabling stops network problem detection and reporting.",
-    "StatisticalDiagnostic": "Statistical diagnostic data collection. Disabling stops statistical analysis data.",
-    "WirelessDiagnostics": "Wireless (Wi-Fi/cellular) diagnostic logging. Disabling stops wireless troubleshooting data.",
-    "DuetHeuristic": "Duet heuristic engine for battery/baseband predictions. Disabling stops predictive battery optimization.",
-    "DuetExpert": "Duet expert system for contextual suggestions. Disabling stops smart suggestions.",
-    "Decisiond": "Decision daemon for on-device ML predictions. Disabling stops intelligent device behavior.",
-    "Triald": "Apple's A/B testing and feature flag daemon (triald). Disabling stops experimental feature enrollment.",
-    "Sociald": "Social framework daemon for social media integration. Disabling breaks social sharing features.",
-    "FollowUp": "Follow-up suggestions (e.g. return a call, answer a message). Disabling stops follow-up notifications.",
-    "Location": "Core Location services daemon. Disabling breaks ALL location services including Find My, Maps, and Camera geotagging.",
-    "Aggregated": "Aggregates anonymised usage and app-analytics data before it is reported to Apple.",
-    "Geniusd": "Appleseed / feedback assistant telemetry that uploads diagnostic and beta feedback data.",
-    "MobileAssetd": "Downloads and reports on Apple mobile assets; also reports asset-usage telemetry.",
-    "OTAPackd": "Packages and reports OTA software update telemetry.",
-    "CoreCaptured": "Collects low-level network capture data for diagnostics.",
-    "Pcapd": "Packet capture daemon that records network traffic for diagnostic reports.",
-    "IMETrafficCollector": "Collects IME (baseband) traffic statistics for telemetry.",
-    "CoreTelephonyAnalytics": "Reports cellular / telephony quality analytics to Apple.",
-    "CoreTelephony": "Cellular telephony service and analytics. Disabling breaks calls and cellular data.",
-    "Runwayd": "Runway experimentation client that reports feature-flag and experiment metrics.",
-    "Mld": "On-device machine-learning telemetry daemon.",
-    "AppStoreAnalytics": "App Store analytics and usage reporting. Disabling may affect App Store features.",
-    "CommerceAnalytics": "Reports App Store / iTunes commerce analytics.",
-    "SaleAnalytics": "Reports sales and purchase telemetry to Apple.",
-    "RepairAnalytics": "Repair and service-history telemetry reporting.",
-    "Recalibration": "Reports sensor recalibration data for analytics.",
-    "PrivacyAnalytics": "Apple differential-privacy analytics aggregation service.",
-    "SafetyAlerts": "Emergency and safety-alert reporting service. Disabling disables safety alert data.",
-    "CipherMining": "Cryptographic mining/telemetry daemon used for hardware performance reporting.",
-    "LifeScienceAnalytics": "Reports health/life-science research analytics.",
-    "SiriKnowledge": "Siri knowledge-graph tracking and indexing. Disabling affects Siri suggestions.",
-    "SiriUnattended": "Siri unattended (background) tracking service.",
-    "SiriService": "Siri service daemon for system-wide Siri integration.",
-    "SiriCore": "Core Siri framework daemon. Disabling breaks Siri entirely.",
-    "SearchPartyd": "Find My network daemon that tracks the location of devices and items.",
-    "Nearbyd": "Proximity / nearby-device tracking service (Bluetooth/UWB ranging).",
-    "NearbyInteraction": "UWB Nearby Interaction ranging and tracking service.",
-    "FindMyDevice": "Find My device tracking and activation-lock service.",
-    "FindMyLocate": "Find My location reporting service. Disabling breaks Find My.",
-    "GazeTracking": "Apple Vision Pro / gaze-based input tracking service.",
-    "Sportskitd": "Sports data tracking and live-score service.",
-    "Watchlistd": "Tracks watch-lists (TV/sports) for recommendations.",
-    "ARKitTracking": "ARKit motion and world-tracking service.",
-    "FaceTracking": "Face ID / face-tracking service. Disabling breaks Face ID.",
-    "MediaTracking": "Tracks media playback sessions for analytics and control.",
-    "MediaRemoteControl": "Remote media control tracking service.",
-    "IMessageTracking": "iMessage/imagent delivery and tracking service. Disabling breaks iMessage.",
-    "IMFoundation": "IMFoundation framework daemon used by Messages.",
-    "IMTranscoding": "iMessage media transcoding service.",
-    "ContinuityTracking": "Continuity handoff tracking between Apple devices.",
-    "Osanalyticsd": "OS-wide analytics collection and crash/hang reporting.",
-    "Microstackshots": "Collects micro stackshots for performance telemetry.",
-    "StackshotServer": "System stackshot capture server for diagnostics.",
-    "CrashReporterSupport": "Helper that collects and uploads crash reports.",
-    "AccountAnalytics": "Apple Account (Apple ID) analytics and usage reporting.",
-    "SystemLogger": "System-wide diagnostic logging service.",
-    "AppleIDServiced": "Apple ID sign-in service and analytics. Disabling may affect Apple ID features.",
-    "CloudPhotoAnalytics": "iCloud Photos sync and analytics. Disabling stops iCloud Photo Library sync.",
-    "CloudStorage": "iCloud Drive storage service. Disabling breaks iCloud Drive.",
-    "CloudKeychain": "iCloud Keychain sync proxy. Disabling breaks iCloud Keychain sync.",
-    "Diagnostics": "System diagnostics collection service (diagnosticd and helpers). Disabling stops diagnostic data gathering.",
-    "AskPermissions": "Handles 'Ask to Buy' and permission prompts for Family Sharing. Disabling stops those prompts.",
-    "Feedback": "Apple feedback assistant service. Disabling stops Feedback Assistant submissions.",
-    "Commerce": "App Store / iTunes commerce service. Disabling breaks purchases.",
-    "Automount": "Mounts disk images and developer disk images. Disabling may affect mounting.",
-    "Shazam": "Shazam music-recognition service. Disabling breaks Shazam.",
-    "SettingsStats": "Collects Settings app usage statistics. Disabling stops Settings telemetry.",
-    "StatusKit": "Status sharing service (e.g. Focus status). Disabling stops status sharing.",
-}
+_ROW_SPACING = 12
+_FAVORITE_SIZE = 44
+_INFO_SIZE = 36
+
+from src.tweaks.daemon_descriptions import DAEMON_DESCRIPTIONS
+from src.gui.ios.daemon_categories import CATEGORY_ORDER, DAEMON_CATEGORIES, REPORTS_CATEGORY, ACCOUNTS_CATEGORY
 
 
 class _DaemonRows(QWidget):
@@ -237,7 +130,7 @@ class _DaemonRows(QWidget):
         fade = QPropertyAnimation(effect, b"opacity", self)
         fade.setStartValue(0.0 if shown else 1.0)
         fade.setEndValue(1.0 if shown else 0.0)
-        fade.setDuration(self.FADE_IN_MS if shown else self.FADE_OUT_MS)
+        fade.setDuration(self.FAD_IN_MS if shown else self.FADE_OUT_MS)
         fade.setEasingCurve(
             QEasingCurve.Type.OutCubic if shown else QEasingCurve.Type.InCubic)
         group.addAnimation(fade)
@@ -527,7 +420,7 @@ class IOSDaemonsContent(QWidget):
     def _make_daemon_switch(self, title: str, daemon: Daemon):
         card = IOSCard()
         card.setProperty("searchText", " ".join([title, daemon.name, *daemon.value]))
-        desc = _DAEMON_DESCRIPTIONS.get(daemon.name, "")
+        desc = DAEMON_DESCRIPTIONS.get(daemon.name, "")
         if desc:
             card.setToolTip(desc)
         row_layout = QHBoxLayout(card)
