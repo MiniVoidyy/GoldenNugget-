@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QToolButton, QSizePolicy
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QToolButton, QSizePolicy, QCheckBox
 from PySide6.QtGui import QFont, QIcon, QPixmap
 from PySide6.QtCore import QSize
 
@@ -227,10 +227,22 @@ class UpdateAppDialog(QDialog):
         message_text += self.tr("Would you like to go to the download on GitHub?")
         message = QLabel(message_text)
 
+        # "Don't check for updates again" checkbox
+        from src.controllers.settings import Settings
+        self._dont_check = QCheckBox(self.tr("Don't check for updates again"))
+        self._dont_check.stateChanged.connect(self._on_dont_check_changed)
+
         layout.addWidget(title)
         layout.addWidget(message)
+        layout.addWidget(self._dont_check)
         layout.addWidget(self.buttonBox)
         self.setLayout(layout)
+
+    def _on_dont_check_changed(self, state):
+        from src.controllers.settings import Settings
+        settings = Settings("settings")
+        settings.setValue("check_for_updates", state == 0)  # unchecked = True (keep checking)
+        settings.sync()
 
     def accept(self):
         # open up the repo page
