@@ -315,6 +315,11 @@ STYLES = {
     "summary_dialog": """
         QLabel#confirmTitle {{ font-size: 22px; }}
         QPushButton {{ background-image: none; }}
+        QPushButton:disabled {{ background: {bg_tertiary}; color: {text_disabled}; }}
+        QCheckBox {{ color: {text_primary}; font-size: 14px; background: transparent; spacing: 10px; }}
+        QCheckBox::indicator {{ width: 18px; height: 18px; border-radius: 5px;
+            border: 1.5px solid {text_secondary}; background: {bg_input}; }}
+        QCheckBox::indicator:checked {{ background: {accent}; border-color: {accent}; }}
     """,
     "reset_dialog": """
         QScrollArea, QScrollArea > QWidget > QWidget {{ background: transparent; }}
@@ -555,6 +560,18 @@ STYLES = {
             background-color: {bg_tertiary};
             border-radius: 8px;
             color: {text_primary};
+            border: none;
+            padding: 6px 12px;
+            font-size: 13px;
+        }}
+        QPushButton:hover {{ background-color: {surface_hover}; }}
+    """,
+
+    "mini_button_danger": """
+        QPushButton {{
+            background-color: {bg_tertiary};
+            border-radius: 8px;
+            color: {error};
             border: none;
             padding: 6px 12px;
             font-size: 13px;

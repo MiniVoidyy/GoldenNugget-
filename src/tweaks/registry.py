@@ -645,6 +645,9 @@ SPECS: tuple[TweakSpec, ...] = (
        description=QT_TRANSLATE_NOOP("Nugget", "Removes the search button below the icons on the Home Screen (the faint search bar/icon above the Dock). Enabled when the switch is ON.")),
 
     # --- Internal Options ---
+    _t(TweakID.SBShowRSSI, Section.INTERNAL, "Show RSSI (Experimental)",
+       FileLocation.springboard, "SBShowRSSI", min_version="26.5",
+       description=QT_TRANSLATE_NOOP("Nugget", "Requests the SpringBoard RSSI (signal strength) debug indicator. Preference reading was verified in the iOS 26.5 simulator and the key is present in iOS 27.0.1. A visible indicator and support on physical devices are not yet verified.")),
     _t(TweakID.SBBuildNumber, Section.INTERNAL, "Show Build Version in Status Bar", GP, "UIStatusBarShowBuildVersion",
        description=QT_TRANSLATE_NOOP("Nugget", "Displays the iOS build number (e.g. 21A5284a) in the status bar next to the iOS version.")),
     _t(TweakID.RTL, Section.INTERNAL, "Force Right-to-Left Layout", GP, "NSForceRightToLeftWritingDirection",

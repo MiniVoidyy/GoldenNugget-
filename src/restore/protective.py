@@ -63,7 +63,6 @@ from src.restore.afc_media import (  # noqa: F401  (re-exported public API)
 from src.restore.inject import (  # noqa: F401  (re-exported public API)
     _is_encrypted_backup,
     _validate_sqlite_db,
-    inject_file_into_backup,
     inject_files_into_backup,
 )
 from src.restore.protective_cache import (  # noqa: F401  (re-exported public API)
@@ -466,11 +465,6 @@ def _media_tree_scope(device_name: str) -> str:
             seg = rest.split("/", 1)[0]
             return seg
     return ""
-
-
-def _is_afc_media_tree(device_name: str) -> bool:
-    """Whether an upload belongs to a Media tree moved to the AFC channel."""
-    return _media_tree_scope(device_name) in AFC_MEDIA_TREES
 
 
 def _posterboard_db_match(device_name: str) -> bool:

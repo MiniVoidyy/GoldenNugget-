@@ -1,3 +1,8 @@
+# PEP 810: defer operation-only dependencies on Python 3.15+; eager on older Python.
+__lazy_modules__ = (
+    "src.tweaks.status_bar.status_bar_c.status_setter",
+)
+
 import base64
 import json
 import os
@@ -6,7 +11,7 @@ import tempfile
 import time
 from typing import Optional
 
-from PySide6.QtCore import QStandardPaths, QCoreApplication
+from PySide6.QtCore import QStandardPaths, QCoreApplication, QT_TRANSLATE_NOOP
 
 from src.tweaks.tweak_names import TweakID
 from src.tweaks import tweak_loader
@@ -223,19 +228,6 @@ class PresetManager:
             print(f"Failed to export preset: {e}")
             return False
 
-    def build_export_data(self, include: Optional[list] = None) -> Optional[dict]:
-        """Serialize the *current* tweak state, optionally limited to a subset.
-
-        ``include`` is a list of ``TweakID`` members (or ``.name`` strings).
-        Returns ``None`` if nothing was serialized.
-        """
-        data = self._serialize_subset(include)
-        if data is None:
-            return None
-        data["exported"] = True
-        data["exported_at"] = int(time.time())
-        return data
-
     @staticmethod
     def _filter_export(data: dict, include: list) -> dict:
         """Return a copy of *data* with ``tweaks`` reduced to ``include``
@@ -280,7 +272,7 @@ class PresetManager:
         """Store JSON or a portable preset without activation; return (ok, name)."""
         if not os.path.isfile(import_path):
             return False, "File not found"
-        owned_assets = temporary = None
+        owned_assets = None
         committed = False
         try:
             import zipfile
@@ -305,40 +297,84 @@ class PresetManager:
                 # Fallback to filename
                 if not new_name or new_name == "Imported Preset":
                     new_name = os.path.splitext(os.path.basename(import_path))[0]
-            
-            # Sanitize and ensure unique
-            base_name = self._sanitize_name(new_name)
-            name = base_name
-            counter = 1
-            while os.path.isfile(self.get_preset_path(name)):
-                name = f"{base_name} {counter}"
-                counter += 1
-            
-            # Update metadata
-            now = int(time.time())
-            if "metadata" not in data:
-                data["metadata"] = {}
-            data["metadata"]["imported_at"] = now
-            data["metadata"]["updated_at"] = now
-            if "created_at" not in data["metadata"]:
-                data["metadata"]["created_at"] = now
-            
-            file_path = self.get_preset_path(name)
-            with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=self.presets_dir,
-                                             delete=False) as f:
-                temporary = f.name
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            os.replace(temporary, file_path)
+
+            name = self._store_imported(data, new_name)
             committed = True
             return True, name
         except Exception as e:
             print(f"Failed to import preset: {e}")
             return False, str(e)
         finally:
-            if temporary and os.path.exists(temporary):
-                os.unlink(temporary)
             if owned_assets is not None and not committed:
                 shutil.rmtree(owned_assets, ignore_errors=True)
+
+    def _store_imported(self, data: dict, new_name: str, replace: bool = False) -> str:
+        """Write validated preset ``data`` under a unique name; return the name."""
+        base_name = self._sanitize_name(new_name)
+        name = base_name
+        counter = 1
+        while not replace and os.path.isfile(self.get_preset_path(name)):
+            name = f"{base_name} {counter}"
+            counter += 1
+
+        now = int(time.time())
+        if "metadata" not in data:
+            data["metadata"] = {}
+        data["metadata"]["imported_at"] = now
+        data["metadata"]["updated_at"] = now
+        if "created_at" not in data["metadata"]:
+            data["metadata"]["created_at"] = now
+
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=self.presets_dir,
+                                             delete=False) as f:
+                temporary = f.name
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(temporary, self.get_preset_path(name))
+            temporary = None
+        finally:
+            if temporary and os.path.exists(temporary):
+                os.unlink(temporary)
+        return name
+
+    ## SHARE CODES
+    def read_preset(self, name: str) -> Optional[dict]:
+        try:
+            with open(self.get_preset_path(name), "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            return None
+        return data if self._valid_import_structure(data) else None
+
+    def share_code(self, name: str) -> str:
+        """Share code for a saved preset; raises ShareCodeError when impossible."""
+        from src.controllers.share_code import ShareCodeError, encode
+        data = self.read_preset(name)
+        if data is None:
+            raise ShareCodeError(QT_TRANSLATE_NOOP("ShareCode", "The preset could not be read."))
+        meta = data.get("metadata", {})
+        return encode(data["tweaks"], name=name, description=meta.get("description", ""),
+                      ios_version=meta.get("ios_version", "") if meta.get("ios_version") != "Unknown" else "")
+
+    def decode_share_code(self, text: str) -> dict:
+        from src.controllers.share_code import decode
+        return decode(text, self._valid_import_structure)
+
+    def import_share_code(self, text: str, new_name: str = "", catalog: dict = None,
+                          replace: bool = False) -> str:
+        """Store a shared setup as a new preset (never activates it); return its name.
+
+        ``catalog`` ({"id", "sha256"}) marks a preset imported from the community
+        catalog so a newer version can be offered; ``replace`` overwrites the
+        preset named ``new_name`` instead of picking a free name (an update)."""
+        data = self.decode_share_code(text)
+        name = new_name or data["metadata"].pop("name", "") or "Shared Preset"
+        data["metadata"].pop("name", None)
+        data.pop("shared_count", None)
+        if catalog:
+            data["metadata"]["catalog"] = dict(catalog)
+        return self._store_imported(data, name, replace=replace)
 
     @staticmethod
     def _valid_import_structure(data) -> bool:
@@ -371,6 +407,9 @@ class PresetManager:
                     return False
             if "templates" in entry and (not isinstance(entry["templates"], list)
                                           or not all(isinstance(path, str) for path in entry["templates"])):
+                return False
+            if "tweak_states" in entry and (not isinstance(entry["tweak_states"], list)
+                                            or not all(isinstance(state, dict) for state in entry["tweak_states"])):
                 return False
             if "themes" in entry:
                 if not isinstance(entry["themes"], list):
@@ -415,6 +454,9 @@ class PresetManager:
             data["value"] = tweak.value
         elif isinstance(tweak, TemplatesTweak):
             data["templates"] = [t.path for t in tweak.templates]
+            states = tweak.tweak_states()
+            if any(states):
+                data["tweak_states"] = states
         elif isinstance(tweak, StatusBarTweak):
             data["enabled"] = tweak.enabled
             data["silly_mode"] = tweak.setter.silly_mode
@@ -507,6 +549,7 @@ class PresetManager:
                         tweak.add_template(path)
                     except Exception as e:
                         print(f"Failed to add template: {e}")
+            tweak.restore_tweak_states(data.get("tweak_states"), data["templates"])
 
     def _apply_status_bar(self, tweak: StatusBarTweak, data: dict):
         tweak.enabled = data.get("enabled", False)

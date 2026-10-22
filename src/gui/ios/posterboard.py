@@ -9,7 +9,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QPixmap, QIcon, QImageReader
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 
-from src.gui.ios.components import IOSCard, IOSPrimaryButton, IOSSwitch
+from src.gui.widgets import (
+    IOSCard, IOSPrimaryButton, IOSSwitch,
+)
 from src.gui.theme import ColorThemeManager, t, theme_pixmap
 from src.tweaks.tweaks import tweaks, TweakID
 
@@ -176,15 +178,8 @@ class IOSPosterboardPage(QWidget):
         reset_layout.addWidget(self._reset_caption)
 
 
-        check_row = QHBoxLayout()
-        check_row.setContentsMargins(16, 0, 16, 0)
-        check_row.addStretch()
-        check_row.addWidget(self._check_btn)
-        layout.addLayout(check_row)
-
         # Tab bar
         self.tab_stack = QStackedWidget()
-        layout.addWidget(self.tab_stack)
 
         # Tendies tab
         self.tendies_page = self._create_tendies_tab()
@@ -198,22 +193,28 @@ class IOSPosterboardPage(QWidget):
         self.video_page = self._create_video_tab()
         self.tab_stack.addWidget(self.video_page)
 
-        # Bottom tab bar
+        # Tab bar on top, sharing its row with "Check Package…": a mobile-style
+        # bottom bar sat in the middle of the window, above the reset footer,
+        # and left the check button floating alone under the header.
         self._tab_bar = QWidget()
-        self._tab_bar.setFixedHeight(56)
+        self._tab_bar.setObjectName("pbTabBar")
+        self._tab_bar.setFixedHeight(52)
         tab_layout = QHBoxLayout(self._tab_bar)
-        tab_layout.setContentsMargins(0, 0, 0, 0)
-        tab_layout.setSpacing(0)
+        tab_layout.setContentsMargins(16, 8, 16, 4)
+        tab_layout.setSpacing(4)
 
         self.tendies_tab_btn = self._make_tab_button(QCoreApplication.translate("Nugget", "Tendies"), ":/icon/wallpaper.svg", 0)
         self.templates_tab_btn = self._make_tab_button(QCoreApplication.translate("Nugget", "Templates"), ":/icon/photo-stack.svg", 1)
         self.video_tab_btn = self._make_tab_button(QCoreApplication.translate("Nugget", "Video"), ":/icon/play-circle.svg", 2)
 
-        tab_layout.addWidget(self.tendies_tab_btn, 1)
-        tab_layout.addWidget(self.templates_tab_btn, 1)
-        tab_layout.addWidget(self.video_tab_btn, 1)
+        tab_layout.addWidget(self.tendies_tab_btn)
+        tab_layout.addWidget(self.templates_tab_btn)
+        tab_layout.addWidget(self.video_tab_btn)
+        tab_layout.addStretch()
+        tab_layout.addWidget(self._check_btn)
 
         layout.addWidget(self._tab_bar)
+        layout.addWidget(self.tab_stack)
         reset_footer = QWidget(self)
         reset_footer_layout = QVBoxLayout(reset_footer)
         reset_footer_layout.setContentsMargins(16, 8, 16, 16)
@@ -234,19 +235,23 @@ class IOSPosterboardPage(QWidget):
         self._reset_btn.setStyleSheet(t("maintenance_button"))
         self._reset_caption.setStyleSheet(f"color: {c.text_secondary}; font-size: 12px; background-color: transparent;")
         self._tab_bar.setStyleSheet(
-            f"background-color: {c.bg_primary}; border-top: 1px solid {c.bg_secondary};"
+            f"QWidget#pbTabBar {{ background-color: {c.bg_primary}; }}"
         )
         for btn in (self.tendies_tab_btn, self.templates_tab_btn, self.video_tab_btn):
             btn.setStyleSheet(f"""
                 QToolButton {{
                     background: transparent;
                     color: {c.text_secondary};
-                    font-size: 11px;
-                    padding: 8px 0;
+                    font-size: 13px;
+                    font-weight: 600;
+                    padding: 6px 12px;
                     border: none;
+                    border-radius: 8px;
                 }}
+                QToolButton:hover {{ background-color: {c.surface_hover}; }}
                 QToolButton:checked {{
                     color: {c.accent};
+                    background-color: {c.bg_tertiary};
                 }}
             """)
         self._retheme_tendies_tab()
@@ -352,9 +357,9 @@ class IOSPosterboardPage(QWidget):
     def _make_tab_button(self, text: str, icon_path: str, index: int) -> QToolButton:
         btn = QToolButton()
         btn.setText(text)
-        btn.setIconSize(QSize(24, 24))
+        btn.setIconSize(QSize(18, 18))
         btn.setProperty('icon_resource', icon_path)
-        btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         btn.setCheckable(True)
         btn.setAutoExclusive(True)
         btn.setCursor(Qt.PointingHandCursor)
@@ -372,7 +377,7 @@ class IOSPosterboardPage(QWidget):
         c = ColorThemeManager.instance().colors
         for button in (self.tendies_tab_btn, self.templates_tab_btn, self.video_tab_btn):
             color = c.accent if button.isChecked() else c.text_secondary
-            button.setIcon(QIcon(theme_pixmap(button.property('icon_resource'), color, 24, self.devicePixelRatioF())))
+            button.setIcon(QIcon(theme_pixmap(button.property('icon_resource'), color, 18, self.devicePixelRatioF())))
 
     def _create_tendies_tab(self) -> QWidget:
         self._tendies_scroll = QScrollArea()
@@ -394,7 +399,6 @@ class IOSPosterboardPage(QWidget):
         return self._tendies_scroll
 
     def _create_download_card(self) -> QWidget:
-        c = ColorThemeManager.instance().colors
         card = IOSCard()
         card.setCursor(Qt.PointingHandCursor)
         card.setMinimumHeight(88)
@@ -495,7 +499,7 @@ class IOSPosterboardPage(QWidget):
                 try:
                     templates_tweak.add_template(file, device_version)
                 except Exception as e:
-                    QMessageBox.warning(self.window, "Import Failed", f"Failed to load template:\n{file}\n\n{str(e)}")
+                    QMessageBox.warning(self.window, QCoreApplication.translate("Nugget", "Import Failed"), QCoreApplication.translate("Nugget", "Failed to load template:\n{0}\n\n{1}").format(file, str(e)))
             self._load_templates_list()
 
     def _load_templates_list(self):
@@ -513,10 +517,10 @@ class IOSPosterboardPage(QWidget):
 
         widgets = {}
         for template in templates:
+            template.loaded = False  # its old card was just removed
             template.create_ui(self.window, tweaks[TweakID.Templates], widgets, self.templates_layout)
 
     def _create_video_tab(self) -> QWidget:
-        c = ColorThemeManager.instance().colors
         self._video_scroll = QScrollArea()
         self._video_scroll.setWidgetResizable(True)
         content = QWidget()

@@ -15,7 +15,6 @@ import json
 import os
 import sys
 import types
-from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -97,14 +96,10 @@ async def _run_fetch(thread):
 
 
 async def main():
-    from src.gui.dialogs import app_list_dialog as mod
-
     # Replace the real InstallationProxy import path with the fake.
-    orig_sys = sys.modules.get("pymobiledevice3.services.installation_proxy")
     sys.modules["pymobiledevice3.services.installation_proxy"] = None  # not hit
 
     # Patch the inner import so the thread pulls our fake service instead.
-    builtin_import = __import__
     real_import = __import__
 
     def fake_import(name, *args, **kwargs):

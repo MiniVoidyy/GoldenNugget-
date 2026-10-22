@@ -1,6 +1,5 @@
 """Offline preview regression: no USB, backups, or real preference writes."""
 import asyncio
-import json
 import os
 from pathlib import Path
 import sys

@@ -13,11 +13,11 @@ responsive and there are no background ``QThread`` lifetime issues.
 import os
 import tempfile
 
-from PySide6.QtCore import Qt, QCoreApplication, QUrl, QSize
+from PySide6.QtCore import Qt, QCoreApplication, QUrl
 from PySide6.QtGui import QPixmap
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QDialog, QVBoxLayout, QLabel, QPushButton,
     QScrollArea, QGridLayout, QWidget, QFrame,
 )
 

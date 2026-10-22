@@ -78,12 +78,12 @@ class ReplaceOption(TemplateOption):
     def on_importReplaceBtn_clicked(self):
         if self.value == None:
             # import image
-            selected_file, _ = QtWidgets.QFileDialog.getOpenFileName(self.window, "Select File", "", self.allowed_files, options=QtWidgets.QFileDialog.ReadOnly)
+            selected_file, _ = QtWidgets.QFileDialog.getOpenFileName(self.window, QtCore.QCoreApplication.translate("Nugget", "Select File"), "", self.allowed_files, options=QtWidgets.QFileDialog.ReadOnly)
             if selected_file != None and selected_file != "":
                 self.value = selected_file
                 self.file_path_lbl.setText(selected_file)
                 self.file_path_lbl.show()
-                self.repl_btn.setText("Remove Selected File")
+                self.repl_btn.setText(QtCore.QCoreApplication.translate("Nugget", "Remove Selected File"))
                 self.repl_btn.setIcon(self.remove_icon)
         else:
             # remove current image

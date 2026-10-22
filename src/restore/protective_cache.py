@@ -17,7 +17,6 @@ snapshot from a crashed apply is self-healed on the next refresh.
 import json
 import logging
 import os
-import shutil
 import tempfile
 import time
 from pathlib import Path
@@ -103,13 +102,6 @@ class ProtectiveBackupCache:
         # objects. It sits OUTSIDE ``master_root`` so working copies and the
         # manifest prune never touch it.
         self.media_dir = self.base / "media" / self.udid
-
-    def _read_info(self) -> dict:
-        try:
-            with open(self.info_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
 
     def locate(self) -> Optional[dict]:
         """Find an existing master across both bases; point homes at it.
@@ -209,14 +201,3 @@ class ProtectiveBackupCache:
                        "created_ts": int(time.time()),
                        "created": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
         return str(self.master_root)
-
-    def make_working_copy(self) -> str:
-        """Build a throwaway hardlink copy of the master for prune + injection."""
-        from src.restore.protective import make_protective_working_copy
-        return make_protective_working_copy(str(self.master_root), self.udid)
-
-    def purge(self):
-        shutil.rmtree(self.master_root, ignore_errors=True)
-        shutil.rmtree(self.media_dir, ignore_errors=True)
-        shutil.rmtree(self.base / "snapshot", ignore_errors=True)
-        self.info_path.unlink(missing_ok=True)

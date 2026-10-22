@@ -12,14 +12,16 @@ from PySide6 import QtWidgets, QtCore, QtGui
 
 from .tendie_file import TendieFile
 from .template_options import OptionType, TemplateOption, ReplaceOption, RemoveOption, SetOption, PickerOption
+from .community_tweaks import CommunityTweak, MAX_SOURCE_BYTES, MAX_TOTAL_SOURCE_BYTES, parse_tweaks
 from src.exceptions.posterboard_exceptions import PBTemplateException
 from src.qt.custom_elements.resizable_image_label import ResizableImageLabel
 from src.devicemanagement.constants import Version
 
-CURRENT_FORMAT = 2
+CURRENT_FORMAT = 3
 
 class TemplateFile(TendieFile):
     options: list[TemplateOption]
+    tweaks: list[CommunityTweak] # switchable tweaks (format 3), see community_tweaks.py
     json_path: str
     tmp_dir: str = None
 
@@ -44,6 +46,7 @@ class TemplateFile(TendieFile):
     def __init__(self, path: str, device_version: str = None):
         super().__init__(path=path)
         self.options = []
+        self.tweaks = []
         self.json_path = None
 
         # find the config.json file
@@ -55,12 +58,13 @@ class TemplateFile(TendieFile):
             if self.json_path != None:
                 file = archive.open(self.json_path)
                 data = load(file)
-                # load the options
-                if not 'options' in data:
+                # load the options; a template with only community tweaks
+                # needs neither options nor a domain
+                if not 'options' in data and not 'tweaks' in data:
                     raise PBTemplateException(path, QtCore.QCoreApplication.tr("No options were found in the config. Make sure that it is in the correct format."))
-                if not 'domain' in data:
+                if not 'domain' in data and not 'tweaks' in data:
                     raise PBTemplateException(path, QtCore.QCoreApplication.tr("This config does not have a valid domain!"))
-                self.domain = data['domain']
+                self.domain = data.get('domain', "")
                 # add backwards compatibility for my mistake in the v5.2 betas
                 if self.domain == "com.apple.PosterBoard":
                     self.domain = "AppDomain-com.apple.PosterBoard"
@@ -120,7 +124,14 @@ class TemplateFile(TendieFile):
                                 if clean_path in prevs:
                                     self.previews[clean_path] = rc_full_path
 
-                for option in data['options']:
+                if 'tweaks' in data:
+                    if self.format_version < 3:
+                        raise PBTemplateException(path, QtCore.QCoreApplication.tr("Templates with tweaks need \"format_version\": \"3\"."))
+                    self.tweaks = parse_tweaks(data['tweaks'], self._source_reader(archive))
+                    if not self.domain and self.has_container(archive):
+                        raise PBTemplateException(path, QtCore.QCoreApplication.tr("This config does not have a valid domain!"))
+
+                for option in data.get('options', []):
                     opt_type = OptionType[option['type']]
                     if opt_type == OptionType.replace:
                         self.options.append(ReplaceOption(data=option))
@@ -138,6 +149,28 @@ class TemplateFile(TendieFile):
             else:
                 raise PBTemplateException(path, QtCore.QCoreApplication.tr("No config.json found in file!"))
     
+    def _source_reader(self, archive: zipfile.ZipFile):
+        base = self.json_path.removesuffix("config.json")
+        names = set(archive.namelist())
+        total = [0]
+
+        def read(relative: str) -> bytes:
+            name = base + relative
+            if name not in names:
+                raise PBTemplateException(self.path, QtCore.QCoreApplication.tr("Missing file in template: {0}").format(relative))
+            size = archive.getinfo(name).file_size
+            total[0] += size
+            if size > MAX_SOURCE_BYTES or total[0] > MAX_TOTAL_SOURCE_BYTES:
+                raise PBTemplateException(self.path, QtCore.QCoreApplication.tr("Template files are too large."))
+            return archive.read(name)
+        return read
+
+    def has_container(self, archive: zipfile.ZipFile = None) -> bool:
+        if archive is None:
+            with zipfile.ZipFile(self.path, mode="r") as opened:
+                return self.has_container(opened)
+        return any(part.lower() == "container" for name in archive.namelist() for part in name.split("/")[:-1])
+
     def clean_files(self):
         if self.tmp_dir != None:
             try:
@@ -199,7 +232,7 @@ class TemplateFile(TendieFile):
         title_widget.setLayout(title_layout)
         # domain label
         self.domain_lbl = QtWidgets.QLabel(left_widget)
-        self.domain_lbl.setText(f" ({self.domain})")
+        self.domain_lbl.setText(f" ({self.domain})" if self.domain else "")
         chevron = QtWidgets.QToolButton(left_widget)
         chevron.setIcon(self.get_chevron_icon(is_up=True)) # for opening/closing the options
         chevron.setStyleSheet("QToolButton {\n    background-color: transparent;\n	icon-size: 20px;\n}")
@@ -287,7 +320,7 @@ class TemplateFile(TendieFile):
             bx_layout = QtWidgets.QVBoxLayout(options_widget)
             bx_layout.setContentsMargins(0, 2, 0, 2)
             bx_lbl = QtWidgets.QLabel(bx_widget)
-            bx_lbl.setText("App bundle id:")
+            bx_lbl.setText(QtCore.QCoreApplication.translate("Nugget", "App bundle id:"))
             bx_layout.addWidget(bx_lbl)
             textbox = QtWidgets.QLineEdit(bx_widget)
             textbox.setPlaceholderText(QtCore.QCoreApplication.tr("Bundle id (default: {0})").format(self.domain.removeprefix('AppDomain-')))
@@ -306,6 +339,9 @@ class TemplateFile(TendieFile):
             option.add_potential_preview_lbls(prevs)
             option.update_preview()
 
+        if self.tweaks:
+            self.create_tweaks_ui(window, options_widget, opt_layout)
+
         options_widget.setLayout(opt_layout)
 
         # finish the main layout
@@ -314,3 +350,78 @@ class TemplateFile(TendieFile):
         widget.setLayout(layout)
         templateLayout.addWidget(widget)
         self.loaded = True
+
+    def create_tweaks_ui(self, window, parent: QtWidgets.QWidget, layout: QtWidgets.QVBoxLayout):
+        """A switch per community tweak, with its control and the files it writes."""
+        try:
+            version = window.device_manager.get_current_device_version()
+        except Exception:
+            version = None
+        header = QtWidgets.QLabel(QtCore.QCoreApplication.translate("CommunityTweaks", "Tweaks"), parent)
+        header.setStyleSheet("QLabel { font-weight: 600; margin-top: 6px; }")
+        layout.addWidget(header)
+        for tweak in self.tweaks:
+            box = QtWidgets.QWidget(parent)
+            box_layout = QtWidgets.QVBoxLayout(box)
+            box_layout.setContentsMargins(0, 2, 0, 6)
+            box_layout.setSpacing(2)
+            check = QtWidgets.QCheckBox(tweak.label, box)
+            check.setChecked(tweak.enabled)
+            box_layout.addWidget(check)
+            notes = [tweak.description] if tweak.description else []
+            if not tweak.supports(version):
+                notes.append(QtCore.QCoreApplication.translate(
+                    "CommunityTweaks", "Not applied on iOS {0}.").format(version))
+            notes.append(QtCore.QCoreApplication.translate("CommunityTweaks", "Writes: {0}").format(
+                ", ".join(tweak.paths())))
+            note = QtWidgets.QLabel("\n".join(notes), box)
+            note.setWordWrap(True)
+            note.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+            note.setStyleSheet("QLabel { font-size: 11px; color: gray; }")
+            box_layout.addWidget(note)
+            control = self._tweak_control(tweak, box)
+            if control is not None:
+                control.setEnabled(tweak.enabled)
+                box_layout.addWidget(control)
+            check.toggled.connect(lambda checked, item=tweak, widget=control: (
+                setattr(item, "enabled", checked),
+                widget is not None and widget.setEnabled(checked)))
+            layout.addWidget(box)
+
+    @staticmethod
+    def _tweak_control(tweak: CommunityTweak, parent: QtWidgets.QWidget):
+        control = tweak.control
+        if control is None:
+            return None
+        if control.type == "text":
+            edit = QtWidgets.QLineEdit(parent)
+            edit.setMaxLength(control.max_length)
+            edit.setText(tweak.value or "")
+            edit.textEdited.connect(lambda text, item=tweak: setattr(item, "value", text))
+            return edit
+        if control.type == "choice":
+            combo = QtWidgets.QComboBox(parent)
+            for label, value in control.choices:
+                combo.addItem(label)
+            values = [value for _, value in control.choices]
+            combo.setCurrentIndex(values.index(tweak.value) if tweak.value in values else 0)
+            combo.currentIndexChanged.connect(lambda index, item=tweak: setattr(item, "value", values[index]))
+            return combo
+        # slider: QSlider works in integer steps
+        row = QtWidgets.QWidget(parent)
+        row_layout = QtWidgets.QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        steps = max(1, round((control.max - control.min) / control.step))
+        slider = QtWidgets.QSlider(QtCore.Qt.Horizontal, row)
+        slider.setRange(0, steps)
+        slider.setValue(round((tweak.value - control.min) / control.step))
+        value_lbl = QtWidgets.QLabel(str(tweak.value), row)
+        value_lbl.setMinimumWidth(48)
+
+        def moved(position, item=tweak):
+            item.value = control.clamp(round(control.min + position * control.step, 6))
+            value_lbl.setText(str(item.value))
+        slider.valueChanged.connect(moved)
+        row_layout.addWidget(slider, 1)
+        row_layout.addWidget(value_lbl)
+        return row

@@ -22,7 +22,6 @@ import re
 import zipfile
 from typing import Optional
 
-PASSTHME_TARGET = "/var/mobile/Library/Caches/TelephonyUI-10"
 PASSTHME_TARGETS_ALL = (
     "/var/mobile/Library/Caches/TelephonyUI-10",
     "/var/mobile/Library/Caches/TelephonyUI-9",
@@ -224,13 +223,3 @@ def stage_files(
     return files
 
 
-def stage_passthm(
-    theme_path: str,
-    *,
-    locale: str = "en",
-    langs: Optional[list[str]] = None,
-    bold: str = "both",
-) -> tuple[dict[str, bytes], list[tuple[str, bytes]]]:
-    """Parse a ``.passthm`` and stage it into ready-to-write file pairs."""
-    keys = parse_passthm(theme_path)
-    return keys, stage_files(keys, locale=locale, langs=langs, bold=bold)

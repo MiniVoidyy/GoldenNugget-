@@ -67,7 +67,6 @@ class EmitterCell:
     contentsScale: float = 1.0
     birthRate: float = 0.0
     lifetime: float = 0.0
-    lifetimeRange: float = 0.0
     emissionLongitude: float = 0.0
     emissionRange: float = 0.0
     emissionLatitude: float = 0.0
@@ -138,7 +137,6 @@ class Layer:
     colors: List[GradientColor] = field(default_factory=list)
     # shape
     shape: Optional[str] = None
-    radius: Optional[float] = None
     fill: Optional[str] = None
     # video
     frameCount: int = 0

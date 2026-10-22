@@ -20,9 +20,6 @@ class IconTheme:
         self.icon_path = icon_path
         self.icon_data = icon_data
 
-    def set_icon_data(self, data: bytes):
-        self.icon_data = data
-
     def get_icon_data(self) -> bytes:
         """Return the icon PNG bytes, loading them from disk if needed."""
         if self.icon_data is not None:

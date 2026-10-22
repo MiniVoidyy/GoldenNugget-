@@ -1,7 +1,13 @@
-from PySide6.QtCore import QObject, Signal, QSettings, QEvent
+from PySide6.QtCore import QObject, Signal, QSettings, QEvent, Qt
 from PySide6.QtGui import QColor, QPalette, QGuiApplication
 
 from src.gui.theme.colors import ThemeColors, DARK, LIGHT, ACCENT_PRESETS, LIGHT_ACCENT_PRESETS
+
+
+# TEMP: the light/dark selector is hidden in Settings, so nobody could leave a
+# light mode saved earlier. Until it comes back, every start uses dark; the saved
+# choice is kept untouched. Set to True when the selector is restored.
+LIGHT_MODE_AVAILABLE = False
 
 
 class ColorThemeManager(QObject):
@@ -20,13 +26,14 @@ class ColorThemeManager(QObject):
         super().__init__(parent)
         self._settings = QSettings("GoldenNugget", "GoldenNugget")
         self._mode = self._settings.value("color_mode", "dark")
-        if self._mode not in ('dark', 'light'):
+        if self._mode not in ('dark', 'light') or not LIGHT_MODE_AVAILABLE:
             self._mode = 'dark'
         self._accent_name = self._settings.value("accent_color", "blue")
         if self._accent_name not in ACCENT_PRESETS:
             self._accent_name = 'blue'
         self._colors = self._build_colors()
         self._revision = 0
+        self._pinned_app = None
 
     @classmethod
     def instance(cls) -> "ColorThemeManager":
@@ -82,10 +89,41 @@ class ColorThemeManager(QObject):
         self._settings.sync()
         self._colors = self._build_colors()
         self._revision += 1
-        app = QGuiApplication.instance()
-        if app is not None:
-            app.setPalette(self.build_palette())
+        self.apply_to_app()
         self.theme_changed.emit()
+
+    # ---- keeping the OS out ----------------------------------------------
+
+    def apply_to_app(self, app=None):
+        """Apply the palette and pin Qt's colour scheme to the saved mode.
+
+        The app never follows the OS appearance. Without the pin, Qt hands
+        native parts (Windows/macOS title bars, system dialogs) to the OS
+        scheme and re-resolves the palette when the OS switches between
+        light and dark. Pinning keeps them on the user's choice (dark unless
+        they picked light); if a platform still reports a different scheme,
+        the palette and pin are applied again.
+        """
+        app = app or self._pinned_app or QGuiApplication.instance()
+        if app is None:
+            return
+        hints = app.styleHints()
+        if hasattr(hints, "setColorScheme"):  # Qt 6.8+
+            hints.setColorScheme(self._qt_scheme())
+        app.setPalette(self.build_palette())
+        if self._pinned_app is not app:
+            self._pinned_app = app
+            if hasattr(hints, "colorSchemeChanged"):
+                hints.colorSchemeChanged.connect(self._on_system_scheme)
+
+    def _qt_scheme(self):
+        return Qt.ColorScheme.Dark if self.is_dark else Qt.ColorScheme.Light
+
+    def _on_system_scheme(self, scheme):
+        # Only the live singleton answers; a replaced manager (tests, reloads)
+        # must not fight it over the scheme.
+        if ColorThemeManager._inst is self and scheme != self._qt_scheme():
+            self.apply_to_app()
 
     # ---- QPalette for Fusion style ---------------------------------------
 

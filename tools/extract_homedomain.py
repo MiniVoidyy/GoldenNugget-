@@ -8,7 +8,6 @@ Usage:
     .env/bin/python3 extract_homedomain.py my_backup/00008130... ./output HomeDomain
 """
 
-import os
 import plistlib
 import shutil
 import sqlite3
@@ -16,10 +15,8 @@ import sys
 from pathlib import Path
 
 
-S_IFMT   = 0o0170000
 S_IFDIR  = 0o0040000
 S_IFREG  = 0o0100000
-S_IFLNK  = 0o0120000
 
 
 def parse_mode(entry_blob: bytes) -> int:

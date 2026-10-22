@@ -1,3 +1,12 @@
+# PEP 810: defer operation-only dependencies on Python 3.15+; eager on older Python.
+__lazy_modules__ = (
+    "pymobiledevice3.services.mobile_config",
+    "pymobiledevice3.services.mobilebackup2",
+    "src.restore.skip_setup27",
+    "src.restore.restore",
+    "src.tweaks.status_bar.statusbar_archive",
+)
+
 import asyncio
 import os.path
 import plistlib
@@ -11,8 +20,6 @@ from typing import Optional
 
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import QSettings, QCoreApplication
-
-from packaging.version import Version
 
 from pymobiledevice3 import usbmux
 from pymobiledevice3.services.mobile_config import MobileConfigService
@@ -277,7 +284,7 @@ class DeviceManager:
                         )
                     self.devices.append(dev)
                     seen_udids.add(normalized_udid)
-            except PasswordRequiredError as e:
+            except PasswordRequiredError:
                 show_alert(ApplyAlertMessage(txt=QCoreApplication.tr("Device is password protected! You must trust the computer on your device.\n\nUnlock your device. On the popup, click \"Trust\", enter your password, then try again.")))
             except MuxException as e:
                 # there is probably a cable issue
@@ -348,8 +355,6 @@ class DeviceManager:
         except Exception:
             return False
         
-    def reset_device_pairing(self):
-        return asyncio.run(self._reset_device_pairing())
     async def _reset_device_pairing(self):
         # first, unpair it
         if self.data_singleton.current_device == None:
@@ -690,6 +695,10 @@ class DeviceManager:
             udid = self.get_current_device_udid()
             if udid:
                 write_lastapply(udid, sparse_signature(files_to_restore))
+                from src.tweaks.posterboard.community_tweaks import write_record
+                community = getattr(self, "_last_community_writes", None)
+                if isinstance(community, tuple) and len(community) == 2:
+                    write_record(udid, *community)
             write_preview(preview_udid, preview_version, preview)
             self._last_operation_preview = preview
             if preview is not None:
@@ -1005,11 +1014,12 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
         only the PosterBoard container is pulled off the device and everything
         else the device uploads is drained mid-stream, so no full backup is
         ever written. A disk-space failure stops the apply with the original
-        destination/action message; other failures keep the legacy fallback.
+        destination/action message. Any fetch failure aborts before restore;
+        continuing could use a stale database or mask the actual error.
         """
         udid = self.get_current_device_udid()
         if not udid:
-            return
+            raise NuggetException("Connect and select a device before fetching the PosterBoard database.")
         # already backed up for this device and no fresh copy required -> reuse it
         if not force and PreferenceManager.has_pbconfig_data(udid):
             return
@@ -1042,9 +1052,10 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
             print(f"Failed to back up PosterBoard database: {e}")
             print(traceback.format_exc())
             if _is_device_locked_error(e):
-                update_label(QCoreApplication.tr("Warning: could not back up PosterBoard database — device is locked. Please unlock your device and try again."))
-            else:
-                update_label(QCoreApplication.tr("Warning: could not back up the PosterBoard database automatically."))
+                raise NuggetException(QCoreApplication.tr(
+                    "Could not fetch the PosterBoard database because the device is locked. "
+                    "Unlock it, keep it awake, and try again."), detailed_text=str(e)) from e
+            raise
 
     async def _apply_tweak_pass(self, update_label=lambda x: None, templates: list = None, prepared_backup_root=None, prompt_password=None, prompt_choice=None, skip_protective_backup: bool = False):
         """Generate all tweak files and restore them to the device in one pass.
@@ -1136,6 +1147,18 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
                         if tweak.enabled:
                             uses_domains = True
 
+            # Community tweaks from .batter templates. Their plist keys merge
+            # into the same files the built-in tweaks write (built-in keys win
+            # a clash); whole files may not replace one GoldenNugget writes.
+            community_plists, community_files = {}, {}
+            if TweakID.Templates in tweaks and TweakID.Templates not in hotload_skipped:
+                community_plists, community_files = tweaks[TweakID.Templates].community_writes(
+                    self.get_current_device_version())
+                if community_plists or community_files:
+                    uses_domains = True
+            # kept for the reset record; the merge below pops from community_plists
+            self._last_community_writes = (dict(community_plists), dict(community_files))
+
             if hotload_skipped:
                 names = sorted(t.name if hasattr(t, "name") else str(t) for t in hotload_skipped)
                 update_label(QCoreApplication.tr(
@@ -1157,6 +1180,8 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
                     ownership = basic_plists_ownership[location]
                 else:
                     ownership = 501
+                if location.value in community_plists:
+                    plist = {**community_plists.pop(location.value)[0], **plist}
                 self.concat_file(
                     contents=plistlib.dumps(plist),
                     path=location.value,
@@ -1177,6 +1202,9 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
             # secondary copy for iOS 27 compatibility. (Phase 3 skips this file
             # to avoid overwriting the tweak copy.)
             home_plist = basic_plists.get(FileLocation.globalPreferences, {})
+            if FileLocation.globalPreferencesHomeDomain.value in community_plists:
+                home_plist = {**community_plists.pop(FileLocation.globalPreferencesHomeDomain.value)[0],
+                              **home_plist}
             self.concat_file(
                 contents=plistlib.dumps(home_plist),
                 path=FileLocation.globalPreferencesHomeDomain.value,
@@ -1191,6 +1219,8 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
                     files_to_restore=files_to_restore,
                     owner=501, group=501
                 )
+
+            self._add_community_files(community_plists, community_files, files_to_restore, is_ios27)
 
             # Check if backup encryption is enabled and handle it
             backup_password = ""
@@ -1268,6 +1298,24 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
                         # ignore clean up errors
                         print(str(e))
 
+    def _add_community_files(self, plists: dict, files: dict,
+                             files_to_restore: list[FileToRestore], is_ios27: bool):
+        """Add community tweak writes that no built-in tweak already covers."""
+        taken = {(item.domain, item.restore_path) for item in files_to_restore}
+        writes = [(path, plistlib.dumps(values), owner) for path, (values, owner) in plists.items()]
+        writes += [(path, data, owner) for path, (data, owner) in files.items()]
+        for path, contents, owner in writes:
+            rel_path, domain = self.get_domain_for_path(path)
+            if (domain, rel_path) in taken:
+                raise NuggetException(QCoreApplication.tr(
+                    "A template tries to replace {0}, which GoldenNugget already writes.").format(path))
+            self.concat_file(contents=contents, path=path, files_to_restore=files_to_restore,
+                             owner=owner, group=owner)
+            app_pref = managed_pref_target(path) if is_ios27 and path in plists else None
+            if app_pref and f"{HOME_PREFIX}{app_pref}" not in plists and f"{HOME_PREFIX}{app_pref}" not in files:
+                self.concat_file(contents=contents, path=f"{HOME_PREFIX}{app_pref}",
+                                 files_to_restore=files_to_restore, owner=501, group=501)
+
     ## RESETTING TWEAKS
     def reset_tweaks(self, reset_pages: list[Page], settings: QSettings, update_label=lambda x: None, show_alert=lambda x: None, prompt_choice=None):
         return asyncio.run(self._reset_tweaks(reset_pages, settings, update_label, show_alert, prompt_choice))
@@ -1289,6 +1337,7 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
             # to already holds the tweaked values, so restoring a captured
             # "original" re-wrote the very tweaks the user asked to remove.
             files_to_null: list[str] = []
+            community_leftover: list[str] = []
             uses_domains = False
 
             # plain if-chains, not match: the page set is a long, stable list
@@ -1346,6 +1395,11 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
                         owner=0, group=0
                     )
                     uses_domains = True
+                elif page == Page.Templates:
+                    ## COMMUNITY TWEAKS FROM TEMPLATES
+                    from src.tweaks.posterboard.community_tweaks import load_record, reset_plan
+                    to_empty, community_leftover = reset_plan(load_record(udid))
+                    files_to_null.extend(path for path in to_empty if path not in files_to_null)
                 elif page == Page.InternalOptions:
                     ## INTERNAL OPTIONS
                     files_to_null.append(FileLocation.globalPreferences.value)
@@ -1410,6 +1464,13 @@ Returns (PreparedBackup, posterboard_db_ok). When the PosterBoard
                 # A partial reset cannot be reconstructed from selection history.
                 from src.controllers.apply_preview import clear_preview
                 clear_preview(udid)
+                if Page.Templates in reset_pages:
+                    from src.tweaks.posterboard.community_tweaks import clear_record
+                    clear_record(udid)
+            if community_leftover:
+                update_label(QCoreApplication.tr(
+                    "Not reset, because GoldenNugget has no copy of what was there before: {0}").format(
+                        ", ".join(community_leftover)))
             update_label(QCoreApplication.tr("Success!"))
             return True
         except Exception as e:

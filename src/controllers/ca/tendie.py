@@ -11,8 +11,6 @@ asset cache).
 from __future__ import annotations
 
 import base64
-import io
-import os
 import re
 import zipfile
 from typing import Dict, List, Optional, Tuple
@@ -127,7 +125,6 @@ def _find_ca_path(pattern: str, paths: List[str]) -> Optional[str]:
 
 
 def _extract_ca_dir(base_dir: str, paths: List[str], zf: zipfile.ZipFile) -> Optional[CADocument]:
-    lower = base_dir.lower()
     by_lower = {p.lower(): p for p in paths}
 
     def get(rel: str) -> Optional[zipfile.ZipInfo]:
@@ -193,7 +190,6 @@ def _extract_inline_assets(caml_text: str) -> Tuple[str, Dict[str, bytes]]:
     assets: Dict[str, bytes] = {}
 
     def repl(m: re.Match) -> str:
-        marker = m.group(1)
         raw = m.group(2)
         try:
             data = base64.b64decode(raw)

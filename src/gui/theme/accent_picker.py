@@ -1,8 +1,21 @@
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QCoreApplication, QT_TRANSLATE_NOOP
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QPushButton
 
 from src.gui.theme.colors import ACCENT_PRESETS
 from src.gui.theme.theme_manager import ColorThemeManager
+
+
+# Tooltip names, declared for lupdate; translated where the tooltip is set.
+_ACCENT_NAMES = {
+    "blue": QT_TRANSLATE_NOOP("Nugget", "Blue"),
+    "purple": QT_TRANSLATE_NOOP("Nugget", "Purple"),
+    "pink": QT_TRANSLATE_NOOP("Nugget", "Pink"),
+    "red": QT_TRANSLATE_NOOP("Nugget", "Red"),
+    "orange": QT_TRANSLATE_NOOP("Nugget", "Orange"),
+    "yellow": QT_TRANSLATE_NOOP("Nugget", "Yellow"),
+    "green": QT_TRANSLATE_NOOP("Nugget", "Green"),
+    "teal": QT_TRANSLATE_NOOP("Nugget", "Teal"),
+}
 
 
 class AccentPicker(QWidget):
@@ -26,7 +39,8 @@ class AccentPicker(QWidget):
             btn.setCursor(Qt.PointingHandCursor)
             btn.setCheckable(True)
             btn.clicked.connect(lambda checked, n=name: self._on_click(n))
-            btn.setToolTip(name.capitalize())
+            btn.setToolTip(QCoreApplication.translate(
+                "Nugget", _ACCENT_NAMES.get(name, name.capitalize())))
             self._buttons[name] = btn
             layout.addWidget(btn)
         layout.addStretch()

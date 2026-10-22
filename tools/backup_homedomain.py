@@ -12,14 +12,12 @@ Requires:
 """
 
 import argparse
-import os
 import sys
-import plistlib
 from pathlib import Path
 
 from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.services.afc import AfcService
-from pymobiledevice3.exceptions import MuxException, ConnectionTerminatedError
+from pymobiledevice3.exceptions import MuxException
 
 
 def connect_device(udid=None):
@@ -39,14 +37,6 @@ def afc_read_file(afc, device_path):
     """Read a file from device via AFC. Returns bytes or None if failed."""
     try:
         return afc.get_file_contents(device_path)
-    except Exception as e:
-        return None
-
-
-def afc_list_dir(afc, device_path):
-    """List directory contents via AFC. Returns list of names or None if not a dir."""
-    try:
-        return afc.listdir(device_path)
     except Exception:
         return None
 
@@ -125,26 +115,6 @@ def try_afc_backup(ld, output_dir):
 
     print(f"AFC backup complete: {count} files downloaded, {skipped} skipped.")
     return count > 0
-
-
-def try_house_arrest_backup(ld, output_dir, bundle_id="com.apple.Preferences"):
-    """
-    Use House Arrest service to access app containers.
-    This gives access to /var/mobile/Containers/ for the specified app.
-    """
-    from pymobiledevice3.services.house_arrest import HouseArrestService
-
-    print(f"\n--- Trying House Arrest backup for {bundle_id} ---")
-    try:
-        ha = HouseArrestService(lockdown=ld, bundle_id=bundle_id, documents_only=False)
-        # House arrest gives access to the app's container
-        # This is limited to specific apps and their containers
-        print("House Arrest connected. Note: This only gives access to specific app containers.")
-        print("For full HomeDomain backup, a proper backup protocol is needed.")
-        return False
-    except Exception as e:
-        print(f"House Arrest failed: {e}")
-        return False
 
 
 def main():

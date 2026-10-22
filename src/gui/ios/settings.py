@@ -8,9 +8,8 @@ from PySide6.QtWidgets import (
 from pathlib import Path
 
 from src.exceptions.nugget_exception import NuggetException
-from src.gui.ios.components import (
-    IOSCard, IOSSectionHeader, IOSSwitch, IOSSettingsAction, IOSSearchField, IOSSearchEmpty,
-    IOSCollapsibleSection, IOSSegmentedFilter
+from src.gui.widgets import (
+    IOSCard, IOSSectionHeader, IOSSwitch, IOSSettingsAction, IOSSearchField, IOSSearchEmpty, IOSCollapsibleSection,
 )
 from src.gui.pages.main.settings import available_languages
 from src.controllers.video_handler import set_ignore_frame_limit
@@ -20,11 +19,6 @@ from src.tweaks.tweaks import tweaks, TweakID
 from src.gui.thread_workers.apply_worker import ResetPairingThread
 from src.gui.dialogs.confirmation import ask_confirmation
 from src.gui.theme import ColorThemeManager, AccentPicker, t, theme_icon
-from src.gui.ios.preset_menu import (
-    load_preset_flow, save_preset_flow, delete_preset_flow,
-    export_preset_flow, partial_export_preset_flow, import_preset_flow,
-    rollback_preset_flow, preset_subtitle,
-)
 
 
 class IOSSettingsPage(QWidget):
@@ -77,6 +71,12 @@ class IOSSettingsPage(QWidget):
         accent_row.addWidget(self._accent_picker)
         self.content_layout.addWidget(accent_row_card)
 
+        self.sidebar_switch = self._make_switch(
+            QCoreApplication.translate("Nugget", "Show Sidebar"),
+            self.window.settings.value("ui/show_sidebar", False, type=bool),
+            self._on_sidebar_toggled,
+        )
+
         # Choose which widget the home screen shows next to the device picker.
         home_widget_card = IOSCard()
         home_widget_row = QHBoxLayout(home_widget_card)
@@ -105,7 +105,7 @@ class IOSSettingsPage(QWidget):
         self.content_layout.addWidget(
             IOSSectionHeader(QCoreApplication.translate("Nugget", "Safety")))
         self._hotload = HotLoad(self.window.settings)
-        self.hotload_switch = self._make_switch(
+        self._make_switch(
             QCoreApplication.translate("Nugget",
                 "Apply automatic safety rules (warns on dangerous features)"),
             self._hotload.is_enabled(),
@@ -187,21 +187,6 @@ class IOSSettingsPage(QWidget):
             pref.use_afc_media,
             lambda checked: self._on_afc_media_toggled(checked, afc_media_switch),
         )
-
-        self.backup_scope = self._make_segmented_choice(
-            QCoreApplication.translate("Nugget", "Backup Type"),
-            [
-                (QCoreApplication.translate("Nugget", "Full Backup"), False),
-                (QCoreApplication.translate("Nugget", "Partial Restore"), True),
-            ],
-            pref.use_partial_restore,
-            self._on_backup_scope_changed,
-        )
-        self.backup_scope.setToolTip(QCoreApplication.translate(
-            "Nugget",
-            "Full Backup includes photos and videos. Partial Restore excludes "
-            "photos and videos, making the backup smaller and faster; settings, "
-            "contacts and messages are still included."))
 
         self.content_layout = standard_layout
         self._make_backup_location_row()
@@ -382,12 +367,13 @@ class IOSSettingsPage(QWidget):
             self._retheme_lang_dropdown()
         if hasattr(self, '_saved_ids_list'):
             self._retheme_saved_ids_list()
-        if hasattr(self, '_preset_name_txt'):
-            self._retheme_preset_inputs()
-        if hasattr(self, '_preset_list'):
-            self._retheme_preset_list()
         if hasattr(self, 'history_count_lbl'):
             self.history_count_lbl.setStyleSheet(t("value_label"))
+        # Edit-value buttons style themselves once in _make_text_row, so they
+        # need to be redone here or they keep the old palette's hover colour.
+        for button in self.findChildren(QPushButton, "settingsEditValue"):
+            button.setStyleSheet(t("tweak_info_button"))
+            button.setIcon(theme_icon(":/icon/edit-value.svg", c.text_secondary))
 
     def _retheme_home_widget_dropdown(self):
         c = self._tm.colors
@@ -450,40 +436,14 @@ class IOSSettingsPage(QWidget):
             QListWidget::item:selected {{ background-color: {c.scrollbar_pressed}; color: {c.text_primary}; }}
         """)
 
-    def _retheme_preset_inputs(self):
-        c = self._tm.colors
-        for edit in (self._preset_name_txt, self._preset_desc_txt):
-            edit.setStyleSheet(f"""
-                QLineEdit {{
-                    background-color: {c.bg_input};
-                    border: none;
-                    border-radius: 10px;
-                    color: {c.text_primary};
-                    font-size: 14px;
-                    padding: 10px 14px;
-                }}
-            """)
-
-    def _retheme_preset_list(self):
-        c = self._tm.colors
-        self._preset_list.setStyleSheet(f"""
-            QListWidget {{
-                background-color: {c.bg_input};
-                border: none;
-                border-radius: 8px;
-                color: {c.text_primary};
-                font-size: 13px;
-                padding: 4px;
-            }}
-            QListWidget::item {{ padding: 8px; }}
-            QListWidget::item:selected {{ background-color: {c.scrollbar_pressed}; color: {c.text_primary}; }}
-        """)
-
     # ---------- helpers ----------
 
     def _style_label(self, label, key):
         label.setProperty('theme_style_key', key)
         label.setStyleSheet(t(key))
+
+    def _on_sidebar_toggled(self, checked):
+        self.window.set_sidebar_enabled(checked)
 
     def _make_switch(self, title: str, checked: bool, on_toggled) -> IOSSwitch:
         c = self._tm.colors
@@ -502,29 +462,6 @@ class IOSSettingsPage(QWidget):
         row.addWidget(switch)
         self.content_layout.addWidget(card)
         return switch
-
-    def _make_segmented_choice(self, title: str, items, current_data, on_changed) -> IOSSegmentedFilter:
-        """A titled card holding a segmented control (two-or-more options).
-
-        ``items`` is a list of ``(title, data)``; the option whose data equals
-        ``current_data`` is preselected without firing ``on_changed``.
-        """
-        card = IOSCard()
-        col = QVBoxLayout(card)
-        col.setContentsMargins(16, 12, 16, 12)
-        col.setSpacing(10)
-
-        label = QLabel(title)
-        self._style_label(label, 'row_title')
-        label.setWordWrap(True)
-        col.addWidget(label)
-
-        segment = IOSSegmentedFilter(items)
-        segment.setCurrentData(current_data)
-        segment.currentIndexChanged.connect(on_changed)
-        col.addWidget(segment)
-        self.content_layout.addWidget(card)
-        return segment
 
     def _make_setting_handler(self, pref_attr: str):
         pref = self.window.device_manager.pref_manager
@@ -545,23 +482,6 @@ class IOSSettingsPage(QWidget):
         mode = self._home_widget_combo.itemData(index)
         if mode:
             self.window.ios_home.set_home_widget(mode)
-
-    def _on_autosave_toggled(self, checked: bool):
-        """Persist the AutoSave option and re-label the home preset banner.
-
-        Nothing is written or deleted here: an existing AutoSave preset stays
-        on disk and remains loadable from the preset list, it just stops being
-        updated and loaded at startup.
-        """
-        pref = self.window.device_manager.pref_manager
-        pref.tweak_autosave = checked
-        self.window.settings.setValue("tweak_autosave", checked)
-        self.window._sync_settings()
-        try:
-            self.window._refresh_preset_widgets()
-        except Exception:
-            # a banner refresh must never break the switch itself
-            pass
 
     def _on_reset_pairing_clicked(self):
         if self.window.device_manager.data_singleton.current_device is None:
@@ -674,21 +594,16 @@ class IOSSettingsPage(QWidget):
         if checked and pref.use_backup_cache:
             QMessageBox.warning(
                 self.window,
-                "Fast Backup Cache is on",
-                "The Fast Backup Cache also uses the AFC (parallel) media "
-                "channel for photos, so this switch has no effect while the "
-                "cache is on. Turn the cache off to use it on the standard "
-                "backup path.",
+                QCoreApplication.translate("Nugget", "Fast Backup Cache is on"),
+                QCoreApplication.translate(
+                    "Nugget",
+                    "The Fast Backup Cache also uses the AFC (parallel) media "
+                    "channel for photos, so this switch has no effect while the "
+                    "cache is on. Turn the cache off to use it on the standard "
+                    "backup path."),
             )
         pref.use_afc_media = checked
         self.window.settings.setValue("use_afc_media", checked)
-        self.window._sync_settings()
-
-    def _on_backup_scope_changed(self, _index: int):
-        pref = self.window.device_manager.pref_manager
-        partial = bool(self.backup_scope.currentData())
-        pref.use_partial_restore = partial
-        self.window.settings.setValue("use_partial_restore", partial)
         self.window._sync_settings()
 
     def _custom_backup_dir_value(self) -> str:
@@ -786,6 +701,7 @@ class IOSSettingsPage(QWidget):
         row.addWidget(self.org_value_lbl)
 
         edit_btn = QPushButton(self)
+        edit_btn.setObjectName("settingsEditValue")
         edit_btn.setFixedSize(44, 36)
         edit_btn.setIcon(theme_icon(":/icon/edit-value.svg", c.text_secondary))
         edit_btn.setIconSize(QSize(19, 19))
@@ -1064,7 +980,7 @@ class IOSSettingsPage(QWidget):
             "", "*.sqlite3", options=FD.ReadOnly)
         if selected_file in (None, ""):
             tweaks[TweakID.PosterBoard].config_manager.database = None
-            self.pb_db_lbl.setText("sqlite: None")
+            self.pb_db_lbl.setText(QCoreApplication.translate("Nugget", "sqlite: None"))
         else:
             # update_database_file RAISES on a rejected database; without this the
             # exception escapes the slot and lands in the crash handler, which is
@@ -1081,7 +997,7 @@ class IOSSettingsPage(QWidget):
                     self, QCoreApplication.translate("Nugget", "Error!"),
                     str(e), e.detailed_text or "")
                 return
-            self.pb_db_lbl.setText("sqlite: Selected")
+            self.pb_db_lbl.setText(QCoreApplication.translate("Nugget", "sqlite: Selected"))
 
     def _on_pb_rebuild(self):
         from src.gui.thread_workers.pb_worker import PBRebuildThread
@@ -1157,167 +1073,6 @@ class IOSSettingsPage(QWidget):
         if curr_row >= 0 and len(tweaks[TweakID.PosterBoard].config_manager.saved_items) > 0:
             tweaks[TweakID.PosterBoard].config_manager.saved_items.pop(curr_row)
             self._refresh_saved_ids()
-
-    # ---------- presets ----------
-
-    def _make_presets_section(self):
-        c = self._tm.colors
-        self.content_layout.addWidget(IOSSectionHeader(
-            QCoreApplication.translate("Nugget", "Presets")
-        ))
-
-        self.autosave_switch = self._make_switch(
-            QCoreApplication.translate("Nugget", "Save Tweaks Automatically"),
-            self.window.device_manager.pref_manager.tweak_autosave,
-            self._on_autosave_toggled,
-        )
-        autosave_hint = QLabel(QCoreApplication.translate(
-            "Nugget",
-            "Saves your tweak selection to a built-in \"AutoSave\" preset "
-            "and restores it on the next launch. Turn off to keep changes "
-            "for this session only — an existing AutoSave preset stays on "
-            "disk and is not loaded at startup."))
-        autosave_hint.setWordWrap(True)
-        self._style_label(autosave_hint, 'small_hint')
-        hint_row = QHBoxLayout()
-        hint_row.setContentsMargins(16, 0, 16, 8)
-        hint_row.addWidget(autosave_hint, 1)
-        self.content_layout.addLayout(hint_row)
-
-        card = IOSCard()
-        presets_layout = QVBoxLayout(card)
-        presets_layout.setContentsMargins(16, 12, 16, 12)
-        presets_layout.setSpacing(8)
-
-        name_row = QHBoxLayout()
-        self.preset_name_txt = QLineEdit()
-        self._preset_name_txt = self.preset_name_txt
-        self.preset_name_txt.setPlaceholderText(QCoreApplication.translate("Nugget", "Preset name"))
-        self.preset_desc_txt = QLineEdit()
-        self._preset_desc_txt = self.preset_desc_txt
-        self.preset_desc_txt.setPlaceholderText(QCoreApplication.translate("Nugget", "Description (optional)"))
-        name_row.addWidget(self.preset_name_txt, 2)
-        name_row.addWidget(self.preset_desc_txt, 3)
-        presets_layout.addLayout(name_row)
-
-        save_btn = self._make_mini_button(QCoreApplication.translate("Nugget", "Save Preset"))
-        save_btn.clicked.connect(self._on_preset_save)
-        presets_layout.addWidget(save_btn)
-
-        self.preset_list = QListWidget()
-        self._preset_list = self.preset_list
-        self.preset_list.setMinimumHeight(120)
-        presets_layout.addWidget(self.preset_list)
-
-        btns_row = QHBoxLayout()
-        for title, handler in [
-            (QCoreApplication.translate("Nugget", "Load"), self._on_preset_load),
-            (QCoreApplication.translate("Nugget", "Delete"), self._on_preset_delete),
-            (QCoreApplication.translate("Nugget", "Refresh"), self.refresh_presets),
-            (QCoreApplication.translate("Nugget", "Rollback Last Apply"), self._on_preset_rollback),
-        ]:
-            btn = self._make_mini_button(title)
-            btn.clicked.connect(handler)
-            btns_row.addWidget(btn)
-        presets_layout.addLayout(btns_row)
-        transfer_row = QHBoxLayout()
-        for title, handler in [
-            (QCoreApplication.translate("Nugget", "Export"), self._on_preset_export),
-            (QCoreApplication.translate("Nugget", "Partial Export"), self._on_preset_partial_export),
-            (QCoreApplication.translate("Nugget", "Import"), self._on_preset_import),
-        ]:
-            btn = self._make_mini_button(title)
-            btn.clicked.connect(handler)
-            transfer_row.addWidget(btn)
-        presets_layout.addLayout(transfer_row)
-
-        self.content_layout.addWidget(card)
-
-    def scroll_to_presets(self):
-        if self.scroll_area is not None:
-            QTimer.singleShot(0, self._scroll_to_bottom)
-
-    def _scroll_to_bottom(self):
-        bar = self.scroll_area.verticalScrollBar()
-        bar.setValue(bar.maximum())
-
-    def refresh_presets(self):
-        self.preset_list.clear()
-        for meta in self.preset_manager.list_presets_with_metadata():
-            name = meta["name"]
-            if name.startswith("__"):
-                continue
-            desc = meta.get("description", "")
-            sub = preset_subtitle(meta)
-            if desc:
-                item_text = f"{name}\n  {desc}  ({sub})"
-            else:
-                item_text = f"{name}  ({sub})"
-            item = QListWidgetItem(item_text)
-            self.preset_list.addItem(item)
-            item.setData(Qt.UserRole, name)
-
-
-    def _on_preset_save(self):
-        if save_preset_flow(
-                self, self.window, self.preset_manager,
-                self.preset_name_txt.text(), self.preset_desc_txt.text()):
-            self.preset_name_txt.clear()
-            self.preset_desc_txt.clear()
-            self.refresh_presets()
-
-    def _on_preset_load(self):
-        if self.preset_list.currentRow() < 0:
-            QMessageBox.warning(
-                self, QCoreApplication.translate("Nugget", "Load Preset"),
-                QCoreApplication.translate("Nugget", "Select a preset to load first."))
-            return
-        name = self._selected_preset_name()
-        if not name:
-            return
-        load_preset_flow(self, self.window, self.preset_manager, name)
-
-    def _on_preset_rollback(self):
-        rollback_preset_flow(self, self.window, self.preset_manager)
-
-    def _selected_preset_name(self) -> str:
-        """Name of the preset selected in the list ("" when nothing is)."""
-        item = self.preset_list.currentItem()
-        if item is None:
-            return ""
-        return item.data(Qt.UserRole) or item.text().split("\n")[0].strip()
-
-    def _require_selection(self, title: str, message: str) -> str:
-        name = self._selected_preset_name()
-        if not name:
-            QMessageBox.warning(
-                self, QCoreApplication.translate("Nugget", title),
-                QCoreApplication.translate("Nugget", message))
-            return ""
-        return name
-
-
-    def _on_preset_delete(self):
-        name = self._require_selection(
-            "Delete Preset", "Select a preset to delete first.")
-        if name and delete_preset_flow(self, self.preset_manager, name):
-            self.refresh_presets()
-
-    def _on_preset_export(self):
-        name = self._require_selection(
-            "Export Preset", "Select a preset to export first.")
-        if name:
-            export_preset_flow(self, self.preset_manager, name)
-
-    def _on_preset_partial_export(self):
-        name = self._require_selection(
-            "Partial Export", "Select a preset to export first.")
-        if name:
-            partial_export_preset_flow(self, self.preset_manager, name)
-
-    def _on_preset_import(self):
-        if import_preset_flow(self, self.preset_manager):
-            self.refresh_presets()
 
     # ---------- about ----------
 

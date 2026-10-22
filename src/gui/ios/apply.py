@@ -1,10 +1,11 @@
 from PySide6.QtCore import Qt, QCoreApplication
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QScrollArea
+    QWidget, QVBoxLayout, QLabel, QScrollArea, QPushButton
 )
 
-from src.gui.ios.components import (
-    IOSSectionHeader, IOSCard, IOSPrimaryButton, IOSDangerButton)
+from src.gui.widgets import (
+    IOSSectionHeader, IOSCard, IOSPrimaryButton, IOSDangerButton,
+)
 from src.gui.theme import ColorThemeManager, t
 
 
@@ -60,6 +61,15 @@ class IOSApplyPage(QWidget):
             "Nugget", "Apply enabled tweaks"))
         self.apply_btn.clicked.connect(self.window.apply_tweaks_clicked)
         apply_layout.addWidget(self.apply_btn)
+        self.preview_btn = QPushButton(QCoreApplication.translate(
+            "DeviceTwin", "Preview on iPhone"))
+        self.preview_btn.setCursor(Qt.PointingHandCursor)
+        self.preview_btn.setMinimumHeight(40)
+        self.preview_btn.setToolTip(QCoreApplication.translate(
+            "DeviceTwin", "See the Lock Screen and Home Screen with the selected tweaks before applying."))
+        self.preview_btn.clicked.connect(self.window.show_device_twin)
+        apply_layout.addWidget(self.preview_btn)
+        self.preview_btn.setStyleSheet(t("mini_button"))
         content_layout.addWidget(apply_card)
 
         # --- Remove ---
@@ -127,6 +137,7 @@ class IOSApplyPage(QWidget):
     def _retheme(self):
         c = ColorThemeManager.instance().colors
         self._scroll.setStyleSheet(f"background-color: {c.bg_primary}; border: none;")
+        self.preview_btn.setStyleSheet(t("mini_button"))
         self.apply_desc.setStyleSheet(f"color: {c.text_secondary}; font-size: 13px; background-color: transparent;")
         self.remove_desc.setStyleSheet(f"color: {c.text_secondary}; font-size: 13px; background-color: transparent;")
         self.progress_card._retheme()

@@ -29,8 +29,6 @@ from .models import (
     Vec3,
 )
 
-_CAML_NS = "http://www.apple.com/CoreAnimation/1.0"
-
 
 def _local(tag) -> str:
     if isinstance(tag, str):

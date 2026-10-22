@@ -39,11 +39,9 @@ from .render import (  # noqa: F401
     SceneCompositeRenderer,
     appearance_variant_state,
     bundle_has_appearance_variants,
-    document_has_motion,
     document_loop_duration,
     home_state,
     preview_renderer,
-    render_document,
     state_transition_spec,
 )
 
@@ -72,10 +70,8 @@ __all__ = [
     "SceneCompositeRenderer",
     "appearance_variant_state",
     "bundle_has_appearance_variants",
-    "document_has_motion",
     "document_loop_duration",
     "home_state",
     "preview_renderer",
-    "render_document",
     "state_transition_spec",
 ]

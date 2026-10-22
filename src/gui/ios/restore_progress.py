@@ -4,7 +4,9 @@ import re
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QSizePolicy
 
-from src.gui.ios.components import IOSCard
+from src.gui.widgets import (
+    IOSCard,
+)
 from src.gui.theme import ColorThemeManager, t, theme_pixmap
 
 _STAGES = {

@@ -1,3 +1,11 @@
+# PEP 810: defer operation-only dependencies on Python 3.15+; eager on older Python.
+__lazy_modules__ = (
+    "src.restore.skip_setup27",
+    "pymobiledevice3.services.installation_proxy",
+    "pymobiledevice3.services.lockdown_service",
+    "pymobiledevice3.services.mobilebackup2",
+)
+
 import asyncio
 import os
 import plistlib
@@ -15,7 +23,7 @@ from src.utils.file_to_restore import FileToRestore, _FileMode
 from .lastapply import is_ios27_scaffolding, load_lastapply, sparse_signature
 from .skip_setup27 import skip_all_setup27
 from .afc_media import (
-    afc_media_dir_for, afc_media_enabled, describe_media_store,
+    afc_media_dir_for, describe_media_store,
     media_store_verified, restore_media_via_afc,
 )
 from .inject import _is_encrypted_backup
@@ -38,7 +46,7 @@ from pymobiledevice3.lockdown import LockdownClient, create_using_usbmux
 from pymobiledevice3.services.installation_proxy import InstallationProxyService
 from pymobiledevice3.services.lockdown_service import LockdownService
 from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
-from pymobiledevice3.exceptions import ConnectionTerminatedError, PyMobileDevice3Exception, DeviceNotFoundError, PasswordRequiredError, NotPairedError, ConnectionFailedError, InvalidServiceError, CloudConfigurationAlreadyPresentError
+from pymobiledevice3.exceptions import ConnectionTerminatedError, PasswordRequiredError, InvalidServiceError, CloudConfigurationAlreadyPresentError
 
 from src.exceptions.nugget_exception import NuggetException
 from src.exceptions.device_errors import is_transient_restore_error, is_find_my_error

@@ -1,4 +1,5 @@
 .env
+.macos-libusb/
 build
 com.apple.MobileGestalt.plist
 .DS_Store

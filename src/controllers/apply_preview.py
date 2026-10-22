@@ -120,6 +120,15 @@ def capture_preview(manager):
                 queued.append((QCoreApplication.translate("ApplyPreview", "Video wallpaper"), os.path.basename(tweak.videoFile)))
         elif tid == TweakID.Templates:
             queued.extend(("Templates", os.path.basename(item.path)) for item in tweak.templates)
+            from src.tweaks.posterboard.community_tweaks import active
+            for item in tweak.templates:
+                for name, community, _writes in active([(item.name, getattr(item, "tweaks", []))], version):
+                    state = community.state()
+                    shown = QCoreApplication.translate("ApplyPreview", "On" if community.enabled else "Off")
+                    if community.enabled and community.control is not None:
+                        shown += f": {community.value}"
+                    add(f"Community/{os.path.basename(item.path)}/{community.id}", "Community Tweaks",
+                        f"{name} — {community.label}", state, shown)
         elif tid == TweakID.IconThemes:
             queued.extend((QCoreApplication.translate("ApplyPreview", "Icon Themes"), item.display_name) for item in tweak.themes)
         elif tid == TweakID.Daemons and tweak.enabled:

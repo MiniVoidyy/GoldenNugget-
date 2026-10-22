@@ -72,39 +72,6 @@ def filter_posterboard_files(
     return filtered
 
 
-def filter_posterboard_from_file_objects(
-    file_objects: list[Any],
-    *,
-    exclude_prefixes: tuple[str, ...] = EXCLUDED_DOMAIN_PREFIXES,
-) -> list[Any]:
-    """Same as filter_posterboard_files but operates on FileToRestore objects.
-
-    Files are identified by their .domain attribute rather than dict key.
-    """
-    if not file_objects:
-        return []
-
-    filtered: list[Any] = []
-    removed: list[str] = []
-
-    for f in file_objects:
-        domain = getattr(f, "domain", "")
-        if isinstance(domain, str) and domain.startswith(exclude_prefixes):
-            removed.append(getattr(f, "restore_path", "<no path>"))
-            continue
-        filtered.append(f)
-
-    if removed:
-        print(
-            f"[PosterBoardFilter] Removed {len(removed)} file object(s)"
-            f" from restore list to avoid MBErrorDomain/205:"
-        )
-        for path in removed:
-            print(f"  - {path}")
-
-    return filtered
-
-
 # ---------------------------------------------------------------------------
 # Standalone usage
 # ---------------------------------------------------------------------------

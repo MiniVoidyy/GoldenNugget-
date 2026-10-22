@@ -8,7 +8,9 @@ from PySide6.QtWidgets import (
     QComboBox, QSizePolicy, QScrollArea, QProgressBar, QToolButton, QTabWidget
 )
 
-from src.gui.ios.components import IOSCard, IOSPrimaryButton
+from src.gui.widgets import (
+    IOSCard, IOSPrimaryButton,
+)
 from src.gui.theme import t, ColorThemeManager, theme_icon, theme_pixmap
 
 from src.gui.ios.feature_icons import FEATURE_ICONS
@@ -191,7 +193,7 @@ class IOSHomePage(QWidget):
         self._logo = QLabel(self)
         self._logo.setFixedSize(88, 88)
         self._logo.setScaledContents(True)
-        pixmap = QPixmap(":/credits/nugget_half_eaten.png")
+        pixmap = QPixmap(":/credits/big_nugget.png")
         if not pixmap.isNull():
             self._logo.setPixmap(pixmap)
         else:
@@ -212,11 +214,12 @@ class IOSHomePage(QWidget):
         self.subtitle.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.subtitle.setTextFormat(Qt.PlainText)
         title_layout.addWidget(self.subtitle)
-        header.addLayout(title_layout, 1)
+        header.addLayout(title_layout)
 
         self.control_tabs = QTabWidget(self)
         self.control_tabs.setDocumentMode(True)
-        self.control_tabs.setFixedSize(560, 116)
+        self.control_tabs.setFixedHeight(116)
+        self.control_tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         self._developer_page = None
         if not getattr(sys, 'frozen', False):
@@ -335,8 +338,7 @@ class IOSHomePage(QWidget):
         self.control_tabs.setCornerWidget(utility_corner, Qt.TopRightCorner)
         self._style_control_tabs()
 
-        header.addStretch(1)
-        header.addWidget(self.control_tabs)
+        header.addWidget(self.control_tabs, 1)
         layout.addLayout(header)
 
         self._style_device_combo()
@@ -358,11 +360,13 @@ class IOSHomePage(QWidget):
             "Icon Themes", "Themed app icons & labels", 10),
             self._make_card(
             "Passcode Theme", "Custom keypad theme (.passthm)", 11)]
-        (self.posterboard_card, self.tweaks_card,
-         self.daemons_card, self.statusbar_card,
-         self.icon_themes_card, self.passcode_theme_card) = cards_row
+        (self.posterboard_card, _, self.daemons_card,
+         self.statusbar_card, _, self.passcode_theme_card) = cards_row
         self.cards_grid = _CardGrid(cards_row)
         layout.addWidget(self.cards_grid)
+        # a slim row instead of a seventh tile, so the six tiles keep one row
+        self.catalog_card = self._make_catalog_row()
+        layout.addWidget(self.catalog_card)
 
         # Apply / Reset share one row on the home screen.
         actions = QHBoxLayout()
@@ -532,6 +536,7 @@ class IOSHomePage(QWidget):
             self._paint_tile_icon(icon_lbl, icon_res)
             title_lbl.setStyleSheet(t("home_tile_title"))
             sub_lbl.setStyleSheet(t("home_tile_subtitle"))
+        self._paint_catalog_row()
         self.update_passcode_support()
 
     def populate_device_picker(self):
@@ -599,11 +604,6 @@ class IOSHomePage(QWidget):
         """Open the dedicated Apply page before starting an operation."""
         self.window.show_ios_page(6)
         self.window._sync_sidebar_selection()
-
-    def reset_tweaks(self):
-        from src.gui.dialogs.reset_dialog import ResetDialog
-        dialog = ResetDialog(device_manager=self.window.device_manager, apply_reset=self.window.apply_changes)
-        dialog.exec()
 
     def show_process_status(self, text: str, success: bool = None):
         c = self._c
@@ -783,8 +783,11 @@ class IOSHomePage(QWidget):
             self.control_tabs.addTab(self._storage_page, QCoreApplication.translate("Nugget", "Device Storage"))
         if current is not None and self.control_tabs.indexOf(current) >= 0:
             self.control_tabs.setCurrentWidget(current)
+        # A preferred width, not a fixed one: the window is only 1000px wide,
+        # so the panel must give way to the logo + title instead of pushing
+        # the whole page into a horizontal scroll.
         width = 640 if mode == "both" else 560
-        self.control_tabs.setFixedWidth(width + (100 if self._developer_page is not None else 0))
+        self.control_tabs.setMaximumWidth(width + (100 if self._developer_page is not None else 0))
         self.control_tabs.blockSignals(False)
 
     def _on_control_tab_changed(self, index):
@@ -863,6 +866,56 @@ class IOSHomePage(QWidget):
         card.mousePressEvent = lambda e: self.switch_to_ios_page(page_index)
         card.setCursor(Qt.PointingHandCursor)
         return card
+
+    def _make_catalog_row(self) -> IOSCard:
+        """The Community Catalog entry: icon, name and caption on one line."""
+        card = _TileCard()
+        row = QHBoxLayout(card)
+        row.setContentsMargins(16, 10, 16, 10)
+        row.setSpacing(12)
+        self._catalog_icon = QLabel(card)
+        self._catalog_icon.setFixedSize(28, 28)
+        self._catalog_icon.setStyleSheet("background-color: transparent;")
+        row.addWidget(self._catalog_icon)
+        self._catalog_title = QLabel(QCoreApplication.translate("Nugget", "Community Catalog"), card)
+        row.addWidget(self._catalog_title)
+        self._catalog_caption = QLabel(
+            QCoreApplication.translate("Nugget", "Presets & templates from the community"), card)
+        row.addWidget(self._catalog_caption, 1)
+        self._catalog_chevron = QLabel("›", card)
+        row.addWidget(self._catalog_chevron)
+        card.mousePressEvent = lambda e: self.switch_to_ios_page(13)
+        card.setCursor(Qt.PointingHandCursor)
+        self._paint_catalog_row()
+        QTimer.singleShot(0, self.refresh_catalog_badge)
+        return card
+
+    def refresh_catalog_badge(self):
+        """Mention catalog updates for imported presets and added templates,
+        counted against the cached catalog (no download)."""
+        text = QCoreApplication.translate("Nugget", "Presets & templates from the community")
+        try:
+            from src.controllers import preset_catalog
+            from src.controllers.preset_manager import PresetManager
+            data, _saved_at = preset_catalog.read_cache()
+            if data is not None:
+                pm = getattr(getattr(self.window, "ios_presets", None), "preset_manager", None) or PresetManager()
+                entries, templates, _ = preset_catalog.parse_catalog(data, pm._valid_import_structure)
+                updates = preset_catalog.count_updates(entries + templates, preset_catalog.installed_items(pm))
+                if updates:
+                    text = QCoreApplication.translate("Nugget", "{0} update(s) available").format(updates)
+        except Exception:
+            pass
+        self._catalog_caption.setText(text)
+
+    def _paint_catalog_row(self):
+        if not hasattr(self, "_catalog_icon"):
+            return
+        self._catalog_icon.setPixmap(theme_pixmap(
+            FEATURE_ICONS["Community Catalog"], self._c.text_primary, 28, self.devicePixelRatioF()))
+        self._catalog_title.setStyleSheet(t("home_tile_title"))
+        self._catalog_caption.setStyleSheet(t("home_tile_subtitle"))
+        self._catalog_chevron.setStyleSheet(t("home_tile_subtitle") + "font-size: 20px;")
 
     def _paint_tile_icon(self, label: QLabel, icon_res: str):
         """Draw a feature icon at tile size (and screen density) in the

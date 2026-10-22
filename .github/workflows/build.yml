@@ -3,14 +3,8 @@ name: Build Nugget
 on:
   workflow_dispatch:
     inputs:
-      build_for_macos_intel:
-        description: 'Build macOS Intel'
-        required: false
-        default: true
-        type: boolean
-
-      build_for_macos_arm:
-        description: 'Build macOS ARM'
+      build_for_macos:
+        description: 'Build macOS Universal2 (Sonoma 14.4+, DMG and ZIP)'
         required: false
         default: true
         type: boolean
@@ -37,83 +31,178 @@ permissions:
   contents: read
 
 jobs:
-  build-macos-intel:
-    if: ${{ github.event_name == 'push' || github.event.inputs.build_for_macos_intel == 'true' }}
-    runs-on: macos-15-intel
-
+  build-macos-qt:
+    if: ${{ github.event_name == 'push' || inputs.build_for_macos }}
+    name: Qt 6.12 / Python 3.15 (cross-compile Universal2)
+    runs-on: macos-26
+    timeout-minutes: 180
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '14.4'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
+      - uses: actions/checkout@v5
+      # python.org ships both slices; setup-python's interpreter is host-specific.
+      - name: Install universal Python 3.15
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/python.pkg" \
+            https://www.python.org/ftp/python/3.15.0/python-3.15.0-macos11.pkg
+          pkgutil --check-signature "$RUNNER_TEMP/python.pkg"
+          sudo installer -pkg "$RUNNER_TEMP/python.pkg" -target /
+          /Library/Frameworks/Python.framework/Versions/3.15/bin/python3.15 -m venv .qt-env
+          echo "$GITHUB_WORKSPACE/.qt-env/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        id: qt-cache
         with:
-          python-version: '3.15'
+          path: .macos-qt-wheels
+          key: qt-universal2-macos26-v1-6.12.0-python-3.15.0-macos14.4-${{ hashFiles('tools/build_macos_qt.sh') }}
+      - name: Cross-compile Universal2 Qt and Python bindings for Sonoma
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        run: bash tools/build_macos_qt.sh
+      - uses: actions/upload-artifact@v6
+        with:
+          name: macOS-Qt-universal2
+          include-hidden-files: true
+          path: .macos-qt-wheels/*.whl
+          if-no-files-found: error
 
-      - name: Create venv and install requirements
+  build-macos-cryptography:
+    if: ${{ github.event_name == 'push' || inputs.build_for_macos }}
+    name: cryptography 50 / static Universal2 OpenSSL
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install universal Python 3.15
         run: |
-          python3 -m venv .env
-          source .env/bin/activate
-          python -m pip install -U pip setuptools wheel
-          pip install --no-binary sslpsk_pmd3 -r requirements.txt
-
-      - name: Build macOS Intel
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/python.pkg" \
+            https://www.python.org/ftp/python/3.15.0/python-3.15.0-macos11.pkg
+          pkgutil --check-signature "$RUNNER_TEMP/python.pkg"
+          sudo installer -pkg "$RUNNER_TEMP/python.pkg" -target /
+          /Library/Frameworks/Python.framework/Versions/3.15/bin/python3.15 -m venv .crypto-env
+          echo "$GITHUB_WORKSPACE/.crypto-env/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        id: crypto-cache
+        with:
+          path: .macos-cryptography-wheels
+          key: cryptography-50-python315-macos26-universal2-${{ hashFiles('tools/build_macos_cryptography.sh') }}
+      - name: Cross-compile static OpenSSL and cryptography
+        if: steps.crypto-cache.outputs.cache-hit != 'true'
+        run: bash tools/build_macos_cryptography.sh
+      - name: Test source-built cryptography on the native host
         run: |
-          source .env/bin/activate
-          python3 compile.py
+          python -m pip install .macos-cryptography-wheels/*.whl
+          python - <<'PY'
+          import cryptography
+          from cryptography.hazmat.primitives import hashes
+          from cryptography.hazmat.primitives.asymmetric import padding, rsa
+          from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+          assert cryptography.__version__ == '50.0.0'
+          cipher = Cipher(algorithms.AES(bytes(16)), modes.ECB()).encryptor()
+          assert cipher.update(bytes(16)) + cipher.finalize() == bytes.fromhex('66e94bd4ef8a2c3b884cfa59ca342b2e')
+          key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+          signature = key.sign(b'GoldenNugget', padding.PKCS1v15(), hashes.SHA256())
+          key.public_key().verify(signature, b'GoldenNugget', padding.PKCS1v15(), hashes.SHA256())
+          print('cryptography 50: AES and RSA passed')
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: macOS-cryptography-universal2
+          include-hidden-files: true
+          path: .macos-cryptography-wheels/*.whl
+          if-no-files-found: error
 
-      - name: Upload macOS Intel
+  build-macos:
+    needs: [build-macos-qt, build-macos-cryptography]
+    name: macOS Universal2 / Python 3.15 / Qt 6.12
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '14.4'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: macOS-Qt-universal2
+          path: .macos-qt-wheels
+      - uses: actions/download-artifact@v7
+        with:
+          name: macOS-cryptography-universal2
+          path: .macos-cryptography-wheels
+      - name: Install universal Python 3.15
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/python.pkg" \
+            https://www.python.org/ftp/python/3.15.0/python-3.15.0-macos11.pkg
+          pkgutil --check-signature "$RUNNER_TEMP/python.pkg"
+          sudo installer -pkg "$RUNNER_TEMP/python.pkg" -target /
+          /Library/Frameworks/Python.framework/Versions/3.15/bin/python3.15 -m venv .env
+          echo "$GITHUB_WORKSPACE/.env/bin" >> "$GITHUB_PATH"
+      - name: Install compatible dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python tools/normalize_macos_wheels.py .macos-qt-wheels/*.whl
+          python -m pip install --no-deps .macos-qt-wheels/*.whl .macos-cryptography-wheels/*.whl
+          python -m pip install -r requirements.txt -c requirements-macos.txt
+          python tools/prepare_macos_universal.py .macos-qt-wheels
+          python -m pip check
+          python -m pip freeze > macOS-dependencies.txt
+      - name: Build portable Universal2 libusb
+        run: bash tools/build_macos_libusb.sh
+      - name: Build Universal2, validate and package DMG
+        run: |
+          python compile.py --target-arch=universal2
+          python tools/package_macos.py
+          # Keep every uploaded file under dist/: upload-artifact roots the
+          # artifact at the common parent, and a file outside dist/ would nest
+          # the ZIP and DMG under dist/ where the smoke test cannot find them.
+          cp macOS-dependencies.txt dist/
+          QT_QPA_PLATFORM=offscreen dist/Nugget.app/Contents/MacOS/Nugget tools/smoke_macos.py > smoke.log 2>&1
+          cat smoke.log
+          grep -q 'MACOS_SMOKE_OK' smoke.log
+      - name: Upload macOS failure diagnostics
+        if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: Nugget_macOS_intel
-          path: dist/Nugget-macOS-*.zip
-          if-no-files-found: error
-          archive: false
-
-
-
-  build-macos-arm:
-    if: ${{ github.event_name == 'push' || github.event.inputs.build_for_macos_arm == 'true' }}
-    runs-on: macos-15
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.15'
-
-      - name: Install OpenSSL
-        run: |
-          brew install openssl@3 pkgconf || true
-
-      - name: Create venv and install requirements
-        run: |
-          python3 -m venv .env
-          source .env/bin/activate
-          python -m pip install -U pip setuptools wheel
-
-          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
-          export CPPFLAGS="-I${OPENSSL_PREFIX}/include"
-          export LDFLAGS="-L${OPENSSL_PREFIX}/lib"
-          export PKG_CONFIG_PATH="${OPENSSL_PREFIX}/lib/pkgconfig"
-
-          pip install --no-binary sslpsk_pmd3 -r requirements.txt
-
-      - name: Build macOS ARM
-        run: |
-          source .env/bin/activate
-          python3 compile.py
-
-      - name: Upload macOS ARM
+          name: Nugget_macOS_diagnostics
+          path: |
+            dist/macOS-validation.json
+            dist/macOS-validation.stderr.log
+            dist/Nugget-macOS-Universal.zip
+            macOS-dependencies.txt
+            smoke.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload macOS Universal2
         uses: actions/upload-artifact@v6
         with:
-          name: Nugget_macOS_arm
-          path: dist/Nugget-macOS-*.zip
+          name: Nugget_macOS_Universal2
+          path: |
+            dist/Nugget-macOS-Universal2.dmg
+            dist/Nugget-macOS-Universal.zip
+            dist/macOS-validation.json
+            dist/SHA256SUMS-macOS.txt
+            dist/macOS-dependencies.txt
           if-no-files-found: error
-          archive: false
+
+  test-macos:
+    needs: build-macos
+    name: Smoke test macOS ARM64
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: Nugget_macOS_Universal2
+          path: artifacts
+      - name: Test frozen application
+        env:
+          QT_QPA_PLATFORM: offscreen
+          TEST_ARCH: arm64
+        run: |
+          ditto -x -k artifacts/Nugget-macOS-Universal.zip extracted
+          codesign --verify --deep --strict extracted/Nugget.app
+          extracted/Nugget.app/Contents/MacOS/Nugget tools/smoke_macos.py > smoke.log 2>&1
+          cat smoke.log
+          grep -q 'MACOS_SMOKE_OK' smoke.log
+          hdiutil verify artifacts/Nugget-macOS-Universal2.dmg
 
   build-windows:
     if: ${{ github.event_name == 'push' || github.event.inputs.build_for_windows == 'true' }}

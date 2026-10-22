@@ -30,7 +30,7 @@ import os
 from typing import Callable, Optional
 from urllib.parse import quote
 
-from PySide6.QtCore import QCoreApplication, QObject, QEvent, QUrl
+from PySide6.QtCore import QCoreApplication, QObject, QEvent, QUrl, QT_TRANSLATE_NOOP
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QDialog, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QPlainTextEdit
 
@@ -79,46 +79,46 @@ def _classify(exc_type, exc_value) -> dict:
         module = ""
 
     # Defaults
-    severity, fault, friendly = "Serious", "Unknown", f"An error occurred ({name})."
+    severity, fault, friendly = QT_TRANSLATE_NOOP("Nugget", "Serious"), QT_TRANSLATE_NOOP("Nugget", "Unknown"), f"An error occurred ({name})."
 
     # --- Device locked ---
     if is_device_locked_error(exc_value):
-        severity, fault, friendly = "Moderate", "Your device", \
-            "Your device is locked. Unlock it and keep it awake, then try again."
+        severity, fault, friendly = QT_TRANSLATE_NOOP("Nugget", "Moderate"), QT_TRANSLATE_NOOP("Nugget", "Your device"), \
+            QT_TRANSLATE_NOOP("Nugget", "Your device is locked. Unlock it and keep it awake, then try again.")
     elif issubclass(exc_type, (BackupDiskSpaceError, NotEnoughDiskSpaceError)):
-        severity, fault, friendly = "Moderate", "Your computer's storage", \
-            (msg or "The backup drive does not have enough free disk space. "
-             "Free space or choose another backup location in Settings.")
+        severity, fault, friendly = QT_TRANSLATE_NOOP("Nugget", "Moderate"), QT_TRANSLATE_NOOP("Nugget", "Your computer's storage"), \
+            (msg or QT_TRANSLATE_NOOP("Nugget", "The backup drive does not have enough free disk space. "
+             "Free space or choose another backup location in Settings."))
     # --- File / OS / user-data issues (subclasses of OSError, so they MUST be
     # checked before the generic connection/OSError branch below). ---
     elif issubclass(exc_type, FileNotFoundError):
-        severity, fault, friendly = "Minor", "Your files or setup", \
-            "GoldenNugget couldn't find a file or folder it needed."
+        severity, fault, friendly = QT_TRANSLATE_NOOP("Nugget", "Minor"), QT_TRANSLATE_NOOP("Nugget", "Your files or setup"), \
+            QT_TRANSLATE_NOOP("Nugget", "GoldenNugget couldn't find a file or folder it needed.")
     elif issubclass(exc_type, PermissionError):
-        severity, fault, friendly = "Minor", "Your files or setup", \
-            "GoldenNugget didn't have permission to access a file or folder."
+        severity, fault, friendly = QT_TRANSLATE_NOOP("Nugget", "Minor"), QT_TRANSLATE_NOOP("Nugget", "Your files or setup"), \
+            QT_TRANSLATE_NOOP("Nugget", "GoldenNugget didn't have permission to access a file or folder.")
     elif issubclass(exc_type, FileExistsError):
-        severity, fault, friendly = "Minor", "Your files or setup", \
-            "GoldenNugget tried to create something that already exists."
+        severity, fault, friendly = QT_TRANSLATE_NOOP("Nugget", "Minor"), QT_TRANSLATE_NOOP("Nugget", "Your files or setup"), \
+            QT_TRANSLATE_NOOP("Nugget", "GoldenNugget tried to create something that already exists.")
     elif issubclass(exc_type, (IsADirectoryError, NotADirectoryError)):
-        severity, fault, friendly = "Minor", "Your files or setup", \
-            "A file path was used as a folder (or a folder as a file)."
+        severity, fault, friendly = QT_TRANSLATE_NOOP("Nugget", "Minor"), QT_TRANSLATE_NOOP("Nugget", "Your files or setup"), \
+            QT_TRANSLATE_NOOP("Nugget", "A file path was used as a folder (or a folder as a file).")
     # --- Device / connection ---
     elif is_connection_error(exc_value) or "terminated" in msg.lower():
-        severity, fault, friendly = "Moderate", "Your device or connection", \
-            "GoldenNugget couldn't communicate with your device."
+        severity, fault, friendly = QT_TRANSLATE_NOOP("Nugget", "Moderate"), QT_TRANSLATE_NOOP("Nugget", "Your device or connection"), \
+            QT_TRANSLATE_NOOP("Nugget", "GoldenNugget couldn't communicate with your device.")
     # --- Out of memory ---
     elif issubclass(exc_type, MemoryError):
-        severity, fault, friendly = "Fatal", "Your computer", \
-            "Your computer ran out of memory. Close some programs and try again."
+        severity, fault, friendly = QT_TRANSLATE_NOOP("Nugget", "Fatal"), QT_TRANSLATE_NOOP("Nugget", "Your computer"), \
+            QT_TRANSLATE_NOOP("Nugget", "Your computer ran out of memory. Close some programs and try again.")
     # --- App logic / programming errors ---
     elif name == "NuggetException" or module.startswith("src."):
-        severity, fault, friendly = "Serious", "The app (GoldenNugget)", \
-            "GoldenNugget hit an internal problem."
+        severity, fault, friendly = QT_TRANSLATE_NOOP("Nugget", "Serious"), QT_TRANSLATE_NOOP("Nugget", "The app (GoldenNugget)"), \
+            QT_TRANSLATE_NOOP("Nugget", "GoldenNugget hit an internal problem.")
     elif issubclass(exc_type, (TypeError, ValueError, KeyError, IndexError,
                                AttributeError, ImportError, NameError, OSError)):
-        severity, fault, friendly = "Serious", "The app (GoldenNugget)", \
-            "GoldenNugget hit an internal problem."
+        severity, fault, friendly = QT_TRANSLATE_NOOP("Nugget", "Serious"), QT_TRANSLATE_NOOP("Nugget", "The app (GoldenNugget)"), \
+            QT_TRANSLATE_NOOP("Nugget", "GoldenNugget hit an internal problem.")
 
     return {
         "severity": severity,
@@ -202,7 +202,7 @@ class CrashDialog(QDialog):
                  backup_path: Optional[str] = None,
                  on_restore: Optional[Callable[[], None]] = None):
         super().__init__(parent)
-        self.setWindowTitle(f"{_app_name()} - Detected an Error")
+        self.setWindowTitle(QCoreApplication.translate("Nugget", "{0} - Detected an Error").format(_app_name()))
         self.setModal(True)
         self.resize(640, 480)
 
@@ -214,22 +214,24 @@ class CrashDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        heading = QLabel(
+        heading = QLabel(QCoreApplication.translate("Nugget", 
             "GoldenNugget detected an error. Here's what we know - report it to "
-            "us or copy the details (with the session log) before restarting.")
+            "us or copy the details (with the session log) before restarting."))
         heading.setWordWrap(True)
         heading.setStyleSheet("font-size: 16px; font-weight: 600;")
         layout.addWidget(heading)
 
-        severity_label = QLabel(f"Severity: {info['severity']}")
+        severity_label = QLabel(QCoreApplication.translate("Nugget", "Severity: {0}").format(
+            QCoreApplication.translate("Nugget", info['severity'])))
         severity_label.setWordWrap(True)
         layout.addWidget(severity_label)
 
-        fault_label = QLabel(f"Likely cause: {info['fault']}")
+        fault_label = QLabel(QCoreApplication.translate("Nugget", "Likely cause: {0}").format(
+            QCoreApplication.translate("Nugget", info['fault'])))
         fault_label.setWordWrap(True)
         layout.addWidget(fault_label)
 
-        friendly_label = QLabel(info['friendly'])
+        friendly_label = QLabel(QCoreApplication.translate("Nugget", info['friendly']))
         friendly_label.setWordWrap(True)
         friendly_label.setStyleSheet("color: #007AFF; font-style: italic;")
         layout.addWidget(friendly_label)
@@ -243,10 +245,10 @@ class CrashDialog(QDialog):
         self._details = QPlainTextEdit()
         self._details.setReadOnly(True)
         self._details.setPlainText(traceback_text)
-        self._details.setPlaceholderText("No technical details available.")
+        self._details.setPlaceholderText(QCoreApplication.translate("Nugget", "No technical details available."))
         layout.addWidget(self._details, 1)
 
-        log_path_label = QLabel(f"Log: {get_log_path()}")
+        log_path_label = QLabel(QCoreApplication.translate("Nugget", "Log: {0}").format(get_log_path()))
         log_path_label.setWordWrap(True)
         log_path_label.setStyleSheet("color: #888; font-size: 10px;")
         layout.addWidget(log_path_label)
@@ -255,32 +257,32 @@ class CrashDialog(QDialog):
         buttons.addStretch(1)
 
         if self._backup_path:
-            restore_btn = QPushButton("Restore data from backup")
-            restore_btn.setToolTip(
+            restore_btn = QPushButton(QCoreApplication.translate("Nugget", "Restore data from backup"))
+            restore_btn.setToolTip(QCoreApplication.translate("Nugget", 
                 "Restore the protective backup from the failed apply to avoid "
-                "data loss.")
+                "data loss."))
             restore_btn.clicked.connect(self._restore)
             buttons.addWidget(restore_btn)
 
-        report_btn = QPushButton("Report on GitHub")
-        report_btn.setToolTip(
+        report_btn = QPushButton(QCoreApplication.translate("Nugget", "Report on GitHub"))
+        report_btn.setToolTip(QCoreApplication.translate("Nugget", 
             "Copies the error details + session log and opens the issue "
-            "tracker in your browser with a pre-filled report.")
+            "tracker in your browser with a pre-filled report."))
         report_btn.clicked.connect(lambda: self._report(info, summary, traceback_text))
         buttons.addWidget(report_btn)
 
-        copy_btn = QPushButton("Copy Error")
-        copy_btn.setToolTip("Copies the full error report + session log to the clipboard.")
+        copy_btn = QPushButton(QCoreApplication.translate("Nugget", "Copy Error"))
+        copy_btn.setToolTip(QCoreApplication.translate("Nugget", "Copies the full error report + session log to the clipboard."))
         copy_btn.clicked.connect(self._copy)
         buttons.addWidget(copy_btn)
 
-        open_log_btn = QPushButton("Open Log")
-        open_log_btn.setToolTip("Opens the session log file in your preferred text editor.")
+        open_log_btn = QPushButton(QCoreApplication.translate("Nugget", "Open Log"))
+        open_log_btn.setToolTip(QCoreApplication.translate("Nugget", "Opens the session log file in your preferred text editor."))
         open_log_btn.clicked.connect(self._open_log)
         buttons.addWidget(open_log_btn)
 
-        continue_btn = QPushButton("Restart App")
-        continue_btn.setToolTip("Close the error report and relaunch GoldenNugget.")
+        continue_btn = QPushButton(QCoreApplication.translate("Nugget", "Restart App"))
+        continue_btn.setToolTip(QCoreApplication.translate("Nugget", "Close the error report and relaunch GoldenNugget."))
         continue_btn.setDefault(True)
         continue_btn.clicked.connect(self.accept)
         buttons.addWidget(continue_btn)
@@ -380,6 +382,17 @@ def _excepthook(exc_type, exc_value, exc_tb):
     _handle_crash(exc_type, exc_value, exc_tb)
 
 
+def _is_dead_object_event(exc_value, exc_tb) -> bool:
+    """True when Qt delivered an event to an object whose Python wrapper is
+    already gone, usually while windows are torn down on close. PySide raises
+    while converting that object for a Python event filter, before any of our
+    code runs, so the traceback has no frame past ``notify``. Nothing can
+    handle such an event; errors raised inside our own handlers have deeper
+    frames and still reach the crash dialog."""
+    return ("already deleted" in str(exc_value)
+            and exc_tb is not None and exc_tb.tb_next is None)
+
+
 class CrashHandlerApp(QApplication):
     """QApplication subclass that routes Qt event-handler exceptions to the
     crash handler instead of silently printing and dropping them."""
@@ -387,6 +400,13 @@ class CrashHandlerApp(QApplication):
     def notify(self, receiver: QObject, event: QEvent) -> bool:
         try:
             return super().notify(receiver, event)
+        except RuntimeError:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            if _is_dead_object_event(exc_value, exc_tb):
+                logger.warning("Dropped %s event: %s", event.type(), exc_value)
+                return False
+            _handle_crash(exc_type, exc_value, exc_tb)
+            return False
         except Exception:
             exc_type, exc_value, exc_tb = sys.exc_info()
             _handle_crash(exc_type, exc_value, exc_tb)

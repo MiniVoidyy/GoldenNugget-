@@ -35,7 +35,9 @@ from PySide6.QtWidgets import (
 )
 
 from src.controllers.nugget_logger import get_log_path
-from src.gui.ios.components import _auto_retheme, IOSSwitch, IOSSearchField
+from src.gui.widgets import (
+    _auto_retheme, IOSSwitch, IOSSearchField,
+)
 from src.gui.theme import t
 
 # Newest slice of the log that is ever held in memory. The rotating handler

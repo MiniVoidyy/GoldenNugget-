@@ -5,7 +5,6 @@ Exercises: cache validity, hardlink working copies, prune interplay,
 PosterBoard DB extraction. Run: python tools/test_protective_cache.py
 """
 import os
-import plistlib
 import sqlite3
 import sys
 import tempfile
@@ -107,11 +106,10 @@ def main():
     # --- working copy is hardlinked and isolated ---
     wc = make_protective_working_copy(str(cache.master_root), UDID)
     wc_device = Path(wc) / UDID
-    src_icon = cache.device_dir / [p for p in cache.device_dir.rglob("*") if p.is_file() and p.name != "Status.plist"][0]
     check("working copy exists", wc_device.is_dir())
 
     # --- prune drops drained rows + non-protective payloads in the COPY only ---
-    removed_rows, removed_files = clean_backup_for_restore(wc, UDID)
+    removed_rows, _ = clean_backup_for_restore(wc, UDID)
     check("prune removed rows", removed_rows >= 1)
     conn = sqlite3.connect(str(wc_device / "Manifest.db"))
     rels = {r[0] for r in conn.execute("SELECT relativePath FROM Files")}

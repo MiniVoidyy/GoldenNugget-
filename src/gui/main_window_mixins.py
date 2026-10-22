@@ -14,7 +14,6 @@ from PySide6.QtCore import QCoreApplication
 
 from src.controllers.video_handler import set_ignore_frame_limit
 from src.devicemanagement.constants import Version
-from src.gui.dialogs import AboutProgramDialog
 from src.gui.dialogs.reset_dialog import ResetDialog
 from src.gui.logger import get_logger
 from src.gui.theme import ColorThemeManager, theme_icon
@@ -499,16 +498,29 @@ class SettingsMixin:
             pass  # Silent fail - autosave is best-effort
 
 
+    def sidebar_enabled(self) -> bool:
+        return self.settings.value("ui/show_sidebar", False, type=bool)
+
+    def set_sidebar_enabled(self, enabled: bool):
+        self.settings.setValue("ui/show_sidebar", bool(enabled))
+        self._sync_settings()
+        show_sidebar = self.theme_manager.current_theme == ThemeManager.CLASSIC or bool(enabled)
+        self.ui.sidebar.setVisible(show_sidebar)
+        self.ios_home.cards_grid.setVisible(not show_sidebar)
+        self._sync_sidebar_selection()
+
     def apply_theme(self, theme: int):
         """Apply the UI mode WITHOUT navigating away.
 
         CLASSIC: sidebar + classic home; iOS-style pages open as actions.
-        IOS: full-screen iOS UI with the shared header providing back
-        navigation. Only the chrome changes — the current page stays put.
+        IOS: iOS UI with an optional sidebar and the shared header providing
+        back navigation. Only the chrome changes — the current page stays put.
         """
         self.theme_manager.save_theme(theme)
         is_ios = theme == ThemeManager.IOS
-        self.ui.sidebar.setVisible(not is_ios)
+        show_sidebar = not is_ios or self.sidebar_enabled()
+        self.ui.sidebar.setVisible(show_sidebar)
+        self.ios_home.cards_grid.setVisible(not show_sidebar)
         self.ui.deviceBar.setVisible(not is_ios)
         if is_ios:
             # iOS mode: full-screen, no padding
@@ -602,7 +614,7 @@ class NavigationMixin:
 
 
     def _page_section_targets(self, page):
-        from src.gui.ios.components import IOSCollapsibleSection, IOSSectionHeader
+        from src.gui.widgets import IOSCollapsibleSection, IOSSectionHeader
         scrolls = page.findChildren(QtWidgets.QScrollArea)
         for widget in page.findChildren(QtWidgets.QWidget):
             if not widget.isVisibleTo(page):
@@ -616,7 +628,7 @@ class NavigationMixin:
                 yield widget.property("navigationTitle") or widget.text(), widget
 
     def _jump_to_page_section(self, page, name):
-        from src.gui.ios.components import IOSCollapsibleSection
+        from src.gui.widgets import IOSCollapsibleSection
         for label, target in self._page_section_targets(page):
             if label != name:
                 continue
@@ -885,12 +897,6 @@ class NavigationMixin:
         self._sync_sidebar_selection()
 
 
-    def show_about_dialog(self):
-        dialog = AboutProgramDialog(self)
-        dialog.exec()
-
-
-
 class ApplyMixin:
     """Apply/reset orchestration, alerts and dialog prompts."""
 
@@ -1019,6 +1025,15 @@ class ApplyMixin:
             if compatibility_warning:
                 lines.append(compatibility_warning)
             from src.gui.ios.components import IOSSummaryDialog
+            report = self._risk_report()
+            risk_panel = acknowledge = None
+            if report is not None:
+                from src.controllers.risk_assessment import RiskLevel
+                from src.gui.ios.risk_panel import RiskPanel
+                risk_panel = RiskPanel(report)
+                if report.level == RiskLevel.HIGH:
+                    acknowledge = QCoreApplication.translate(
+                        "RiskAssessment", "I understand the risks and want to apply anyway")
             dlg = IOSSummaryDialog(
                 title=QCoreApplication.translate("Nugget", "Apply Tweaks"),
                 lines=lines,
@@ -1030,7 +1045,9 @@ class ApplyMixin:
                 confirm_text=QCoreApplication.translate("Nugget", "Apply"),
                 extra_button=(QCoreApplication.translate("Nugget", "Update Cache")
                               if cache_enabled else ""),
-                parent=self, details_callback=self._show_apply_preview)
+                parent=self, details_callback=self._show_apply_preview,
+                header_widget=risk_panel, acknowledge_text=acknowledge or "",
+                preview_callback=self.show_device_twin)
             res = dlg.exec()
             if res == self._SUMMARY_UPDATE_CACHE:
                 self._run_cache_update()
@@ -1040,6 +1057,48 @@ class ApplyMixin:
             if res != QtWidgets.QDialog.Accepted:
                 return False
             return self._confirm_tweak_conflicts()
+
+    def show_device_twin(self, parent=None):
+        from src.gui.dialogs.device_twin import show_current_twin
+        show_current_twin(self, parent if isinstance(parent, QtWidgets.QWidget) else self)
+
+    def _risk_report(self):
+        """Risk verdict for the current selection, or None if it cannot be built."""
+        try:
+            from src.controllers.apply_preview import load_preview
+            from src.controllers.hotload import HotLoad
+            from src.controllers.preset_manager import PresetManager
+            from src.controllers.risk_assessment import assess, apply_factors
+            from src.controllers.tweak_conflicts import current_conflicts
+            manager = self.device_manager
+            version = manager.get_current_device_version() or ""
+            model = manager.get_current_device_model() or ""
+            hotload = HotLoad(manager.pref_manager.settings)
+            context = dict(device_version=version, device_model=model)
+            hidden = hotload.hidden_tweak_names(**context)
+            data = {name: entry for name, entry in PresetManager()._serialize()["tweaks"].items()
+                    if name not in hidden and hotload.rule_for(name, **context) is None}
+            battery = getattr(self, "_battery_info", None)
+            if not battery or battery.get("udid") != manager.get_current_device_udid():
+                battery = None
+            board = tweaks.get(TweakID.PosterBoard)
+            extra = apply_factors(
+                conflicts=len(current_conflicts(manager)),
+                battery=battery,
+                storage_low=bool(self._storage_warning_line()),
+                first_apply=load_preview(manager.get_current_device_udid(), version) is None,
+                wallpapers=len(board.tendies) if board is not None else 0)
+            templates = tweaks.get(TweakID.Templates)
+            if templates is not None and "Templates" in data:
+                from src.controllers.risk_assessment import community_factors
+                from src.tweaks.posterboard.community_tweaks import active
+                extra += community_factors(active(
+                    [(item.name, getattr(item, "tweaks", [])) for item in templates.templates], version))
+            return assess(data, version, model, hotload=hotload, extra=extra)
+        except Exception:
+            import logging
+            logging.getLogger("GoldenNugget.risk").exception("Could not assess apply risk")
+            return None
 
     def _storage_warning_line(self):
         """Return a warning when the selected device has little free space."""
@@ -1290,7 +1349,7 @@ class ApplyMixin:
         if alert is None:
             # do sudo dialog input
             get_sudo_pwd() # clear if it is already there
-            pwd, ok = QtWidgets.QInputDialog.getText(None, "Enter Sudo Password", "Enter Your Computer's Password:", QtWidgets.QLineEdit.Password, "")
+            pwd, ok = QtWidgets.QInputDialog.getText(None, QCoreApplication.translate("Nugget", "Enter Sudo Password"), QCoreApplication.translate("Nugget", "Enter Your Computer's Password:"), QtWidgets.QLineEdit.Password, "")
             if ok and pwd:
                 set_sudo_pwd(pwd)
             return
@@ -1304,7 +1363,7 @@ class ApplyMixin:
         # GitHub + Open Log), instead of a raw QMessageBox.
         if (icon == QtWidgets.QMessageBox.Critical
                 and alert.exc_type is not None and alert.detailed_txt):
-            from src.exceptions.crash_handler import show_error_dialog, _classify
+            from src.exceptions.crash_handler import _classify
             info = _classify(alert.exc_type, alert.exc_value)
             self._embedded_alert_error(alert, info)
             return
@@ -1489,23 +1548,6 @@ class ApplyMixin:
         self.ios_home.result_card.hide()
         self.ios_apply.result_card.hide()
 
-    def prompt_star_on_github(self):
-        if self.settings.value("star_prompt_done", False, type=bool):
-            return
-        self.settings.setValue("star_prompt_done", True)
-        self._sync_settings()
-        box = QtWidgets.QMessageBox(self)
-        box.setIcon(QtWidgets.QMessageBox.Question)
-        box.setWindowTitle(self.tr("Enjoying GoldenNugget?"))
-        box.setText(self.tr("If you like GoldenNugget, please consider giving it a star on GitHub!"))
-        star_btn = box.addButton(self.tr("Star on GitHub"), QtWidgets.QMessageBox.AcceptRole)
-        box.addButton(self.tr("Not now"), QtWidgets.QMessageBox.RejectRole)
-        box.exec()
-        if box.clickedButton() == star_btn:
-            from PySide6.QtGui import QDesktopServices
-            QDesktopServices.openUrl(QtCore.QUrl("https://github.com/awesomenull-dev/GoldenNugget"))
-
-
     def prompt_first_launch_backup(self) -> bool:
         box = QtWidgets.QMessageBox(self)
         box.setIcon(QtWidgets.QMessageBox.Warning)
@@ -1516,7 +1558,10 @@ class ApplyMixin:
             "are risky — a bad tweak can bootloop the device or force a full "
             "restore, which erases everything. Create a backup in iTunes or "
             "Finder before using GoldenNugget."))
-        box.setDetailedText(QCoreApplication.translate(
+        # Informative text, not detailed text: the "Show Details..." button
+        # would make a third button, and QMessageBox caps its width at 500px
+        # (half the screen below 1000px), which truncated the button labels.
+        box.setInformativeText(QCoreApplication.translate(
             "Nugget",
             "Back up your iPhone before tweaking:\n"
             "• Windows: iTunes → your device → Back Up Now\n"

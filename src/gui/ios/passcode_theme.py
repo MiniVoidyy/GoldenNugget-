@@ -27,26 +27,22 @@ from PySide6.QtWidgets import (
 # pymobiledevice3 lockdown stack (plus IPython/questionary) — ~400 ms — and this
 # page module is imported at startup, before any theme is ever written.
 from src.tweaks.passcode_theme import (
-    PASSTHME_TARGET,
     PASSTHME_TARGETS_ALL,
     KEYPAD_LOCALES_ALL,
     PasscodeThemeError,
     parse_passthm,
     stage_files,
-    keypad_code_for_locale,
     theme_size,
 )
 from pymobiledevice3.exceptions import (
     NotPairedError, PasswordRequiredError, UserDeniedPairingError,
     PairingDialogResponsePendingError, FatalPairingError,
 )
-from src.gui.ios.components import (
-    IOSSectionHeader, IOSCard, IOSPrimaryButton, IOSDangerButton,
+from src.gui.widgets import (
+    IOSSectionHeader, IOSCard, IOSPrimaryButton,
 )
 from src.gui.theme import ColorThemeManager
 from src.devicemanagement.passcode_support import current_passcode_theme_reason, passcode_theme_unavailable_reason
-
-logger = logging.getLogger("GoldenNugget.passthme")
 
 _NUGGET = "Nugget"
 
@@ -302,7 +298,8 @@ class IOSPasscodeThemePage(QWidget):
     @staticmethod
     def _lang_label(code: str) -> str:
         names = {
-            "en": "English", "other": "Others", "ru": "Русский", "uk": "Українська",
+            "en": "English", "other": QCoreApplication.translate("Nugget", "Others"),
+            "ru": "Русский", "uk": "Українська",
             "es": "Español", "fr": "Français", "de": "Deutsch", "it": "Italiano",
             "pt": "Português", "tr": "Türkçe", "pl": "Polski", "nl": "Nederlands",
             "ja": "日本語", "ko": "한국어", "zh": "中文", "ar": "العربية", "he": "עברית",

@@ -27,7 +27,9 @@ from PySide6.QtWidgets import (
 )
 
 from src.gui.theme import ColorThemeManager, theme_icon, t
-from src.gui.ios.components import IOSSearchField
+from src.gui.widgets import (
+    IOSSearchField,
+)
 
 class FetchAppsThread(QThread):
     """Pull the installed-app list from the device on a background thread."""

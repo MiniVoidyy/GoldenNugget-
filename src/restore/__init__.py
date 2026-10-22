@@ -1,3 +1,10 @@
+# PEP 810: defer operation-only dependencies on Python 3.15+; eager on older Python.
+__lazy_modules__ = (
+    "pymobiledevice3.lockdown",
+    "pymobiledevice3.services.mobilebackup2",
+    "pymobiledevice3.services.diagnostics",
+)
+
 import os
 from tempfile import TemporaryDirectory
 from pathlib import Path

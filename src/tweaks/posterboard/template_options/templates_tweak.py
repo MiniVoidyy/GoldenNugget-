@@ -7,6 +7,7 @@ from PySide6.QtCore import QCoreApplication
 
 from ...tweak_classes import Tweak
 from ..template_file import TemplateFile
+from .. import community_tweaks
 
 from src.utils.file_to_restore import FileToRestore
 
@@ -18,7 +19,9 @@ class TemplatesTweak(Tweak):
     def uses_domains(self):
         # TODO: figure out which templates use sparse restore
         for template in self.templates:
-            if not template.domain.startswith("Sparserestore-"):
+            if template.domain and not template.domain.startswith("Sparserestore-"):
+                return True
+            if getattr(template, "tweaks", None):
                 return True
         return False
     
@@ -36,6 +39,34 @@ class TemplatesTweak(Tweak):
             detailsBox.setWindowTitle(QCoreApplication.tr("Error"))
             detailsBox.setText(QCoreApplication.tr("Failed to load template") + f" {file}\n\n{str(e)}")
             detailsBox.exec()
+
+    def community_writes(self, version: str = None) -> tuple:
+        """(plists, files) from the community tweaks of every template.
+
+        See community_tweaks.collect; tweaks that do not support ``version``
+        write nothing."""
+        return community_tweaks.collect(
+            [(template.name, getattr(template, "tweaks", [])) for template in self.templates], version)
+
+    def tweak_states(self) -> list:
+        """Community tweak states for presets, one dict per template in order
+        (portable presets rewrite template paths, so the index is the key)."""
+        return [{tweak.id: tweak.state() for tweak in getattr(template, "tweaks", [])}
+                for template in self.templates]
+
+    def restore_tweak_states(self, states: list, paths: list = None):
+        """Apply saved states; ``paths`` are the preset's template paths, so
+        a template that failed to load does not shift the rest."""
+        if not isinstance(states, list):
+            return
+        by_path = dict(zip(paths, states)) if paths is not None else None
+        for index, template in enumerate(self.templates):
+            saved = by_path.get(template.path) if by_path is not None else (
+                states[index] if index < len(states) else None)
+            if not isinstance(saved, dict):
+                continue
+            for tweak in getattr(template, "tweaks", []):
+                tweak.restore_state(saved.get(tweak.id))
 
     def parse_path_string(self, path: str, old_domain: str, new_domain: str) -> str:
         result_path = path.replace("/hiddendot", "/.").replace("//", "/")
@@ -103,7 +134,8 @@ class TemplatesTweak(Tweak):
                 raise ValueError(QCoreApplication.translate(
                     'Nugget', 'Template {0} does not support iOS {1}.').format(template.name, version))
             # ignore PosterBoard templates since that is handled in PosterBoard tweaks
-            if template.domain != 'com.apple.PosterBoard' and template.domain != 'AppDomain-com.apple.PosterBoard':
+            # templates with only community tweaks have no files of their own
+            if template.domain and template.domain != 'com.apple.PosterBoard' and template.domain != 'AppDomain-com.apple.PosterBoard':
                 temp_dir = os.path.join(output_dir, str(uuid.uuid4()))
                 os.makedirs(temp_dir)
                 template.extract(output_dir=temp_dir)

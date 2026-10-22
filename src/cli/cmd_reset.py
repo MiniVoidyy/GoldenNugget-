@@ -26,6 +26,8 @@ def add_parser(subp):
                         help="reset the Daemons section")
     parser.add_argument("--internal", action="store_true",
                         help="reset the Internal Options section")
+    parser.add_argument("--community", action="store_true",
+                        help="reset what community tweaks from templates wrote")
     parser.add_argument("--no-skip-setup", action="store_true",
                         help="don't mark iOS setup panes complete")
     parser.add_argument("--no-reboot", action="store_true",
@@ -46,12 +48,11 @@ def _resolve_pages(args, dm) -> list:
         explicit.append(Page.Daemons)
     if args.internal:
         explicit.append(Page.InternalOptions)
+    if getattr(args, "community", False):
+        explicit.append(Page.Templates)
     if explicit:
         return explicit
     pages = get_resettable_pages(dm)
-    last = ""
-    if pages:
-        last = pages[-1].getPageName()
     print(f"Resetting all resettable sections "
           f"({', '.join(p.getPageName() for p in pages)}).")
     return pages

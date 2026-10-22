@@ -94,9 +94,6 @@ def _macos_token() -> Optional[bytes]:
     except ImportError:  # pragma: no cover
         return None
 
-    class _ObjCObject(ctypes.Structure):
-        pass
-
     try:
         libobjc = ctypes.cdll.LoadLibrary("/usr/lib/libobjc.dylib")
         cf = ctypes.cdll.LoadLibrary(
@@ -151,7 +148,6 @@ def _macos_token() -> Optional[bytes]:
         logger.warning("grappa: no AirTraffic private framework on this host")
         return None
 
-    alloc = libobjc.objc_msgSend
     msg = libobjc.objc_msgSend
 
     try:
@@ -208,7 +204,6 @@ def _macos_token() -> Optional[bytes]:
 
 
 def _cf_dictionary(libobjc, cf, _, mapping: dict) -> Optional[int]:
-    kCFTypeDictionaryKeyCallBacks = 412  # pointer-sized struct; we cheat with NULL
     keys = (ctypes.c_void_p * len(mapping))()
     vals = (ctypes.c_void_p * len(mapping))()
     kCFStringEncodingUTF8 = 0x8000100

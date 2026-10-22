@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt, QCoreApplication, QRectF
 from PySide6.QtGui import QPixmap, QImage, QPainter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
+    QDialog, QVBoxLayout, QLabel, QFrame
 )
 
 import os

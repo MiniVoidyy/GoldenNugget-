@@ -2,7 +2,9 @@
 from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtWidgets import QLabel, QPushButton, QPlainTextEdit, QVBoxLayout, QHBoxLayout, QWidget
 
-from src.gui.ios.components import IOSCard
+from src.gui.widgets import (
+    IOSCard,
+)
 from src.gui.theme import t, ColorThemeManager, theme_pixmap
 
 

@@ -66,9 +66,6 @@ TESTED_BUILDS: frozenset[tuple[str, str]] = frozenset(
 
 SOURCE_PREFIX = "airlift-src-"
 LINK_PREFIX = "airlift-link-"
-RECOVERED_PREFIX = "airlift-recovered-"
-
-AIRLOCK_ROOT = "/var/mobile/Media/Airlock/Book"
 
 SZ_EXTRA_ID = 0x5A53
 
@@ -132,19 +129,6 @@ def normalize_target(value: str) -> str:
     if len(target.encode()) > 768:
         raise AirliftError("target path is too long")
     return target
-
-
-def posix_rel(path: str, base: str) -> str:
-    """POSIX ``relpath(path, base)`` as used for ATAirlock asset identifiers."""
-    path_parts = path.strip("/").split("/")
-    base_parts = base.strip("/").split("/")
-    common = 0
-    for a, b in zip(path_parts, base_parts):
-        if a != b:
-            break
-        common += 1
-    rel: list[str] = [".."] * (len(base_parts) - common) + path_parts[common:]
-    return "/".join(rel) if rel else "."
 
 
 def _zip_info(name: str, mode: int) -> zipfile.ZipInfo:
@@ -580,49 +564,6 @@ async def _cleanup(
                 await afc.rm(path, force=True)
         except Exception:
             pass
-
-
-async def write_file(
-    lockdown: LockdownClient,
-    target_dir: str,
-    leaf: str,
-    payload: bytes,
-    log_cb: Optional[LogCallback] = None,
-) -> dict[str, Any]:
-    """Write a single new file ``target_dir/leaf`` via AirLift."""
-    target = normalize_target(target_dir)
-    check_target(lockdown, log_cb)
-    if not leaf or leaf.startswith("/") or "\x00" in leaf:
-        raise AirliftError("leaf must be a plain relative file name")
-
-    token = secrets.token_hex(10)
-    source = f"{SOURCE_PREFIX}{token}"
-    link_destination = f"{LINK_PREFIX}{token}"
-    link_identifier = f"../../{source}/p0/p1/p2/link"
-    payload_identifier = f"../../{source}/payload"
-    assets = [
-        (link_identifier, link_destination),
-        (payload_identifier, posixpath.join(link_destination, leaf)),
-    ]
-
-    archive = build_archive(target, [(leaf, payload)])
-    books_plist = build_books([identifier for identifier, _ in assets])
-
-    afc = AfcService(lockdown)
-    original_books = await _snapshot_books(afc)
-    try:
-        await _stage_archive(lockdown, afc, source, archive, books_plist)
-        connection = await lockdown.start_lockdown_service(AT_C_SERVICE)
-        try:
-            await AirTrafficClient(connection, log_cb or (lambda m: logger.debug(m))).sync(assets)
-        finally:
-            await connection.close()
-    finally:
-        await _cleanup(afc, source=source, link_destination=link_destination)
-        await _restore_books(afc, original_books)
-        await afc.close()
-
-    return {"leaf": leaf, "targetDirectory": target, "ok": True}
 
 
 async def write_files(

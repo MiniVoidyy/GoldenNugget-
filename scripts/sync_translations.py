@@ -5,7 +5,6 @@ Sync translations from gNugget-i18n submodule to GoldenNugget.
 Usage: python sync_translations.py <source_dir> <target_dir>
 """
 import argparse
-import os
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path

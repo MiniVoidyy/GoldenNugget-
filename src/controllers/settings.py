@@ -35,11 +35,6 @@ class Settings:
         self._primary.remove(key)
         self._legacy.remove(key)
 
-    def allKeys(self) -> list:
-        keys = set(self._primary.allKeys())
-        keys.update(self._legacy.allKeys())
-        return list(keys)
-
     def sync(self):
         self._primary.sync()
         self._legacy.sync()

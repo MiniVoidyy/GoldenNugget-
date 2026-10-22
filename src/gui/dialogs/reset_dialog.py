@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QLabel, QPushButton, QVBoxLayout,
     QSizePolicy, QScrollArea, QWidget,
 )
-from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtCore import QCoreApplication, QT_TRANSLATE_NOOP, Qt
 from src.gui.theme import ColorThemeManager, t
 
 from src.gui.pages.pages_list import Page, get_resettable_pages
@@ -45,14 +45,22 @@ class ResetDialog(QDialog):
         scroll.setWidget(content)
         layout.addWidget(scroll, 1)
         pages = get_resettable_pages(self.device_manager)
+        # getPageName() is plain English (the CLI shares it); translate it here.
+        page_names = (QT_TRANSLATE_NOOP("Nugget", "Status Bar"),
+                      QT_TRANSLATE_NOOP("Nugget", "Springboard"),
+                      QT_TRANSLATE_NOOP("Nugget", "Internal"),
+                      QT_TRANSLATE_NOOP("Nugget", "Daemons"),
+                      QT_TRANSLATE_NOOP("Nugget", "Community Tweaks"))
         for page in pages:
-            page_button = QPushButton(page.getPageName())
+            name = "Community Tweaks" if page == Page.Templates else page.getPageName()
+            label = QCoreApplication.translate("Nugget", name)
+            page_button = QPushButton(label)
             page_button.setObjectName('resetSelection')
             page_button.setCheckable(True)
             page_button.setMinimumHeight(60)
             page_button.setCursor(Qt.PointingHandCursor)
             page_button.toggled.connect(
-                lambda checked, button=page_button, name=page.getPageName():
+                lambda checked, button=page_button, name=label:
                 button.setText(('✓  ' if checked else '') + name))
             page_button.toggled.connect(lambda checked, p=page: self.toggle_page(checked, p))
             rows.addWidget(page_button)

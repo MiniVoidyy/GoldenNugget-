@@ -257,7 +257,6 @@ class RestoreCacheThread(QThread):
         asyncio.run(self._restore())
 
     async def _restore(self):
-        import tempfile
         from pathlib import Path
         from src.restore.protective import (
             make_protective_working_copy,

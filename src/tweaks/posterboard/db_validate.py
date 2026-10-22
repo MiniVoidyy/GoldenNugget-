@@ -21,7 +21,7 @@ user what was actually wrong.
 
 import sqlite3
 from os import path
-from typing import Optional, Union
+from typing import Optional
 
 from src.exceptions.nugget_exception import NuggetException
 
@@ -30,8 +30,6 @@ DB_FILE_NAME = "PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3"
 #: Tables every usable PosterBoard database carries (the pre-db5 schema; db5+
 #: adds posterRoles/posterMetadata on top, which is why the check is a subset).
 POSTERBOARD_TABLES = ("poster", "posterAttributes", "posterRoleMembership", "sqlite_sequence")
-
-PathLike = Union[str, "os.PathLike[str]"]  # noqa: F821
 
 
 class IncompletePosterBoardSnapshot(NuggetException):

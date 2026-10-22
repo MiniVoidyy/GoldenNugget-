@@ -233,10 +233,11 @@ def test_badge_and_bars_round_trip():
     check("secondary name/badge/bars", got["secondary"] == ("Telkomsel", "S", 1),
           got["secondary"])
 
-    # Defaults: name set, no badge, four bars.
+    # Defaults: name set, no badge, no bars. SpringBoard replaces the whole
+    # live entry, so a name-only override must not pin a full signal.
     got = carrier_overrides(build_archive("Mango"))
     check("default badge is unset", got["primary"][1] is None, got["primary"])
-    check("default bars are 4", got["primary"][2] == 4, got["primary"])
+    check("default bars are 0", got["primary"][2] == 0, got["primary"])
 
     # The badge is a separate string object referenced only by badgeString.
     data, objects = status_bar_data(build_archive("Mango", None, "P"))
@@ -271,7 +272,7 @@ def test_badge_and_bars_are_sanitised():
     # Junk falls back to the verified default instead of raising or writing 0.
     for junk in ("x", None, object()):
         got = carrier_overrides(build_archive("Mango", None, None, None, junk))
-        check("junk bars fall back to 4", got["primary"][2] == 4, repr(junk))
+        check("junk bars fall back to 0", got["primary"][2] == 0, repr(junk))
 
 
 def test_tweak_passes_badge_and_bars_to_the_archive():

@@ -24,6 +24,18 @@ written with the fixed values that were verified to deserialize and render;
 exposing more of the record without hardware verification would risk
 shipping a status bar that fails to draw at all.
 
+Merging is all-or-nothing per entry: SpringBoard reconciles the disk record
+with the live one by *replacing the whole* ``cellularEntry`` object (UIKitCore
+``-[_UIStatusBarData dataByApplyingOverlay:]``; the upstream RE project proved
+there is no field-level pass-through). Whatever this writer puts in the entry
+is therefore pinned into the status bar, and whatever it leaves at 0 stays
+at the archiver's zero value. That is why an unset network type or bar count
+is written as 0 ("none") instead of a plausible-looking constant: a
+carrier-name-only override must not fabricate a "5G" label or a permanently
+full signal. Live signal strength cannot be expressed in this format at all;
+the upstream project's answer is a CommCenter-level PLMN mapping, which is
+research-stage and deliberately not implemented here.
+
 There is deliberately **no** support for the classic time/date/battery/wifi
 overrides or for the 46 per-item show/hide toggles: no counterpart for them
 has ever been documented for this archive, and the classic
@@ -65,16 +77,25 @@ _CELLULAR_CLASS_CHAIN = [
 ]
 
 # Fixed cellular-entry values. `status` 5 is "connected" and `enabled` true
-# is what makes the entry render at all; `displayValue` is the signal-bar
-# count and `type` the network-type enum (10 == 5G). The carrier name itself
-# is supplied through `string`/`crossfadeString`. `displayValue` is only a
-# default here -- `build_archive` overrides it with the user's bar count, and
-# `badgeString` stays null unless a badge is set.
+# is what makes the entry render at all; the carrier name itself is supplied
+# through `string`/`crossfadeString`. `badgeString` stays null unless a badge
+# is set, and `displayValue` is only a default -- `build_archive` overrides it
+# with the user's bar count.
+#
+# `type` and `displayValue` MUST stay 0 unless the user set them explicitly:
+# SpringBoard merges this record by *atomically replacing* the whole live
+# cellular entry (UIKitCore `-[_UIStatusBarData dataByApplyingOverlay:]` --
+# no field-level pass-through exists), so any value written here is pinned
+# into the status bar. 10 == 5G and 4 == four bars, which is how a
+# carrier-name-only override used to fabricate a "5G" indicator and a
+# permanently full signal. 0 is the enum's "none" and the archiver's own
+# zero value for a missing key, i.e. the neutral state: no network label,
+# no fabricated bars.
 _ENTRY_DEFAULTS = {
     "badgeString": None,
     "callForwardingEnabled": False,
     "displayRawValue": 0,
-    "displayValue": 4,
+    "displayValue": 0,
     "enabled": True,
     "isBootstrapCellular": False,
     "lowDataModeActive": False,
@@ -84,7 +105,7 @@ _ENTRY_DEFAULTS = {
     "sosAvailable": False,
     "status": 5,
     "suffixString": None,
-    "type": 10,
+    "type": 0,
     "wifiCallingEnabled": False,
 }
 
@@ -109,7 +130,12 @@ def _truncate_badge(text):
 
 
 def _bars(value):
-    """Clamp a signal-bar count into the drawable range."""
+    """Clamp a signal-bar count into the drawable range.
+
+    ``None`` (and junk) falls back to the entry default -- the neutral 0,
+    because the entry is pinned wholesale and must not claim bars the user
+    never asked for.
+    """
     if value is None:
         return _ENTRY_DEFAULTS["displayValue"]
     try:
@@ -135,7 +161,8 @@ def build_archive(
 
     ``primary_badge``/``secondary_badge`` become the entry ``badgeString`` and
     ``primary_bars``/``secondary_bars`` its ``displayValue``; ``None`` keeps
-    the verified default (no badge, four bars).
+    the neutral default (no badge, no bars -- the entry is pinned wholesale,
+    so an unset field must not claim a value the user never asked for).
     """
     primary = _truncate(primary_carrier)
     secondary = _truncate(secondary_carrier)
@@ -150,7 +177,6 @@ def build_archive(
     # first, then the payload objects, then every class definition, and the
     # NSSet instance last. Object order carries no meaning to the unarchiver,
     # but matching it keeps our bytes diffable against a real device dump.
-    data_class = {}
     data_obj = {"$class": None}
     root_obj = {
         "$class": None,

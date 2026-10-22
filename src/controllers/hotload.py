@@ -16,7 +16,7 @@ from typing import Optional
 
 import urllib.request
 
-from PySide6.QtCore import QStandardPaths
+from PySide6.QtCore import QCoreApplication, QStandardPaths
 
 from src.version import App_Version as _APP_VERSION
 from src.tweaks.registry import SPECS_BY_SECTION, SECTION_FEATURES
@@ -42,6 +42,12 @@ HIDE_ACTION = "hide_feature"
 # time regardless of the UI toggles, their switches are locked ON in the page,
 # and presets cannot turn them back on (the apply pass re-forces them).
 DISABLE_DAEMON_ACTION = "disable_daemon"
+
+# A rule with action == RISK_ACTION never blocks anything: it attaches a
+# warning (fields "tweak", "level": "low"|"medium"|"high", "reason") to the
+# pre-apply risk assessment on matching setups, e.g. "reported to cause a
+# respring loop on iOS 27.0.1". See src/controllers/risk_assessment.py.
+RISK_ACTION = "risk"
 
 # Feature (page) name -> the tweak names that belong to it. A "hide_feature"
 # rule names one of these keys; the UI and the apply/preset paths use this map
@@ -148,7 +154,7 @@ class HotLoad:
         tweak_name = getattr(tweak_id, "name", str(tweak_id))
         for rule in self._rules.get("rules", []):
             try:
-                if rule.get("tweak") != tweak_name:
+                if rule.get("tweak") != tweak_name or rule.get("action") == RISK_ACTION:
                     continue
                 if not self._rule_applicable(rule, device_version, device_model, app_version):
                     continue
@@ -177,6 +183,22 @@ class HotLoad:
             except Exception:
                 continue
         return None
+
+    def risk_notes(self, device_version=None, device_model=None,
+                   app_version=None) -> list:
+        """Warn-only "risk" rules that match this setup, in file order."""
+        if not self.is_enabled():
+            return []
+        notes = []
+        for rule in self._rules.get("rules", []):
+            try:
+                if rule.get("action") != RISK_ACTION or not rule.get("tweak"):
+                    continue
+                if self._rule_applicable(rule, device_version, device_model, app_version):
+                    notes.append(rule)
+            except Exception:
+                continue
+        return notes
 
     def feature_for(self, tweak_id) -> Optional[str]:
         """Return the feature (page) name a tweak belongs to, or None."""
@@ -345,16 +367,19 @@ def confirm_flagged(rule: dict, parent=None) -> bool:
     if reason:
         reason_txt = str(reason)
     else:
-        reason_txt = "This feature is currently flagged as dangerous or broken."
-    text = (f"GoldenNugget safety rules have flagged \"{tweak}\" as currently "
-            f"dangerous or broken.\n\n{reason_txt}\n\n"
-            "It is recommended not to enable it. Do you still want to enable it?")
+        reason_txt = QCoreApplication.translate(
+            "Nugget", "This feature is currently flagged as dangerous or broken.")
+    text = (QCoreApplication.translate(
+                "Nugget", "GoldenNugget safety rules have flagged \"{0}\" as currently dangerous or broken.").format(tweak)
+            + f"\n\n{reason_txt}\n\n"
+            + QCoreApplication.translate(
+                "Nugget", "It is recommended not to enable it. Do you still want to enable it?"))
     box = QMessageBox(parent)
     box.setIcon(QMessageBox.Icon.Warning)
-    box.setWindowTitle("Disabled Feature Warning")
+    box.setWindowTitle(QCoreApplication.translate("Nugget", "Disabled Feature Warning"))
     box.setText(text)
-    continue_btn = box.addButton("Continue Anyway", QMessageBox.ButtonRole.AcceptRole)
-    cancel_btn = box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+    continue_btn = box.addButton(QCoreApplication.translate("Nugget", "Continue Anyway"), QMessageBox.ButtonRole.AcceptRole)
+    cancel_btn = box.addButton(QCoreApplication.translate("Nugget", "Cancel"), QMessageBox.ButtonRole.RejectRole)
     box.setDefaultButton(cancel_btn)
     box.exec()
     return box.clickedButton() is continue_btn

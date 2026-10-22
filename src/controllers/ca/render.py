@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 from collections import OrderedDict
 import copy as _copy
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from urllib.parse import unquote
 
 from PySide6.QtCore import QPointF, QRectF, Qt
@@ -565,7 +565,6 @@ class CAMLRenderer:
         self._state_root: Optional[Layer] = None
         self._state_root_id: Optional[object] = None
         self._emitter_particles: Dict[str, List[Tuple[float, float, float, float, float]]] = {}
-        self._painted_layers = 0
 
     # -- asset access ------------------------------------------------------ #
 
@@ -739,11 +738,9 @@ class CAMLRenderer:
                 self._paint_layer_content(p, layer, w, h, next_use_y_up, t_ms, delay_ms, bg_color)
             finally:
                 p.restore()
-                self._painted_layers += 1
             return
 
         p.restore()
-        self._painted_layers += 1
 
     def _paint_layer_content(
         self,
@@ -1105,16 +1102,6 @@ class CAMLRenderer:
 # Convenience helpers
 # --------------------------------------------------------------------------- #
 
-def render_document(doc: CADocument, t_ms: float = 0.0, state: str = "Locked",
-                    size: Optional[Tuple[int, int]] = None) -> Optional[QImage]:
-    if doc is None or doc.root is None:
-        return None
-    if state not in doc.stateOverrides and doc.stateOverrides and doc.states:
-        state = doc.states[0]
-    renderer = CAMLRenderer(doc, size=size, state=state)
-    return renderer.render(t_ms)
-
-
 class SceneCompositeRenderer:
     """Render a wallpaper as several scenes composited like the lock screen.
 
@@ -1287,7 +1274,3 @@ def document_loop_duration(doc: CADocument) -> float:
 
     walk(doc.root)
     return longest
-
-
-def document_has_motion(doc: CADocument) -> bool:
-    return document_loop_duration(doc) > 0.0

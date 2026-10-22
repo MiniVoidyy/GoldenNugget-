@@ -1,0 +1,6 @@
+# Constraints for the default Python 3.15 / Qt 6.12 Universal2 build.
+# cryptography 49+ ships only arm64 macOS wheels. CI builds a static Universal2
+# wheel from source so both architectures can use the current release.
+cryptography==50.0.0
+# Use the portable universal wheel, without Intel-only optional AES modules.
+pycryptodome==4.0.0

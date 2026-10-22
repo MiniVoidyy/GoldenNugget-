@@ -1,3 +1,10 @@
+# PEP 810: defer operation-only dependencies on Python 3.15+; eager on older Python.
+__lazy_modules__ = (
+    "multiprocessing",
+    "runpy",
+    "traceback",
+)
+
 import sys
 import os
 import multiprocessing
@@ -161,7 +168,8 @@ def main() -> int:
 
     from src.gui.theme import ColorThemeManager, FONT_FAMILY
     _color_theme = ColorThemeManager.instance()
-    app.setPalette(_color_theme.build_palette())
+    # Pins the colour scheme too, so the OS light/dark setting never leaks in.
+    _color_theme.apply_to_app(app)
 
     # Register the bundled Inter variable font and make it the single UI font
     # on every platform. Both the dev tree and the PyInstaller bundle
@@ -274,7 +282,10 @@ def main() -> int:
 
     widget = MainWindow(device_manager=dm, translator=translator)
     translator.fix_ui_for_rtl(widget.ui)
-    widget.resize(800, 600)
+    # Open a little roomier than the 1000x600 minimum when the screen allows.
+    avail = widget.screen().availableGeometry()
+    widget.resize(max(1000, min(1100, avail.width() - 80)),
+                  max(600, min(760, avail.height() - 80)))
     widget.show()
 
     # First-launch dialogs (interface picker + backup reminder) are deferred

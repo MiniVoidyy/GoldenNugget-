@@ -265,3 +265,73 @@ An example format of `config.json` looks like this:
   ]
 }
 ```
+# Community Tweaks (format 3)
+A batter file can also carry ready-made tweaks that show up as switches, just like GoldenNugget's built-in tweaks. They can write to the same places the built-in tweaks do: any path under a backup domain GoldenNugget knows (`/var/Managed Preferences/`, `/var/mobile/`, `/var/preferences/`, `/var/db/`, `/var/root/`, `/var/MobileDevice/` and the system group containers).
+
+Set `"format_version": "3"` and add a `tweaks` list. A template that only has tweaks does not need `domain` or `options`.
+
+```json
+{
+  "title": "Dock Tweaks",
+  "author": "you",
+  "format_version": "3",
+  "tweaks": [
+    {
+      "id": "hide-dock",
+      "label": "Hide Dock Background",
+      "description": "Shown under the switch.",
+      "default": false,
+      "min_version": "26.0",
+      "writes": [
+        {"type": "plist", "path": "/var/Managed Preferences/mobile/com.apple.springboard.plist",
+         "values": {"SBHideDockBackground": true}}
+      ],
+      "writes_off": [
+        {"type": "plist", "path": "/var/Managed Preferences/mobile/com.apple.springboard.plist",
+         "values": {"SBHideDockBackground": false}}
+      ]
+    },
+    {
+      "id": "dock-alpha",
+      "label": "Dock Opacity",
+      "control": {"type": "slider", "min": 0, "max": 1, "step": 0.1, "default": 0.5},
+      "writes": [
+        {"type": "plist", "path": "/var/Managed Preferences/mobile/com.apple.springboard.plist",
+         "values": {"SBDockAlpha": "$value"}}
+      ]
+    },
+    {
+      "id": "my-file",
+      "label": "Install My File",
+      "writes": [
+        {"type": "file", "path": "/var/mobile/Library/Preferences/com.example.plist", "source": "files/com.example.plist"}
+      ]
+    }
+  ]
+}
+```
+
+__Tweak fields:__
+- `id` - unique within the template (letters, digits, `.`, `_`, `-`); presets remember switches by it
+- `label` - the switch text
+- `description` *(Optional)* - text under the switch
+- `default` *(Optional)* - whether the switch starts on (`false` by default)
+- `min_version` / `max_version` *(Optional)* - outside this range the tweak writes nothing
+- `control` *(Optional)* - an extra input whose value replaces any `"$value"` string in `values`
+  - `{"type": "slider", "min": 0, "max": 10, "step": 1, "default": 5}`
+  - `{"type": "text", "default": "", "max_length": 200}`
+  - `{"type": "choice", "default": 0, "choices": [{"label": "Small", "value": 1}, {"label": "Big", "value": 2}]}`
+- `writes` - what to write while the switch is on (1 to 32 writes)
+- `writes_off` *(Optional)* - what to write while it is off, for example to put a key back
+
+__Write types:__
+- `plist` - writes `values` as the plist at `path`. Keys are merged with GoldenNugget's own keys for the same file, so built-in tweaks keep working; if both set the same key, the built-in tweak wins. They are **not** merged with what is already on the iPhone: like GoldenNugget's own tweaks, the file is written whole. That is how Managed Preferences are meant to be used (`/var/Managed Preferences/mobile/…`); anywhere else the iPhone's own settings in that file are lost.
+- `file` - writes `source` (a file in the batter, relative to `config.json`, at most 4 MB) to `path`.
+- `empty` - writes an empty file to `path` (an empty plist when `path` ends in `.plist`, since a zero-byte plist can send iOS 26.2+ into a boot loop).
+- `owner` *(Optional)* - `501` (mobile, default) or `0` (root).
+
+A `file` or `empty` write may not replace a file that GoldenNugget itself writes, and two templates may not replace the same file with different contents. Pairing records, the setup assistant plist and backups are protected. On iOS 27, plist writes to Managed Preferences are also mirrored to the app's preferences in the home folder, the same as built-in tweaks.
+
+The template card lists every file each tweak writes. Before applying, the summary shows each community tweak on its own line and the risk check rates it: keys in Managed Preferences are low risk, a whole file anywhere else is medium (the iPhone's copy is lost) and system folders (`/var/db`, `/var/root`, `/var/preferences`, `/var/MobileDevice`, `/var/containers`) are high.
+
+**Reset → Community Tweaks** appears once community tweaks have written something to the iPhone. It empties the Managed Preferences files they wrote (which also clears GoldenNugget's own keys in those files, like the other resets) and lists the other files, which cannot be reset because GoldenNugget keeps no copy of what was there before. To undo a tweak's keys without a reset, give it `writes_off`, switch it off and apply. Check a template before sharing it with `python nugget_cli.py wallpaper validate my.batter`.

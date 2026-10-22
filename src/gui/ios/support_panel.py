@@ -6,7 +6,9 @@ from PySide6.QtWidgets import (
 )
 
 from src.gui.credits import CREDITS
-from src.gui.ios.components import IOSCard, IOSCollapsibleSection
+from src.gui.widgets import (
+    IOSCard, IOSCollapsibleSection,
+)
 from src.gui.theme import ColorThemeManager, theme_pixmap, t
 
 
@@ -44,18 +46,19 @@ class SupportPanel(IOSCard):
         team = QHBoxLayout()
         team.setSpacing(12)
         portraits = (
-            ":/credits/awesomenull.webp",
-            ":/credits/windows11aero.webp",
+            ":/credits/awesomenull.png",
+            ":/credits/windows11aero.png",
+            ":/credits/kik4311.png",
             ":/credits/LeminLimez.png",
         )
-        for (role, name, url), portrait in zip(CREDITS[:3], portraits):
+        for (role, name, url), portrait in zip(CREDITS[:len(portraits)], portraits):
             team.addWidget(self._profile(role, name, url, portrait), 1)
         layout.addLayout(team)
         credits = IOSCollapsibleSection(_tr('Contributors && acknowledgements'), expanded=False)
         grid = QGridLayout()
         grid.setHorizontalSpacing(24)
         grid.setVerticalSpacing(16)
-        for index, (role, name, url) in enumerate(CREDITS[3:]):
+        for index, (role, name, url) in enumerate(CREDITS[len(portraits):]):
             grid.addWidget(self._credit(role, name, url), index // 2, index % 2)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
@@ -100,7 +103,7 @@ class SupportPanel(IOSCard):
         label = QLabel(_tr(role))
         label.setObjectName('supportMuted')
         column.addWidget(label)
-        link = QLabel(f'<a href="{url}">{name}</a>')
+        link = QLabel(f'<a href="{url}">{_tr(name)}</a>')
         link.setObjectName('supportCredit')
         link.setWordWrap(True)
         link.setOpenExternalLinks(True)

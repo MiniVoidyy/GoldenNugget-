@@ -154,10 +154,6 @@ SOURCES = {
 }
 
 
-def get_source(source_id: str) -> WallpaperSource:
-    return SOURCES[source_id]
-
-
 # --- shared on-disk cache ({CacheLocation}/wallpaper_cache) ---
 # Written by the wallpaper downloader dialog; reused here so the Tendies
 # page can resolve real preview images for loaded .tendies files by name.
@@ -252,14 +248,3 @@ def find_wallpaper_by_name(file_name: str):
         if wp.name.strip().casefold() in candidates:
             return wp
     return None
-
-
-def download_file(url: str, dest_path: str, timeout: int = 60) -> str:
-    """Download ``url`` to ``dest_path`` (streamed). Returns ``dest_path``."""
-    with requests.get(url, stream=True, timeout=timeout) as resp:
-        resp.raise_for_status()
-        with open(dest_path, "wb") as f:
-            for chunk in resp.iter_content(chunk_size=65536):
-                if chunk:
-                    f.write(chunk)
-    return dest_path

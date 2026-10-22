@@ -57,7 +57,7 @@ STOCK_WALLPAPER = {
 def test_wallpaper_plist_only_gets_the_new_id():
     print("\nWallpaper.plist: identifier rewritten, family/name untouched")
     tweak = PosterboardTweak()
-    path = write("com.apple.XYZ_Wallpaper.plist", plistlib.dumps(STOCK_WALLPAPER))
+    write("com.apple.XYZ_Wallpaper.plist", plistlib.dumps(STOCK_WALLPAPER))
     out = tweak.update_plist_id(TMP, "com.apple.XYZ_Wallpaper.plist", 77777)
     check("contents returned", out is not None and len(out) > 0)
     plist = plistlib.loads(out)
@@ -77,7 +77,7 @@ def test_wallpaper_plist_only_gets_the_new_id():
 def test_wallpaper_plist_without_assets():
     print("\nWallpaper.plist: minimal file still works")
     tweak = PosterboardTweak()
-    path = write("com.apple.MIN_Wallpaper.plist", plistlib.dumps({"identifier": 1}))
+    write("com.apple.MIN_Wallpaper.plist", plistlib.dumps({"identifier": 1}))
     out = tweak.update_plist_id(TMP, "com.apple.MIN_Wallpaper.plist", 5150)
     plist = plistlib.loads(out)
     check("identifier rewritten", plist["identifier"] == 5150, repr(plist["identifier"]))
@@ -90,8 +90,8 @@ def test_other_id_files_unchanged():
     check("descriptor.identifier is the raw id",
           tweak.update_plist_id(TMP, "com.apple.posterkit.provider.descriptor.identifier", 31337)
           == b"31337")
-    path = write("com.apple.posterkit.provider.contents.userInfo",
-                 plistlib.dumps({"wallpaperRepresentingIdentifier": 7, "keep": "me"}))
+    write("com.apple.posterkit.provider.contents.userInfo",
+          plistlib.dumps({"wallpaperRepresentingIdentifier": 7, "keep": "me"}))
     out = tweak.update_plist_id(TMP, "com.apple.posterkit.provider.contents.userInfo", 31337)
     plist = plistlib.loads(out)
     check("userInfo representing identifier rewritten",
@@ -107,9 +107,9 @@ def test_userinfo_identifier_added_when_missing():
     tweak = PosterboardTweak()
     # A third-party tendie's userInfo looks exactly like this.
     name = "com.apple.posterkit.provider.contents.userInfo"
-    path = write(name,
-                 plistlib.dumps({"posterEnvironmentOverrides": b"{}",
-                                 "wallpaperRepresentingFileName": "Windows_11.wallpaper"}))
+    write(name,
+          plistlib.dumps({"posterEnvironmentOverrides": b"{}",
+                          "wallpaperRepresentingFileName": "Windows_11.wallpaper"}))
     out = tweak.update_plist_id(TMP, name, 99378)
     plist = plistlib.loads(out)
     check("missing wallpaperRepresentingIdentifier is added (as a string)",

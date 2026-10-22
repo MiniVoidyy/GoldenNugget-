@@ -71,6 +71,7 @@ Need support? Join our [Discord Server][server].
 - Templates: Custom Operations and file editing
   - See documentation on the structure of batter files in [documentation.md](documentation.md)
 - Status Bar
+  - Live preview of the Lock Screen and Home Screen status bar before applying
   - iOS 26 and below: full override set
     - Change carrier name
     - Change secondary carrier name
@@ -83,10 +84,11 @@ Need support? Join our [Discord Server][server].
     - Change breadcrumb text
     - Show numeric WiFi/Cellular strength
     - Hide or show many icons in the status bar
-  - iOS 27 and above: carrier name only (the rest of the overrides have no
+  - iOS 27 and above: cellular entry only (the rest of the overrides have no
     equivalent in the new status bar format and are hidden on that page)
-    - Change carrier name
-    - Change secondary carrier name
+    - Change primary and secondary carrier name
+    - Change primary and secondary service badge
+    - Change primary and secondary signal bars
     - Not yet verified on physical hardware, only on the iOS 27 simulator
 - Springboard Options
   - Set Lock Screen Footnote
@@ -100,40 +102,44 @@ Need support? Join our [Discord Server][server].
   - Enable AirPlay support for Stage Manager
   - Show Red/Green Authentication Line on Lock Screen (See [this issue](https://github.com/leminlimez/Nugget/issues/656) for what it looks like)
   - Disable Floating Tab Bar on iPads
+  - Disable AirDrop Time Limit for Everyone Option
+  - Disable Breadcrumbs
+  - Disable Dynamic Island
+  - Disable Icon Parallax
+  - Hide Search Button on Home Screen
+  - Allow pairing with any watchOS version (iPad only)
 - Internal Options
   - Build Version in Status Bar
-  - Force Right to Left
+  - Force Right to Left / Left to Right
   - Show Hidden Icons on Home Screen
-  - Force Metal HUD Debug
-  - iMessage Diagnostics
-  - IDS Diagnostics
-  - VC Diagnostics
+  - iMessage, Continuity and FaceTime Debugging
+  - Show Accessory Developer Settings
+  - Disable Clock Icon Seconds Hand
+  - Disable Spotlight Searching in Websites
+  - Show Hardware Button Hints in Screenshots
+  - Vibrate on Raise-to-Wake
   - App Store Debug Gesture
   - Notes App Debug Mode
   - Show Touches With Debug Info
   - Hide Respring Icon
   - Play Sound on Paste
   - Show Notifications for System Pastes
-- Disable Liquid Glass (iOS 26.0+):
-  - Ignore Liquid Glass App Build Check (iOS 26.0+)
-  - Force Solarium Fallback (iOS 26.0+, doesn't work on iOS 27 anymore)
-- Disable Daemons:
-  - OTAd
-  - UsageTrackingAgent
-  - Game Center
-  - Screen Time Agent
-  - Logs, Dumps, and Crash Reports
-  - ATWAKEUP
-  - Tipsd
-  - VPN
-  - Chinese WLAN service
-  - HealthKit
-  - AirPrint
-  - Assistive Touch
-  - iCloud
-  - Internet Tethering (aka Personal Hotspot)
-  - PassBook
-  - Spotlight
+- Liquid Glass (iOS 26.0+): 98 options, searchable in the app
+  - Disable or tone down Liquid Glass: Solarium fallback (iOS 26 only), linked-on, hardware and opt-out checks
+  - Turn off specular highlights, refraction, HDR and shadows for the Dock, folders, widgets and Lock Screen clock
+  - Flat icons everywhere
+  - iOS 27: experimental glass flags (Calistoga, floating and stacked-image effects, debug overlays)
+- Disable Daemons (with a one-tap Recommended set):
+  - System services: thermalmonitord, OTA updates, UsageTrackingAgent, Game Center, Screen Time Agent, ATWAKEUP, Tips, VPN icon, Chinese WLAN service, HealthKit, AirPrint, Assistive Touch, iCloud, Internet Tethering (Personal Hotspot), Passbook, Spotlight, Voice Control, NanoTimeKit, Apple Ads, News, Family Sharing, Video Subscriptions, Web Bookmarks, Apple Watch (Nano) services, Siri backend services, Wi-Fi logging, Maps (geod), Safari Suggestions, Reminders, AirPlay, GameKit, Sidecar, Speech Recognition, Translate, Mock Location, DeviceCheck
+  - Analytics & diagnostics: crash reporting, Wi-Fi, system, audio, ecosystem, call and media analytics, CoreDuet, Insight, Metrics, symptom, statistical and wireless diagnostics, Duet heuristics, decisiond, triald, sociald
+- Icon Themes: custom Home Screen icons and labels as WebClips, plus downloadable icon packs
+- Passcode Themes: custom passcode keypads from `.passthm` packages, written over USB/Wi-Fi with [AirLift] (no reboot)
+- Presets: save, switch, export and import whole tweak setups (`.gnpreset`); see [Portable presets](docs/PORTABLE_AND_DIAGNOSTICS.md)
+- Share a preset as a QR code or a one-line code, and import someone else's setup from a screenshot or pasted text
+- Preset catalog: browse community presets reviewed by the team, check their risk, preview and import them, or submit your own
+- Risk check before every apply: a Low / Medium / High verdict with reasons, and an explicit confirmation for high-risk setups
+- Preview on iPhone: see the Lock Screen and Home Screen with your tweaks, drawn for your model, before applying (also for presets and shared codes)
+- Command line: everything above is scriptable through `python nugget_cli.py --help`, with `--json` output and `--dry-run` applies
 </details>
 
 ## Screenshots
@@ -170,13 +176,13 @@ Need support? Join our [Discord Server][server].
 
 <div align="center">
 
-**Thanks everyone who contributes to project!** 🎉
+**Thanks to everyone who contributes to the project!** 🎉
 
 <a href="https://github.com/GoldenNugget-Team/GoldenNugget/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=GoldenNugget-Team/GoldenNugget" alt="Contributors" />
 </a>
 
-Want to see your name here? Open [Pull Request](https://github.com/GoldenNugget-Team/GoldenNugget/pulls)!
+Want to see your name here? Open a [Pull Request](https://github.com/GoldenNugget-Team/GoldenNugget/pulls)!
 
 </div>
 
@@ -210,6 +216,8 @@ Want to see your name here? Open [Pull Request](https://github.com/GoldenNugget-
 
   - [usbmuxd][usbmuxdGitHub]
   - [libimobiledevice][libimobiledeviceGitHub]
+
+  If they are missing, GoldenNugget offers to install them (Arch, Debian/Ubuntu, Fedora, openSUSE, Alpine and Void families); the system asks for your administrator password through polkit, so the app never sees it.
 </details>
 
 <details>
@@ -239,14 +247,13 @@ step is required for the current interface.
 
 When changing Qt resources, regenerate the resource module:
 ```py
-pyside6-rcc src/qt/resources.qrc -o src/qt/resources_rc.py
+pyside6-rcc --compress-algo zlib src/qt/resources.qrc -o src/qt/resources_rc.py
 ```
 
-To create and compile languages, you can use the following commands:
-```py
-pyside6-lupdate main_app.py src/gui/main_window.py src/gui/pages/page.py src/gui/pages/pages_list.py src/gui/pages/main/*.py src/gui/pages/tools/*.py src/gui/dialogs/*.py src/gui/ios/*.py src/devicemanagement/device_manager.py src/exceptions/*.py src/tweaks/*.py src/tweaks/posterboard/*.py src/tweaks/posterboard/template_options/*.py src/tweaks/status_bar/*.py src/controllers/*.py -ts src/qt/translations/Nugget_{language code}.ts # generate/update the language file
-pyside6-lrelease src/qt/translations/Nugget_{language code}.ts -qm src/qt/translations/Nugget_{language code}.qm # compile to binary
-```
+Translations live in the [gNugget-i18n repository][i18n] and are synced into
+`src/qt/translations/` automatically, so do not edit the `Nugget_*.ts` files here.
+See [I18N_SETUP.md](I18N_SETUP.md) for the sync, the local Russian catalog and the
+pitfalls of regenerating catalogs with `pyside6-lupdate`.
 
 Build the application for your current platform:
 
@@ -263,10 +270,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions and [FORKING.md](FORKIN
 ## Credits
 - [awesomenull] Lead developer
 - [Wind0ws11Aero] for helping with development a lot.
+- [kik4311] Co-developer
 - Translations crowdsourced using [gNugget-i18n repository][i18n]
 - [LeminLimez] for creating Nugget.
 - [0xjonhnnydev] for [AirLift]
-- [LEGACY] Old translations was crowdsourced using [Nugget POEditor][POEditorJoin]. Thank you everyone who assisted in the translation effort!
+- [LEGACY] Old translations were crowdsourced using [Nugget POEditor][POEditorJoin]. Thank you everyone who assisted in the translation effort!
 - [PosterRestore][PosterRestoreDiscord] for their help with PosterBoard
   - Special thanks to [dootskyre][dootskyreX], [Middo][MiddoX], [dulark][dularkGitHub], forcequitOS, and pingubow for their work on nugget. It would not have been possible without them!
   - Thanks to [Snoolie for aar handling][python-aar-stuffGitHub]!
@@ -314,5 +322,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions and [FORKING.md](FORKIN
 [server]: https://discord.gg/Rm6r4zeE3y
 [0xjonhnnydev]: https://github.com/0xjohnnydev
 [awesomenull]: https://github.com/awesomenull-dev
+[kik4311]: https://github.com/kik4311
 [AirLift]: https://github.com/0xjohnnydev/airlift
 [mobile]: https://github.com/GoldenNugget-Team/GoldenNugget-mobile

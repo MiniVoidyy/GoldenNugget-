@@ -1,32 +1,22 @@
 from PySide6.QtCore import (
-    Qt, QTimer, QCoreApplication, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup,
+    QTimer, QCoreApplication, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup,
 )
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel, QMessageBox,
-    QGraphicsOpacityEffect, QSizePolicy, QFrame, QPushButton,
+    QGraphicsOpacityEffect, QSizePolicy,
 )
 
-from src.gui.ios.components import IOSCard, IOSSectionHeader, IOSSwitch, IOSSearchField, IOSSearchEmpty, IOSSegmentedFilter, IOSSettingsAction
-from src.gui.theme import ColorThemeManager, theme_pixmap, theme_icon, t
+from src.gui.widgets import (
+    IOSCard, IOSSectionHeader, IOSSwitch, IOSSearchField, IOSSearchEmpty, IOSSettingsAction,
+)
+from src.gui.theme import ColorThemeManager
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.tweak_loader import load_daemons
 from src.tweaks.daemons_tweak import Daemon, RECOMMENDED_ANALYTICS, NOTIFICATION_RECOVERY_DAEMONS
-
-ANALYTICS_DAEMONS = (Daemon.AnalyticsHelper, Daemon.WifiAnalytics, Daemon.UsageTrackingAgent,
-                     Daemon.AppleAds, Daemon.SettingsStats, Daemon.AudioAnalytics,
-                     Daemon.EcosystemAnalytics, Daemon.CallAnalytics, Daemon.Feedback, Daemon.Metrics)
 from src.controllers.hotload import HotLoad, confirm_flagged
-from src.controllers.favorites import TweakFavorites
 
 # QWIDGETSIZE_MAX — PySide6 does not export the C macro, this is its value.
 _NO_MAX_HEIGHT = 16777215
-
-_ROW_SPACING = 12
-_FAVORITE_SIZE = 44
-_INFO_SIZE = 36
-
-from src.tweaks.daemon_descriptions import DAEMON_DESCRIPTIONS
-from src.gui.ios.daemon_categories import CATEGORY_ORDER, DAEMON_CATEGORIES, REPORTS_CATEGORY, ACCOUNTS_CATEGORY
 
 
 class _DaemonRows(QWidget):
@@ -130,7 +120,7 @@ class _DaemonRows(QWidget):
         fade = QPropertyAnimation(effect, b"opacity", self)
         fade.setStartValue(0.0 if shown else 1.0)
         fade.setEndValue(1.0 if shown else 0.0)
-        fade.setDuration(self.FAD_IN_MS if shown else self.FADE_OUT_MS)
+        fade.setDuration(self.FADE_IN_MS if shown else self.FADE_OUT_MS)
         fade.setEasingCurve(
             QEasingCurve.Type.OutCubic if shown else QEasingCurve.Type.InCubic)
         group.addAnimation(fade)
@@ -189,6 +179,26 @@ class IOSDaemonsContent(QWidget):
         master_row.addWidget(self.master_switch)
         layout.addWidget(master_card)
 
+        # Shown while the master switch is off: without it the page is just a
+        # lone switch over empty space, with no hint of what turning it on does.
+        self._disabled_hint = QLabel(QCoreApplication.translate(
+            "Nugget", "Turn this on to choose which system services (daemons) to "
+            "disable: analytics, diagnostics and other background services. "
+            "Nothing changes on your device until you apply tweaks."))
+        self._disabled_hint.setWordWrap(True)
+        self._disabled_hint.setContentsMargins(8, 0, 8, 0)
+        self._disabled_hint.setStyleSheet(
+            f"color: {c.text_secondary}; font-size: 13px; background-color: transparent;")
+        layout.addWidget(self._disabled_hint)
+
+        self.recover_notifications_button = IOSSettingsAction(
+            QCoreApplication.translate("Nugget", "Restore Call Notification Services"))
+        self.recover_notifications_button.setToolTip(QCoreApplication.translate(
+            "Nugget", "Re-enable Spotlight and services disabled by the previous Recommended set. "
+            "Apply changes and reboot your device afterwards. Safety rules still apply."))
+        self.recover_notifications_button.clicked.connect(self._restore_notification_services)
+        layout.addWidget(self.recover_notifications_button)
+
         # Everything that acts on daemons lives in one block that the master
         # switch unrolls / folds away, so those rows only exist on screen while
         # daemon modifications are actually on. The Recommended shortcut is the
@@ -200,9 +210,7 @@ class IOSDaemonsContent(QWidget):
         self._rows = _DaemonRows(self)
         layout.addWidget(self._rows)
 
-        # Recommended: one tap to disable every safe analytics/telemetry daemon.
-        # Pure analytics/tracking/logging — nothing boot-critical, so this set
-        # is confirmed safe to disable (mirrors MiniVoidyy/GoldenNugget-).
+        # Recommended only includes the curated analytics/diagnostics set.
         self.recommended_card = IOSCard()
         recommended_row = QHBoxLayout(self.recommended_card)
         recommended_row.setContentsMargins(16, 12, 16, 12)
@@ -259,7 +267,7 @@ class IOSDaemonsContent(QWidget):
             (QCoreApplication.translate("Nugget", "Disable News"), Daemon.News),
             (QCoreApplication.translate("Nugget", "Disable Family Sharing"), Daemon.FamilySharing),
             (QCoreApplication.translate("Nugget", "Disable Video Subscriptions"), Daemon.VideoSubscriptions),
-(QCoreApplication.translate("Nugget", "Disable Web Bookmarks"), Daemon.WebBookmarks),
+            (QCoreApplication.translate("Nugget", "Disable Web Bookmarks"), Daemon.WebBookmarks),
             (QCoreApplication.translate("Nugget", "Disable Apple Watch (Nano) Services"), Daemon.AppleWatchNano),
             (QCoreApplication.translate("Nugget", "Disable Wi-Fi Logging"), Daemon.WifiLogging),
             (QCoreApplication.translate("Nugget", "Disable Maps (Geod)"), Daemon.Maps),
@@ -328,7 +336,6 @@ class IOSDaemonsContent(QWidget):
             (QCoreApplication.translate("Nugget", "Disable Decisiond"), Daemon.Decisiond),
             (QCoreApplication.translate("Nugget", "Disable Triald (A/B Experiment Telemetry)"), Daemon.Triald),
             (QCoreApplication.translate("Nugget", "Disable Sociald"), Daemon.Sociald),
-            # --- Extended analytics / tracking / telemetry set ---
         ]:
             card, switch = self._make_daemon_switch(title, daemon)
             self.daemon_cards.append(card)
@@ -367,9 +374,6 @@ class IOSDaemonsContent(QWidget):
     def _make_daemon_switch(self, title: str, daemon: Daemon):
         card = IOSCard()
         card.setProperty("searchText", " ".join([title, daemon.name, *daemon.value]))
-        desc = DAEMON_DESCRIPTIONS.get(daemon.name, "")
-        if desc:
-            card.setToolTip(desc)
         row_layout = QHBoxLayout(card)
         row_layout.setContentsMargins(16, 12, 16, 12)
         row_layout.setSpacing(12)
@@ -378,8 +382,6 @@ class IOSDaemonsContent(QWidget):
         label = QLabel(title)
         label.setWordWrap(True)
         label.setStyleSheet(f"color: {c.text_primary}; font-size: 15px; background-color: transparent;")
-        if desc:
-            label.setToolTip(desc)
         self._daemon_labels.append(label)
         row_layout.addWidget(label, 1)
 
@@ -388,8 +390,6 @@ class IOSDaemonsContent(QWidget):
         if dangerous:
             value = False
         switch = IOSSwitch(value)
-        if desc:
-            switch.setToolTip(desc)
         switch.toggled.connect(
             lambda checked, d=daemon: self._on_daemon_toggled(d, checked)
         )
@@ -442,6 +442,25 @@ class IOSDaemonsContent(QWidget):
             return False
         return all(value.get(d.value[0], False) for d in RECOMMENDED_ANALYTICS)
 
+    def _restore_notification_services(self):
+        if not self.daemons_tweak.enabled:
+            self.master_switch.setChecked(True)
+            if not self.daemons_tweak.enabled:
+                return
+        for daemon in NOTIFICATION_RECOVERY_DAEMONS:
+            if daemon.name in self._forced_daemons:
+                continue
+            # Write explicit False values: dropping keys does not reliably undo
+            # a previously applied launchd disabled override on the device.
+            self.daemons_tweak.set_multiple_values(daemon.value, value=False)
+            self._set_switch(daemon, False)
+        self.refresh_from_tweaks()
+        QMessageBox.information(
+            self, QCoreApplication.translate("Nugget", "Call Notification Services"),
+            QCoreApplication.translate(
+                "Nugget", "Service settings are ready. Apply changes and reboot your device "
+                "to re-enable them. Services locked by safety rules remain disabled."))
+
     def _on_recommended_toggled(self, checked: bool):
         """Toggle every safe analytics/telemetry daemon at once."""
         if not self.daemons_tweak.enabled:
@@ -489,21 +508,6 @@ class IOSDaemonsContent(QWidget):
             self.master_switch.setChecked(True)
             if daemon is Daemon.Location:
                 self._warn_location_daemon()
-            self._apply_screen_time_group(checked)
-            self._mirror_screen_time_plist(checked)
-
-    def _apply_screen_time_group(self, checked: bool):
-        """Toggle the full Screen Time daemon set, UsageTrackingAgent included.
-
-        lara's proven Screen Time disable covers ScreenTimeAgent +
-        UsageTrackingAgent (+ homed + familycircled); UsageTrackingAgent is
-        the piece that keeps Screen Time usage bookkeeping alive on its own,
-        so it rides along with the ScreenTime group and its dedicated switch
-        is kept in lockstep.
-        """
-        self.daemons_tweak.set_multiple_values(Daemon.UsageTrackingAgent.value,
-                                               value=checked)
-        self._set_switch(Daemon.UsageTrackingAgent, checked)
 
     def _on_screen_time_toggled(self, checked: bool):
         if not self.daemons_tweak.enabled:
@@ -517,28 +521,6 @@ class IOSDaemonsContent(QWidget):
             self.screen_time_switch.blockSignals(False)
             return
         self.screen_time_tweak.set_enabled(checked)
-        # Keep the "Disable Screen Time" daemon toggle in lockstep.
-        self._apply_screen_time_group(checked)
-        if checked:
-            self.master_switch.setChecked(True)
-
-    def _mirror_screen_time_plist(self, checked: bool):
-        """Disabling Screen Time must also clear the ScreenTimeAgent.plist.
-
-        The Screen Time agent runs as a per-user launchd agent, which the
-        system disabled-daemons plist does NOT shut down, so the daemon keys
-        alone leave Screen Time fully working. Writing an empty valid plist to
-        /var/mobile/Library/Preferences/com.apple.ScreenTimeAgent.plist (the
-        same file method as the dedicated "Clear ScreenTimeAgent.plist file"
-        row) is what actually removes the Screen Time configuration, so both
-        controls are kept in lockstep.
-        """
-        if self.screen_time_tweak is None:
-            return
-        self.screen_time_tweak.set_enabled(checked)
-        self.screen_time_switch.blockSignals(True)
-        self.screen_time_switch.setChecked(checked)
-        self.screen_time_switch.blockSignals(False)
 
     def _set_switch(self, daemon: Daemon, value: bool):
         for d, switch in self.daemon_switches:
@@ -596,7 +578,7 @@ class IOSDaemonsContent(QWidget):
         continue_btn = box.addButton(
             QCoreApplication.translate("Nugget", "Continue Anyway"),
             QW.QMessageBox.ButtonRole.AcceptRole)
-        stop_btn = box.addButton(
+        box.addButton(
             QCoreApplication.translate("Nugget", "Stop"),
             QW.QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(continue_btn)
@@ -639,6 +621,7 @@ class IOSDaemonsContent(QWidget):
         # the only caller that animates is the master switch itself; a build, a
         # device change or a theme change must never re-run the cascade
         self._rows.set_shown(enabled, animate=animate)
+        self._disabled_hint.setVisible(not enabled)
         self._apply_search()
 
     def refresh_from_tweaks(self):
@@ -674,6 +657,8 @@ class IOSDaemonsContent(QWidget):
     def _retheme(self):
         c = ColorThemeManager.instance().colors
         self._master_label.setStyleSheet(f"color: {c.text_primary}; font-size: 15px; background-color: transparent;")
+        self._disabled_hint.setStyleSheet(
+            f"color: {c.text_secondary}; font-size: 13px; background-color: transparent;")
         for lbl in self._daemon_labels:
             lbl.setStyleSheet(f"color: {c.text_primary}; font-size: 15px; background-color: transparent;")
         for note in self._forced_notes:

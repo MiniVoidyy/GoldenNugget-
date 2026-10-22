@@ -14,7 +14,7 @@ import sys
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
+from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication
 
 from src.gui.ios.daemons import IOSDaemonsContent, _NO_MAX_HEIGHT
@@ -163,7 +163,6 @@ def main():
 
     # --- individual daemon switches still work inside the block --------------
     from src.tweaks.daemons_tweak import Daemon
-    switch = dict((d, s) for d, s in content.daemon_switches)[Daemon.WifiAnalytics]
     daemons_tweak.set_multiple_values(Daemon.WifiAnalytics.value, value=True)
     content._on_daemon_toggled(Daemon.WifiAnalytics, True)
     check("an individual daemon still records its value",

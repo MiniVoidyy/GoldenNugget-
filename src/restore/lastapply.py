@@ -20,7 +20,6 @@ from PySide6.QtCore import QStandardPaths
 
 log = logging.getLogger("GoldenNugget.lastapply")
 
-FILENAME = "lastapply.json"
 
 # PosterBoard files are delivered via Phase 3's protective restore, never via
 # the sparse pass — so they never decide whether Phase 2 has something new.

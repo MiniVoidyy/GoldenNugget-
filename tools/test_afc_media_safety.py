@@ -481,7 +481,7 @@ def test_afc_open_retry():
         install(fails_once(DROPPED))
 
         async def run_dropped():
-            async with afc_media.open_afc_for_media(object()) as svc:
+            async with afc_media.open_afc_for_media(object()):
                 return "ok"
         check("a dropped connection is retried, not fatal",
               asyncio.run(run_dropped()) == "ok")
@@ -531,7 +531,7 @@ def test_afc_open_retry():
         async def run_abort():
             async with afc_media.open_afc_for_media(
                     object(), prompt_choice=prompt_abort,
-                    unlock_prompt=("T", "unlock it"), timeout=0) as svc:
+                    unlock_prompt=("T", "unlock it"), timeout=0):
                 raise AssertionError("body must not run")
         try:
             asyncio.run(run_abort())

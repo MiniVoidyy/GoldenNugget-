@@ -1,4 +1,9 @@
 """Offline wallpaper/template inspection; never extracts or executes a package."""
+# PEP 810: defer operation-only dependencies on Python 3.15+; eager on older Python.
+__lazy_modules__ = (
+    "xml.etree.ElementTree",
+)
+
 import json
 from pathlib import Path
 import plistlib
@@ -89,11 +94,16 @@ def validate_wallpaper(path, ios_version=None):
                 if not isinstance(config, dict):
                     issue('error', 'invalid_template', 'Template config must be an object.', name)
                     continue
-                required = ('options', 'domain', 'format_version', 'title', 'author')
-                if any(key not in config for key in required) or not isinstance(config.get('options'), list):
+                # templates with community tweaks (format 3) may skip options and domain
+                required = ('format_version', 'title', 'author') + (
+                    () if 'tweaks' in config else ('options', 'domain'))
+                if any(key not in config for key in required) \
+                        or not isinstance(config.get('options', []), list):
                     issue('error', 'invalid_template', 'Template config is missing required fields or options.', name)
-                if config.get('format_version') not in (1, 2):
+                if str(config.get('format_version')) not in ('1', '2', '3'):
                     issue('error', 'template_version', 'Unsupported template format version.', name)
+                if 'tweaks' in config:
+                    _check_tweaks(archive, name, config, issue)
                 if ios_version and (config.get('min_version') or config.get('max_version')):
                     # packaging is already a runtime dependency of the app.
                     from packaging.version import Version, InvalidVersion
@@ -113,6 +123,31 @@ def validate_wallpaper(path, ios_version=None):
     report['issues_truncated'] = len(report['issues']) >= MAX_ISSUES
     report['note'] = 'Static inspection only. Device/model compatibility and rendering effects are not verified.'
     return report
+
+
+def _check_tweaks(archive, config_name, config, issue):
+    """Validate a format 3 ``tweaks`` list with the rules the app loads it by."""
+    from src.tweaks.posterboard.community_tweaks import CommunityTweakError, MAX_SOURCE_BYTES, parse_tweaks
+    if str(config.get('format_version')) != '3':
+        issue('error', 'template_version', 'Templates with tweaks need format_version 3.', config_name)
+    base = config_name[:-len('config.json')]
+    names = set(archive.namelist())
+
+    def read(relative):
+        member = base + relative
+        if member not in names:
+            raise CommunityTweakError(f'Missing file in template: {relative}')
+        if archive.getinfo(member).file_size > MAX_SOURCE_BYTES:
+            raise CommunityTweakError(f'Template file is too large: {relative}')
+        return archive.read(member)
+    try:
+        loaded = parse_tweaks(config['tweaks'], read)
+    except CommunityTweakError as exc:
+        issue('error', 'invalid_tweak', str(exc), config_name)
+        return
+    for tweak in loaded:
+        for path in tweak.paths():
+            issue('info', 'tweak_write', f'Tweak "{tweak.id}" writes {path}.', config_name)
 
 
 def validation_text(report):

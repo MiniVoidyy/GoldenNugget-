@@ -58,6 +58,17 @@ metadata only; macOS adds `--osx-bundle-identifier`/codesign. i18n is not
 compiled by `compile.py` — `.qm`/`resources_rc.py` are produced by the
 pyside6-lrelease/lupdate/rcc pipeline (README / CI).
 
+Selected operation-only imports use Python 3.15's PEP 810
+`__lazy_modules__` allowlist (backup/restore services, setup certificates,
+wallpaper conversion and status-bar preset serialization). Dependencies load
+on first use; Python 3.14 and earlier keep ordinary eager imports without a
+syntax change. Entries name the fully qualified module after `from`, including
+the package for `from . import ...`. Keep Qt resources, tweak registry/singleton
+initialization, the SSL timeout patch and protective device-link shims eager;
+imports inside functions or `try` blocks also stay eager, preserving optional
+video dependency error handling. `tools/test_lazy_imports.py` checks deferral
+and resolution in fresh processes, plus the older-Python fallback.
+
 Windows-only packaging detail — **the abi3t compat DLL**: the Windows branch of
 `compile.py` collects `python3t.dll` into the bundle root. cryptography ≥ 50
 ships an abi3/abi3t wheel whose `hazmat/bindings/_rust.pyd` links
@@ -229,6 +240,11 @@ broken on iOS 26+).
 - `template_file.py` + `template_options/` — the `.batter`-style template
   format: JSON-defined option widgets (picker/remove/replace/set) that edit
   caml/xml/plist payloads at apply time.
+- `community_tweaks.py` — format 3 `.batter` `tweaks`: switchable tweaks that
+  write plist keys or files to domain-mapped paths. `TemplatesTweak.community_writes`
+  collects them; `DeviceManager._apply_tweak_pass` merges their plist keys into
+  the built-in plists (built-in keys win) and refuses whole-file clashes.
+  Switch states ride in presets as `Templates.tweak_states`, one dict per template.
 - `status_bar/status_setter.py` + `status_bar_tweak.py` + `statusbar_archive.py`
   — the UI state is the binary `StatusBarOverrideData` struct (cffi,
   `-malign-double`), which is what gets written on **iOS 26 and below** as
@@ -242,7 +258,8 @@ broken on iOS 26+).
   `STStatusBarDataCellularEntry`), built by `statusbar_archive.py` with plain
   `plistlib`. Same HomeDomain as the classic path, so it is an ordinary
   restore file — no exploit and no out-of-band channel.
-  **Scope on iOS 27 is the carrier name only** (primary + secondary); the
+  **Scope on iOS 27 is the cellular entry only**: carrier name, service
+  badge and signal bars (primary + secondary); the
   archive has no representation for the time/battery/icon overrides, so
   `src/gui/ios/statusbar.py` hides those rows on 27 instead of offering
   switches that do nothing. Everything else in the cellular entry is written
@@ -452,6 +469,31 @@ never toggles a tweak automatically. These checks cover known plist conflicts,
 not every possible interaction with wallpapers, templates or device software.
 The same conflicts appear in View changes.
 
+The summary also opens with a **risk verdict** (`controllers/risk_assessment.py`,
+`gui/ios/risk_panel.py`): Low / Medium / High plus the most serious reasons.
+It combines a per-tweak and per-daemon risk table, registry compatibility,
+warn-only HotLoad `risk` rules for the device's iOS version, conflicts, battery,
+free space, wallpaper packages, a first apply on this iOS version and the
+number of tweaks changed at once. It works on preset-shaped data, so the same
+verdict is shown for an imported share code and for every preset in the
+community catalog (`controllers/preset_catalog.py`,
+`gui/dialogs/preset_catalog.py`; see docs/PORTABLE_AND_DIAGNOSTICS.md). A High verdict disables Apply until
+the user ticks "I understand the risks". The verdict is advice: an unlisted
+tweak is Low only because nothing is known against it.
+
+**Preview on iPhone** (`gui/ios/device_twin.py`, `gui/dialogs/device_twin.py`)
+draws the selection on a full Lock Screen and Home Screen in a frame that
+matches the device: Dynamic Island, notch or Home button (unknown devices use
+the island shape). `build_state()` works on preset-shaped data, so the Apply
+page, the pre-apply summary, a saved preset and an Import Code result all use
+the same picture. It draws the status bar overrides (via `statusbar_preview`),
+Dynamic Island off, the Lock Screen footnote and supervision text, Liquid Glass
+on/off for the clock, Dock and icons, the search button, the Clock icon seconds
+hand, the build number, RTL order, icon themes and the first PosterBoard
+wallpaper's preview. Tweaks that are incompatible with the device are not drawn;
+tweaks without a visible result are counted in the legend instead. It is a
+stylised drawing, not a device screenshot.
+
 Apply and reset workers append a bounded local operation history through
 `controllers/apply_history.py`. Settings shows the ten newest entries with
 timestamp, operation, device, iOS version and result; it can clear the history
@@ -558,3 +600,34 @@ Local transfer/inspection modules:
   `tools/test_cache_placement.py` (no device needed); smoke run =
   `QT_QPA_PLATFORM=offscreen python main_app.py --test-mode`. `tools/` also
   holds device operation utilities (backups, syslog capture, sparse inspection).
+
+
+## awesomeUI widget library
+
+Shared widgets now come from the vendored `awesomeui/` package, sourced from
+`~/Projects/awesomeUI/awesomeui`. It contains the theme-aware controls, standalone
+Sidebar and other independent widgets, PhoneFrame, MultiComboBox, and
+ResizableImageLabel. It imports only PySide6 and the standard library.
+`src/gui/widgets.py` binds it to GoldenNugget's existing theme manager, `t()`,
+icon renderer, and lazy visible-widget theme connections. Pages import shared
+controls through this adapter. `src/gui/ios/components.py` retains the
+application's input/summary dialogs and compatibility exports. The phone-frame
+and Designer custom-element modules also retain compatibility imports.
+
+MainWindow replaces the generated sidebar at runtime with awesomeUI Sidebar;
+existing `ui.*PageBtn` references point to its items so feature gating and page
+callbacks use the same controllers. The generated Designer module is unchanged.
+The full-screen iOS layout and persisted theme/accent behavior are preserved.
+Settings → Appearance → Show Sidebar enables navigation alongside the iOS pages
+without switching layouts or leaving the current page. It is off by default,
+applies immediately, and persists as `ui/show_sidebar` in the app settings.
+Application-specific pages, safety dialogs, restore progress and device logic
+remain owned by GoldenNugget; they compose the shared controls.
+
+Update the library with `python3 tools/sync_awesomeui.py` (optional `--source
+/path/to/awesomeUI`), then verify with `--check`. The manifest records working-tree
+SHA-256 hashes as well as the source commit. Runtime and frozen builds use the
+checked-in copy, with no sibling-checkout or pip-install requirement. PyInstaller
+collects the statically imported modules and ships the upstream license. Include
+`awesomeui/controls.py` when running translation extraction; its original
+translation contexts are preserved.

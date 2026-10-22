@@ -7,6 +7,7 @@ FEATURE_ICONS = {
     "Status Bar": ":/icon/app-indicator.svg",
     "Icon Themes": ":/icon/brush.svg",
     "Passcode Theme": ":/icon/features/passcode-theme.svg",
+    "Community Catalog": ":/icon/globe.svg",
 }
 
 FEATURE_PAGE_ICONS = {
@@ -16,4 +17,5 @@ FEATURE_PAGE_ICONS = {
     5: FEATURE_ICONS["Status Bar"],
     10: FEATURE_ICONS["Icon Themes"],
     11: FEATURE_ICONS["Passcode Theme"],
+    13: FEATURE_ICONS["Community Catalog"],
 }

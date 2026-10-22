@@ -13,9 +13,9 @@ from src.utils.log_util import log_warn
 from .pb_config_item import PBConfigItem
 # The snapshot checks live in a Qt-free module so the restore path can gate a
 # pulled database on them too; the private aliases below keep the old local names
-# working, and POSTERBOARD_TABLES/DB_FILE_NAME stay re-exported from here.
+# working, and DB_FILE_NAME stays re-exported from here.
 from .db_validate import (
-    DB_FILE_NAME, POSTERBOARD_TABLES, is_encrypted_database, list_tables,
+    DB_FILE_NAME, is_encrypted_database, list_tables,
     posterboard_db_is_snapshot_ok, snapshot_problem)
 
 _list_tables = list_tables

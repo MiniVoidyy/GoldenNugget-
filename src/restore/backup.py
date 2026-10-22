@@ -1,3 +1,8 @@
+# PEP 810: defer operation-only dependencies on Python 3.15+; eager on older Python.
+__lazy_modules__ = (
+    "sqlite3",
+)
+
 from dataclasses import dataclass
 from datetime import datetime
 import plistlib

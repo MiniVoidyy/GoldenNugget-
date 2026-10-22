@@ -250,39 +250,3 @@ def extract_tendie_preview(tendie_path: str) -> str:
         zf.close()
 
 
-def render_tendie_preview(
-    tendie_path: str,
-    width: int = 390,
-    height: int = 844,
-    save_path: str | None = None,
-) -> QImage | None:
-    """Render a .tendies lock screen through the CAPlayground scene renderer.
-
-    Parses the tendie's Core Animation scenes (``src/controllers/ca``) and
-    renders the preferred scene (floating > background > wallpaper) at ``t`` = 0
-    into a ``QImage`` scaled to ``width`` x ``height``. Photo-style wallpapers
-    that split their art between a ``floating`` and a ``background`` scene are
-    composited so the character appears on its photograph. Falls back to
-    ``None`` when the tendie carries no CAML scenes (container types, mercury
-    refuses).
-    """
-    from src.controllers.ca import load_tendie
-    from src.controllers.ca.tendie import preferred_scene
-    from src.controllers.ca.render import preview_renderer
-
-    try:
-        bundle = load_tendie(tendie_path)
-        if bundle is None:
-            return None
-        doc, key = preferred_scene(bundle)
-        if doc is None:
-            return None
-        renderer = preview_renderer(bundle, key, size=(width, height))
-        img = renderer.render(0.0)
-        if img is None or img.isNull():
-            return None
-        if save_path:
-            img.save(save_path, "PNG")
-        return img
-    except Exception:
-        return None

@@ -8,7 +8,9 @@ from PySide6.QtWidgets import (
     QLineEdit, QMessageBox,
 )
 
-from src.gui.ios.components import IOSCard
+from src.gui.widgets import (
+    IOSCard,
+)
 from src.gui.dialogs.confirmation import ask_confirmation
 from src.gui.theme import ColorThemeManager, theme_icon, t
 from src.gui.dialogs.icon_pack_downloader import IconPackDownloaderDialog

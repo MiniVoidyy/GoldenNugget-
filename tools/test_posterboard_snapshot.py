@@ -144,7 +144,7 @@ from src.tweaks.posterboard.db_validate import require_usable_snapshot
 try:
     require_usable_snapshot(good)
     check("usable snapshot does not raise", True)
-except NuggetException as e:
+except NuggetException:
     check("usable snapshot does not raise", False)
 try:
     require_usable_snapshot(torn)
@@ -221,7 +221,6 @@ class FakeBackup2:
         return False
 
 
-import src.devicemanagement.session as session_mod
 pbb.lockdown_session = lambda udid: FakeLockdown()
 pbb.ProtectiveBackupService = FakeBackup2
 pbb.is_supported_by_fork = lambda v: True

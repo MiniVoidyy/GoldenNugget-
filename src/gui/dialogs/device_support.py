@@ -1,5 +1,5 @@
 """Explain the selected device's support using the same local rules as the UI."""
-from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtCore import QCoreApplication, QT_TRANSLATE_NOOP, Qt
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QWidget,
 )
@@ -8,7 +8,9 @@ from src.controllers.hotload import HotLoad
 from src.gui.ios.compat import compatibility_reasons
 from src.devicemanagement.passcode_support import current_passcode_theme_reason
 from src.gui.theme import ColorThemeManager, t
-from src.gui.ios.components import IOSCard, IOSCollapsibleSection
+from src.gui.widgets import (
+    IOSCard, IOSCollapsibleSection,
+)
 from src.tweaks.registry import SPECS
 from src.tweaks.tweak_names import TweakID
 
@@ -145,8 +147,8 @@ class DeviceSupportDialog(QDialog):
         name = getattr(manager, "get_current_device_name", lambda: None)() or report["model"]
         heading.addWidget(self._label(name, "compatDevice"), 1)
         state = "limited" if report["partial"] else "supported" if report["supported"] else "unsupported"
-        status = self._label(self._tr({"limited": "Limited Support", "supported": "Supported",
-                                      "unsupported": "Not Supported"}[state]), "compatBadge")
+        status = self._label(self._tr({"limited": QT_TRANSLATE_NOOP("Nugget", "Limited Support"), "supported": QT_TRANSLATE_NOOP("Nugget", "Supported"),
+                                      "unsupported": QT_TRANSLATE_NOOP("Nugget", "Not Supported")}[state]), "compatBadge")
         status.setProperty("supportState", state)
         heading.addWidget(status, 0, Qt.AlignTop)
         device_layout.addLayout(heading)
@@ -169,8 +171,8 @@ class DeviceSupportDialog(QDialog):
 
         counts = QHBoxLayout()
         counts.setSpacing(10)
-        for key, text in (("available", "Available"), ("unavailable", "Unavailable"),
-                          ("blocked", "Safety Restrictions")):
+        for key, text in (("available", QT_TRANSLATE_NOOP("Nugget", "Available")), ("unavailable", QT_TRANSLATE_NOOP("Nugget", "Unavailable")),
+                          ("blocked", QT_TRANSLATE_NOOP("Nugget", "Safety Restrictions"))):
             card = IOSCard()
             column = QVBoxLayout(card)
             column.setContentsMargins(12, 12, 12, 12)
@@ -187,9 +189,9 @@ class DeviceSupportDialog(QDialog):
                 "Automatic safety rules are off. You can turn them back on in Settings → Safety."), "compatWarning")
             body.addWidget(warning)
 
-        for key, title in (("blocked", "Safety Restrictions"),
-                           ("unavailable", "Unavailable on This Device"),
-                           ("available", "Available Tweaks")):
+        for key, title in (("blocked", QT_TRANSLATE_NOOP("Nugget", "Safety Restrictions")),
+                           ("unavailable", QT_TRANSLATE_NOOP("Nugget", "Unavailable on This Device")),
+                           ("available", QT_TRANSLATE_NOOP("Nugget", "Available Tweaks"))):
             entries = report["groups"][key]
             section = IOSCollapsibleSection(self._tr("{0} ({1})").format(self._tr(title), len(entries)), expanded=False)
             grouped = {}

@@ -24,7 +24,11 @@ Runs against ``Library/SpringBoard/StatusBarOverrides.archive`` in
 comes out is byte-comparable with what we produce.
 """
 
-import os
+# PEP 810: defer operation-only dependencies on Python 3.15+; eager on older Python.
+__lazy_modules__ = (
+    "pymobiledevice3.services.mobilebackup2",
+)
+
 import plistlib
 import sqlite3
 import tempfile

@@ -164,7 +164,6 @@ def test_startup_load():
 # =============================================================================
 def test_banner_and_settings_hook():
     print("\nthe UI tells the truth about it")
-    from src.gui.ios import settings as settings_mod
     from src.gui.preset_widget import PresetBanner
 
     banner = PresetBanner.__new__(PresetBanner)
@@ -182,7 +181,8 @@ def test_banner_and_settings_hook():
           seen[-1] != "AutoSave", seen[-1])
     check("it says the state is not saved", seen[-1] == "Not Saved", seen[-1])
 
-    src = open(settings_mod.__file__, encoding="utf-8").read()
+    from src.gui.ios import presets as presets_mod
+    src = open(presets_mod.__file__, encoding="utf-8").read()
     check("the Presets section has the switch", "_on_autosave_toggled" in src)
     check("it persists to the same key the loader reads",
           '"tweak_autosave"' in src)

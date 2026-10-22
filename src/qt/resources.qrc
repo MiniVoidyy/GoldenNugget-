@@ -1,8 +1,9 @@
 <RCC>
     <qresource prefix="/">
         <file>credits/LeminLimez.png</file>
-        <file>credits/awesomenull.webp</file>
-        <file>credits/windows11aero.webp</file>
+        <file>credits/awesomenull.png</file>
+        <file>credits/windows11aero.png</file>
+        <file>credits/kik4311.png</file>
         <file>icon/app-indicator.svg</file>
         <file>icon/arrow-clockwise.svg</file>
         <file>icon/brush.svg</file>
@@ -65,6 +66,7 @@
         <file>icon/liquid-glass.svg</file>
         <file>icon/lock.svg</file>
         <file>icon/play-circle.svg</file>
+        <file>dmg_icon.icns</file>
     </qresource>
     <qresource prefix="/translations">
         <file>translations/Nugget_ab.qm</file>

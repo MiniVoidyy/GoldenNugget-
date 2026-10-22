@@ -106,7 +106,7 @@ jobs:
       - name: Regenerate resources_rc.py
         run: |
           cd src/qt
-          pyside6-rcc resources.qrc -o resources_rc.py
+          pyside6-rcc --compress-algo zlib resources.qrc -o resources_rc.py
 
       # The .ts/.qm copies are committed on purpose: PyInstaller ships
       # src/qt/translations on disk (--add-data=src/qt:src/qt) and the

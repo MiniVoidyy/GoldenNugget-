@@ -32,6 +32,25 @@ class UIRefinementTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
+    def test_profile_resources_work_without_optional_image_plugins(self):
+        from PySide6.QtCore import QFile, QIODevice, QResource, QCoreApplication
+        from PySide6.QtGui import QPixmap
+        original_paths = QCoreApplication.libraryPaths()
+        try:
+            QCoreApplication.setLibraryPaths([])
+            for name in ('awesomenull', 'windows11aero', 'kik4311', 'LeminLimez'):
+                path = f':/credits/{name}.png'
+                resource = QResource(path)
+                self.assertTrue(resource.isValid(), path)
+                self.assertNotEqual(resource.compressionAlgorithm(),
+                                    QResource.Compression.ZstdCompression, path)
+                file = QFile(path)
+                self.assertTrue(file.open(QIODevice.ReadOnly), f'{path}: {file.errorString()}')
+                self.assertGreater(len(file.readAll()), 0, path)
+                self.assertFalse(QPixmap(path).isNull(), path)
+        finally:
+            QCoreApplication.setLibraryPaths(original_paths)
+
     def test_confirmation_actions_and_escape(self):
         for action, expected in (("cancel", QDialog.Rejected), ("confirm", QDialog.Accepted),
                                  ("escape", QDialog.Rejected)):
