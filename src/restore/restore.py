@@ -444,7 +444,6 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                           skip_setup: bool = True,
                            skip_protective_backup: bool = False,
                           include_keychain: bool = False,
-                          include_photos: bool = True,
                           prompt_choice=None,
                           afc_media: bool = False,
                           merge_phases: bool = True,
@@ -590,12 +589,11 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
             log_warn("Phase 1: protective backup SKIPPED at the user's request "
                      "(no data protection for this apply)")
         else:
-            scope = "photos, Apple ID, settings, home screen" if include_photos else "Apple ID, settings, home screen (partial: photos excluded)"
-            log_info(f"Phase 1: Starting protective backup ({scope})")
+            log_info("Phase 1: Starting protective backup (photos, Apple ID, settings, home screen)")
             await perform_protective_backup(
                 lockdown_client, backup_root,
                 progress_callback=progress_callback,
-                include_photos=include_photos,
+                include_photos=True,
                 include_keychain=include_keychain,
                 include_afc_media=bool(media_dir),
             )
@@ -1001,7 +999,7 @@ def _is_ios27_scaffolding(file) -> bool:
 
 
 # files is a list of FileToRestore objects
-async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdown_client: LockdownClient = None, progress_callback = lambda x: None, backup_password: str = "", prepared_backup_root: PreparedBackup = None, skip_setup: bool = True, skip_protective_backup: bool = False, include_keychain: bool = False, include_photos: bool = True, prompt_choice=None, afc_media: bool = False, merge_phases: bool = True, supervised: bool = False, organization_name: str = "", stage_callback=None):
+async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdown_client: LockdownClient = None, progress_callback = lambda x: None, backup_password: str = "", prepared_backup_root: PreparedBackup = None, skip_setup: bool = True, skip_protective_backup: bool = False, include_keychain: bool = False, prompt_choice=None, afc_media: bool = False, merge_phases: bool = True, supervised: bool = False, organization_name: str = "", stage_callback=None):
     # create the files to be backed up
     files_list = [
     ]
@@ -1204,7 +1202,6 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
                                  skip_setup=skip_setup,
                                  skip_protective_backup=skip_protective_backup,
                                  include_keychain=include_keychain,
-                                 include_photos=include_photos,
                                  prompt_choice=prompt_choice,
                                  afc_media=afc_media,
                                  merge_phases=merge_phases,
