@@ -18,12 +18,13 @@ from .tweak_classes import BasicPlistTweak
 
 def _dual_shimmer_factory() -> BasicPlistTweak:
     """Writes both the Accessibility 'Reduce Bright Effects' key and the
-    SpringBoard 'SBNoIconShimmer' fallback so the icon shimmer is killed
-    even on iOS 26.6.1 where the AX key alone is ignored."""
+    SpringBoard 'SBNoIconShimmer' fallback (in the MANAGED SpringBoard domain,
+    like all other SB tweaks) so the icon shimmer is killed even on iOS 26.6.1
+    where the AX key alone is ignored."""
     from .basic_plist_locations import FileLocation
     return _DualShimmerTweak(
         FileLocation.accessibility, "ReduceHighlightingEffectsEnabled",
-        companion={FileLocation.springboardPrefs: "SBNoIconShimmer"})
+        companion={FileLocation.springboard: "SBNoIconShimmer"})
 
 
 class _DualShimmerTweak(BasicPlistTweak):
