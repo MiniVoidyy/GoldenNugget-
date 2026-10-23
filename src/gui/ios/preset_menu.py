@@ -16,6 +16,7 @@ import os
 import sys
 import weakref
 from typing import Optional
+from src.devicemanagement.device_capabilities import device_os_name
 
 from PySide6.QtCore import (
     Qt, QCoreApplication, QObject, QEvent, QPoint, QRect,
@@ -61,7 +62,7 @@ def preset_subtitle(meta: dict) -> str:
         return ""
     model = meta.get("device_model") or "Unknown"
     ios = meta.get("ios_version") or "Unknown"
-    text = _T("Nugget", "{0} • iOS {1}").format(model, ios)
+    text = _T("Nugget", "{0} • {1} {2}").format(model, device_os_name(model), ios)
     tags = meta.get("tags") or []
     if tags:
         text += "  #" + " #".join(tags)
@@ -179,6 +180,13 @@ def load_preset_flow(parent, window, pm: PresetManager, name: str,
         return False
 
     window.settings.setValue("last_loaded_preset", name)
+    # Loading sets the tweaks directly, without the change callback that keeps
+    # AutoSave current, and startup restores AutoSave when autosave is on, so
+    # write it now or the restart would bring back the previous configuration
+    # (the CLI's `preset load` does the same).
+    save_autosave = getattr(window, "_save_autosave_preset", None)
+    if save_autosave is not None:
+        save_autosave()
     window._sync_settings()
     QMessageBox.information(
         parent, _T("Nugget", "Load Preset"),

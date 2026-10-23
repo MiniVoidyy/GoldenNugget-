@@ -292,6 +292,10 @@ def _ensure_directory_rows(conn, domain: str, relative_dir: str,
             blob = plistlib.loads(_build_mbdir_blob(rel))
             objects = blob["$objects"]
         objects[1]["InodeNumber"] = next_inode
+        if domain == "SysContainerDomain-com.apple.eligibilityd":
+            # Project Linwood's verified system-container directory row shape.
+            objects[1]["ProtectionClass"] = 0
+            objects[1]["Mode"] = 0o40755
         if owner is not None:
             objects[1]["UserID"] = owner
         if group is not None:
@@ -433,6 +437,8 @@ def inject_files_into_backup(backup_dir: "str | Path", udid: str, files: list,
                     mode=safe_mode, owner=_owned(owner), group=_owned(group))
             patched = plistlib.loads(blob)
             patched["$objects"][1]["InodeNumber"] = unique_inode
+            if domain == "SysContainerDomain-com.apple.eligibilityd":
+                patched["$objects"][1]["ProtectionClass"] = 4
             blob = plistlib.dumps(patched, fmt=plistlib.FMT_BINARY)
             payload = device_dir / file_id[:2] / file_id
             payload.parent.mkdir(parents=True, exist_ok=True)

@@ -50,7 +50,7 @@ from pymobiledevice3.exceptions import ConnectionTerminatedError, PasswordRequir
 
 from src.exceptions.nugget_exception import NuggetException
 from src.exceptions.device_errors import is_transient_restore_error, is_find_my_error
-from src.exceptions.device_errors import is_connection_error
+from src.exceptions.device_errors import is_connection_error, is_device_lock_required_error, is_device_locked_error
 
 def concat_regular_file(file: FileToRestore, files_list: list[FileToRestore], last_domain: str, last_path: str):
     path, name = os.path.split(file.restore_path)
@@ -75,7 +75,11 @@ def concat_regular_file(file: FileToRestore, files_list: list[FileToRestore], la
         if full_path != "":
             full_path += "/"
         full_path += path_item
-        if not last_path.startswith(full_path):
+        if full_path == "":
+            continue
+        # compare whole components: "Library/Preferences-x" sorts before
+        # "Library/Preferences/..." but does not contain it
+        if last_path != full_path and not last_path.startswith(full_path + "/"):
             files_list.append(backup.Directory(
                 full_path,
                 file.domain,
@@ -86,7 +90,7 @@ def concat_regular_file(file: FileToRestore, files_list: list[FileToRestore], la
             last_path = full_path
     # finally, append the file
     files_list.append(backup.ConcreteFile(
-        f"{full_path}/{name}",
+        f"{full_path}/{name}" if full_path else name,
         file.domain,
         owner=file.owner,
         group=file.group,
@@ -147,26 +151,6 @@ _RECONNECT_TIMEOUT = 20 * 60
 # impossible.
 
 
-def _scaled_callback(progress_callback, lo: float, hi: float):
-    """Map pymobiledevice3's raw 0-100 progress into the [lo, hi] range.
-
-    Status strings pass through untouched (the GUI shows them as labels);
-    other non-numeric values are dropped so the bar never sees garbage.
-    """
-    span = hi - lo
-
-    def _cb(value):
-        if isinstance(value, str):
-            progress_callback(value)
-            return
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            return
-        pct = max(0.0, min(100.0, float(value)))
-        progress_callback(lo + span * pct / 100.0)
-
-    return _cb
-
-
 async def _wait_for_device(udid: str, progress_callback,
                            timeout: float = _RECONNECT_TIMEOUT,
                            prompt_choice=None) -> LockdownClient:
@@ -195,6 +179,7 @@ async def _wait_for_device(udid: str, progress_callback,
         DeviceNotFoundError, PasswordRequiredError, NotPairedError,
         ConnectionFailedError, ConnectionTerminatedError, LockdownError,
         MissingValueError, PairingError, FatalPairingError,
+        MuxException,
     )
     while True:
         start = time.monotonic()
@@ -247,18 +232,25 @@ async def _wait_for_device(udid: str, progress_callback,
                             "re-pair completed but lockdownd still reports "
                             "the host as unpaired")
                     except (MissingValueError, LockdownError,
-                            PairingError, FatalPairingError) as e2:
+                            PairingError, FatalPairingError,
+                            DeviceNotFoundError, ConnectionFailedError,
+                            ConnectionTerminatedError, MuxException,
+                            ConnectionError, OSError, asyncio.TimeoutError) as e2:
                         # PairingError covers the pending/denied trust dialog;
                         # FatalPairingError a rejected re-pair. None of these
                         # should kill the wait — the device may still be
-                        # finishing recovery, so keep polling.
+                        # finishing recovery, so keep polling. USB transport
+                        # drops during re-pairing need the same retry too.
                         last_error = e2
             except (DeviceNotFoundError, PasswordRequiredError,
                     ConnectionFailedError, ConnectionTerminatedError,
+                    MuxException,
                     ConnectionError, OSError, asyncio.TimeoutError,
                     LockdownError) as e:
                 # LockdownError covers MissingValueError and every other
-                # lockdown-level complaint the recovering device may emit
+                # lockdown-level complaint the recovering device may emit.
+                # MuxException is separate from ConnectionError/OSError and
+                # covers usbmux sockets torn down during a reboot.
                 last_error = e
                 if isinstance(e, PasswordRequiredError):
                     saw_password_required = True
@@ -350,16 +342,63 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
 
     max_retries = 18
 
-    async def _restore_once():
-        async with _start_mobilebackup2(lc) as mb:
+    from src.restore.find_my_wait import current_find_my_wait, ApplyCancelledError
+    wait_control = current_find_my_wait.get()
+    restore_started = False
+
+    async def _perform_restore(client):
+        nonlocal restore_started
+        restore_started = False
+
+        def report_progress(value):
+            nonlocal restore_started
+            if isinstance(value, (int, float)) and value > 0:
+                restore_started = True
+                if wait_control is not None:
+                    wait_control.finish()
+            progress_callback(value)
+        async with _start_mobilebackup2(client) as mb:
             await mb.restore(
                 backup_root,
                 system=True, copy=True, remove=False,
                 reboot=reboot, source=udid,
                 skip_apps=skip_apps,
-                progress_callback=progress_callback,
+                progress_callback=report_progress,
                 password=backup_password,
             )
+        if wait_control is not None:
+            wait_control.finish()
+
+    async def _restore_once():
+        blocked_by_find_my = False
+        while True:
+            try:
+                if blocked_by_find_my:
+                    from src.devicemanagement.session import lockdown_session
+                    async with lockdown_session(udid, autopair=False, connection_type="USB") as fresh:
+                        await _perform_restore(fresh)
+                else:
+                    await _perform_restore(lc)
+                return
+            except ApplyCancelledError:
+                raise
+            except Exception as error:
+                if wait_control is None:
+                    raise
+                if is_find_my_error(error):
+                    blocked_by_find_my = True
+                    progress_callback(QCoreApplication.tr(
+                        "Waiting for Find My to be turned off. Keep the device connected and unlocked. "
+                        "Restoration will retry automatically."))
+                elif (blocked_by_find_my and not restore_started
+                      and (is_transient_restore_error(error) or is_connection_error(error)
+                           or is_device_lock_required_error(error) or is_device_locked_error(error))):
+                    progress_callback(QCoreApplication.tr(
+                        "Waiting for the device while Find My is checked. Keep it connected and unlocked."))
+                else:
+                    wait_control.finish()
+                    raise
+                await wait_control.wait_for_retry()
 
     def _on_retry(attempt: int, total: int, e: Exception, delay: float) -> None:
         progress_callback(
@@ -367,6 +406,8 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
         )
 
     def _on_failure(e: Exception) -> None:
+        if isinstance(e, ApplyCancelledError):
+            raise e
         # Like Nugget-Mobile, classify Find My from the restore failure text;
         # the restore service does not expose a dependable preflight setting.
         # Inspect chained causes too, since pymobiledevice3 may wrap the
@@ -394,10 +435,8 @@ async def _restore_protective_backup(lc: LockdownClient, backup_root: str,
                 "The iPhone would not start the restore service "
                 "(mobilebackup2) even after several minutes of retries.",
                 detailed_text=(
-                    "This is not about Developer Mode - that is only "
-                    "needed for the tweak restore (BookRestore), not "
-                    "for restoring your data.\n\nThe phone was likely "
-                    "still booting, locked, or had the screen off. "
+                    "The backup/restore service was unavailable. This does not establish "
+                    "whether Developer Mode is enabled. The device may still be booting or locked. "
                     "Unlock the iPhone, keep the screen on, wait for "
                     "it to reach the home screen, then apply again. "
                     "Your data was not lost - the protective backup is "
@@ -546,6 +585,7 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
             media_dir = afc_media_dir_for(backup_root)
             log_info(f"AFC media for this run will be pulled into: {media_dir}")
     backup_complete = False
+    sparse_failure = None
     try:
         log_info(f"Starting iOS 27 restore for device {udid}")
         log_info(f"Protective backup directory: {protective_dir or backup_root}")
@@ -647,9 +687,12 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                 injected, unchanged, failed = await asyncio.to_thread(
                     inject_files_into_backup, backup_root, udid, batch,
                     manifest_password)
-                level = log_error if failed else log_info
-                level(f"Tweak files delivered via protective restore: "
-                      f"{injected} ok, {unchanged} unchanged, {failed} failed")
+                log_info(f"Tweak files delivered via protective restore: "
+                         f"{injected} ok, {unchanged} unchanged, {failed} failed")
+                if failed:
+                    raise NuggetException(
+                        f"Could not prepare {failed} tweak file(s) for restore. "
+                        "The device has not been modified.")
 
             # Last line of defence against MBErrorDomain/205: the device requests
             # every regular-file row's payload — a single missing one aborts the
@@ -657,8 +700,9 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
             missing_payloads = await asyncio.to_thread(
                 verify_backup_payloads, backup_root, udid, manifest_password)
             if missing_payloads:
-                log_error(f"{len(missing_payloads)} manifest rows lack payloads "
-                          f"(e.g. {missing_payloads[:5]}) — Phase 3 will likely fail with MBErrorDomain/205")
+                raise NuggetException(
+                    f"{len(missing_payloads)} manifest rows lack payloads "
+                    f"(e.g. {missing_payloads[:5]}). Restore stopped before modifying the device.")
 
         progress_callback(100)
 
@@ -704,19 +748,21 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                         # delivery the PosterBoard-only path already uses).
                         backup=back, reboot=not merge_phases,
                         lockdown_client=lockdown_client if sparse_attempt == 0 else None,
-                        progress_callback=_tracking_callback)
+                        progress_callback=_tracking_callback, udid=udid)
                     log_info(f"Phase 2: sparse restore completed cleanly "
                              f"({sparse_progress['calls']} progress events)")
                     break
                 except (ConnectionTerminatedError, ssl.SSLEOFError,
-                        ConnectionAbortedError, ConnectionResetError):
-                    if sparse_progress["last"] is None and sparse_attempt + 1 < max_sparse_attempts:
+                        ConnectionAbortedError, ConnectionResetError) as e:
+                    no_progress = sparse_progress["last"] is None or sparse_progress["last"] <= 0
+                    if no_progress and sparse_attempt + 1 < max_sparse_attempts:
                         log_warn("Phase 2: connection dropped at 0% right after the cache "
                                  "session — cooling down 25s and retrying once on a "
                                  "fresh connection")
                         await asyncio.sleep(25)
                         continue
-                    if sparse_progress["last"] is None:
+                    if no_progress:
+                        sparse_failure = e
                         log_error("Phase 2: connection dropped with ZERO restore progress "
                                   "on every attempt — the sparse restore was likely "
                                   "REJECTED. Security state recovery will not trigger; "
@@ -921,7 +967,8 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                 log_info("Phase 5: Skipping setup panes via MobileConfigService")
                 try:
                     await skip_all_setup27(lc, udid, supervised=supervised,
-                                           organization_name=organization_name)
+                                           organization_name=organization_name,
+                                           progress_callback=progress_callback)
                 except CloudConfigurationAlreadyPresentError:
                     log_info("Phase 5: device already has a cloud configuration "
                              "— setup already handled, nothing to skip")
@@ -943,6 +990,10 @@ async def _restore_ios27(back: backup.Backup, reboot: bool,
                 await lc.close()
             except Exception:
                 pass
+        if sparse_failure is not None:
+            raise NuggetException(
+                "The protective data restore completed, but the device rejected "
+                "the tweak transfer without progress. Tweaks were not applied.") from sparse_failure
     except Exception as e:
         if backup_complete:
             if regenerate_cache:
@@ -1024,6 +1075,8 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
     # MBErrorDomain/205 — those keep the sparse delivery).
     # GOLDENNUGGET_PB_SPARSE=1 forces the old sparse delivery.
     pb_via_protective = (prepared_backup_root is not None
+                         and not skip_protective_backup
+                         and os.environ.get("GOLDENNUGGET_NO_PROTECTIVE_BACKUP") != "1"
                          and os.environ.get("GOLDENNUGGET_PB_SPARSE") != "1")
     inject_all = False
     if pb_via_protective:
@@ -1036,6 +1089,8 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
             log_warn("Prepared backup is encrypted — injecting tweaks is "
                      "impossible (MBErrorDomain/205); falling back to sparse "
                      "restore delivery")
+    from src.tweaks.siri_ai import require_protective_delivery
+    require_protective_delivery(sorted_files, inject_all)
     inject_files = []
     for file in sorted_files:
         if file.domain == "" or file.domain == "z":
@@ -1044,8 +1099,7 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
             # restore cannot use — they are dropped.
             continue
         else:
-            if pb_via_protective and (inject_all
-                                      or file.domain == "AppDomain-com.apple.PosterBoard"):
+            if pb_via_protective and inject_all:
                 inject_files.append(file)
                 continue
             last_domain, last_path = concat_regular_file(file, files_list, last_domain, last_path)
@@ -1172,6 +1226,11 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
 
     if device_ver >= _V("27.0"):
         if skip_protective_backup:
+            if stage_callback:
+                stage_callback("backup", "skipped")
+                stage_callback("restore", "skipped")
+                stage_callback("media", "skipped")
+                stage_callback("tweaks", "")
             # Raw sparse mode (GOLDENNUGGET_NO_PROTECTIVE_BACKUP=1): the iOS 27
             # three-phase restore would trigger Apple's security-recovery erasure
             # and restore an empty backup — exactly what bootloop-testing must
@@ -1185,13 +1244,18 @@ async def restore_files(files: list[FileToRestore], reboot: bool = False, lockdo
                     ConnectionAbortedError, ConnectionResetError):
                 log_info("Device disconnected during restore — expected on reboot")
             if reboot and skip_setup:
+                if stage_callback:
+                    stage_callback("setup", "waiting")
                 lc = await _wait_for_device(lockdown_client.udid,
                                             progress_callback,
                                             prompt_choice=prompt_choice)
                 log_info("Raw sparse: skipping setup panes via MobileConfigService")
+                if stage_callback:
+                    stage_callback("setup", "settings")
                 await skip_all_setup27(lc, lockdown_client.udid,
                                        supervised=supervised,
-                                       organization_name=organization_name)
+                                       organization_name=organization_name,
+                                       progress_callback=progress_callback)
                 progress_callback(95)
         else:
             # iOS 27 era: three-phase protective backup + restore

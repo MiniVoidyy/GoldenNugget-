@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QPushButton, QScrollArea, QToolButton, QStackedWidget,
     QCheckBox, QComboBox
 )
-from PySide6.QtGui import QPixmap, QIcon, QImageReader
+from PySide6.QtGui import QPixmap, QIcon, QImageReader, QDesktopServices
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 
 from src.gui.widgets import (
@@ -14,6 +14,9 @@ from src.gui.widgets import (
 )
 from src.gui.theme import ColorThemeManager, t, theme_pixmap
 from src.tweaks.tweaks import tweaks, TweakID
+
+# Batter Builder: the visual editor for .batter templates with community tweaks.
+BATTER_BUILDER_URL = "https://github.com/GoldenNugget-Team/GoldenNugget-TemplateBuilder/releases/latest"
 
 
 class TendieRow(IOSCard):
@@ -31,6 +34,7 @@ class TendieRow(IOSCard):
 
     def __init__(self, page, tendie, parent=None):
         super().__init__(parent)
+        self._page = page
         self.tendie = tendie
         self.setCursor(Qt.PointingHandCursor)
         self.setMinimumHeight(72)
@@ -98,12 +102,29 @@ class TendieRow(IOSCard):
         # IOSCard.__init__ already connected _retheme to theme_changed; restyle
         # now that the child widgets exist.
         self._retheme()
+        self._update_conversion_ui()
+
+    def _conversion_supported(self) -> bool:
+        version = self._page.window.device_manager.get_current_device_version()
+        return tweaks[TweakID.PosterBoard]._legacy_convert_supported(version)
+
+    def _update_conversion_ui(self):
+        if self.convert_switch is not None:
+            supported = self._conversion_supported()
+            self.convert_switch.setVisible(supported)
+            self.convert_lbl.setVisible(supported)
+        self.format_lbl.setText(self._format_caption())
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Rows survive device changes; recheck the currently selected iPhone.
+        self._update_conversion_ui()
 
     def _format_caption(self) -> str:
         posterboard = tweaks[TweakID.PosterBoard]
         if not posterboard.tendie_needs_conversion(self.tendie):
             return QCoreApplication.translate("Nugget", "Modern format")
-        if posterboard.tendie_convert_enabled(self.tendie):
+        if self._conversion_supported() and posterboard.tendie_convert_enabled(self.tendie):
             return QCoreApplication.translate("Nugget", "Converts to the modern format")
         return QCoreApplication.translate("Nugget", "Installs as is")
 
@@ -308,6 +329,22 @@ class IOSPosterboardPage(QWidget):
             self.templates_placeholder.setStyleSheet(
                 f"font-size: 15px; color: {c.text_secondary}; background-color: transparent;"
             )
+        if hasattr(self, '_builder_icon'):
+            self._builder_icon.setStyleSheet(
+                f"QLabel {{ background-color: {c.accent}; border-radius: 12px; font-size: 24px; color: {c.text_inverse}; }}"
+            )
+        if hasattr(self, '_builder_title'):
+            self._builder_title.setStyleSheet(
+                f"font-size: 16px; font-weight: 600; color: {c.text_primary}; background-color: transparent;"
+            )
+        if hasattr(self, '_builder_subtitle'):
+            self._builder_subtitle.setStyleSheet(
+                f"font-size: 12px; color: {c.text_secondary}; background-color: transparent;"
+            )
+        if hasattr(self, '_builder_chevron'):
+            self._builder_chevron.setStyleSheet(
+                f"font-size: 26px; color: {c.text_secondary}; background-color: transparent;"
+            )
 
     def _retheme_video_tab(self):
         c = ColorThemeManager.instance().colors
@@ -476,6 +513,9 @@ class IOSPosterboardPage(QWidget):
         self.templates_import_btn = import_btn
         self.templates_layout.addWidget(import_btn)
 
+        self.templates_builder_card = self._create_builder_card()
+        self.templates_layout.addWidget(self.templates_builder_card)
+
         self.templates_placeholder = QLabel(QCoreApplication.translate("Nugget", "No templates added yet"))
         self.templates_placeholder.setAlignment(Qt.AlignCenter)
         self.templates_layout.addWidget(self.templates_placeholder)
@@ -483,6 +523,42 @@ class IOSPosterboardPage(QWidget):
         self._load_templates_list()
 
         return self._templates_scroll
+
+    def _create_builder_card(self) -> QWidget:
+        """A row that opens Batter Builder's download page, for people who
+        want to make a template of their own instead of writing JSON."""
+        card = IOSCard()
+        card.setCursor(Qt.PointingHandCursor)
+        card.setMinimumHeight(88)
+        card.mousePressEvent = lambda e: self.open_batter_builder()
+
+        inner = QHBoxLayout(card)
+        inner.setContentsMargins(16, 12, 16, 12)
+        inner.setSpacing(12)
+
+        self._builder_icon = QLabel()
+        self._builder_icon.setFixedSize(48, 48)
+        self._builder_icon.setAlignment(Qt.AlignCenter)
+        self._builder_icon.setText("\u270E")
+        inner.addWidget(self._builder_icon)
+
+        text_col = QVBoxLayout()
+        text_col.setSpacing(2)
+        self._builder_title = QLabel(QCoreApplication.translate("Nugget", "Create Your Own Template"))
+        text_col.addWidget(self._builder_title)
+        self._builder_subtitle = QLabel(QCoreApplication.translate(
+            "Nugget", "Batter Builder makes switches, sliders and lists without writing JSON"))
+        self._builder_subtitle.setWordWrap(True)
+        text_col.addWidget(self._builder_subtitle)
+        inner.addLayout(text_col, 1)
+
+        self._builder_chevron = QLabel("\u203A")
+        inner.addWidget(self._builder_chevron)
+
+        return card
+
+    def open_batter_builder(self):
+        QDesktopServices.openUrl(QUrl(BATTER_BUILDER_URL))
 
     def show_add_templates_dialog(self):
         from PySide6.QtWidgets import QFileDialog, QMessageBox
@@ -512,7 +588,8 @@ class IOSPosterboardPage(QWidget):
 
         for i in reversed(range(self.templates_layout.count())):
             widget = self.templates_layout.itemAt(i).widget()
-            if widget is not None and widget not in (self.templates_placeholder, self.templates_import_btn):
+            if widget is not None and widget not in (self.templates_placeholder, self.templates_import_btn,
+                                                     self.templates_builder_card):
                 widget.deleteLater()
 
         widgets = {}
@@ -687,7 +764,8 @@ class IOSPosterboardPage(QWidget):
         dialog.exec()
 
     def show_add_tendies_dialog(self):
-        from PySide6.QtWidgets import QFileDialog
+        from zipfile import BadZipFile
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
         selected_files, _ = QFileDialog.getOpenFileNames(
             self.window, QCoreApplication.translate("Nugget", "Select PosterBoard Files"), "", "Zip Files (*.tendies)"
         )
@@ -697,8 +775,19 @@ class IOSPosterboardPage(QWidget):
             except Exception:
                 device_version = None
             for file in selected_files:
-                if not tweaks[TweakID.PosterBoard].add_tendie(file, device_version):
-                    break
+                try:
+                    if not tweaks[TweakID.PosterBoard].add_tendie(file, device_version):
+                        break
+                except (BadZipFile, OSError, ValueError) as error:
+                    message = (QCoreApplication.translate(
+                        "Nugget", "This file is not a valid wallpaper ZIP archive. "
+                        "It may be incomplete or damaged. Download the original "
+                        ".tendies file again; renaming another file will not convert it.")
+                        if isinstance(error, BadZipFile) else str(error))
+                    QMessageBox.warning(
+                        self.window,
+                        QCoreApplication.translate("Nugget", "Import Failed"),
+                        os.path.basename(file) + "\n\n" + message)
             self.refresh_tendies()
 
     def refresh_tendies(self):

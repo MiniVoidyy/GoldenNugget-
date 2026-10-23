@@ -1,4 +1,3 @@
-import plistlib
 from typing import Optional, Callable
 
 from .basic_plist_locations import FileLocation
@@ -57,21 +56,6 @@ class NullifyFileTweak(Tweak):
             other_tweaks[self.file_location] = b""
     
 
-class EmptyPlistTweak(NullifyFileTweak):
-    """Clear a preferences file by writing a valid, empty plist.
-
-    Unlike ``NullifyFileTweak`` (a zero-byte file, which cfprefsd can treat as
-    corrupt and skip), an empty ``{}`` plist parses cleanly and makes the
-    owning process fall back to its defaults -- the same "no configuration"
-    outcome lara reaches by deleting the file, but expressible through a
-    restore. Used to clear ``com.apple.ScreenTimeAgent.plist``.
-    """
-
-    def apply_tweak(self, other_tweaks: dict):
-        if self.enabled:
-            other_tweaks[self.file_location] = plistlib.dumps({})
-    
-
 class BasicPlistTweak(Tweak):
     def __init__(
             self,
@@ -96,13 +80,95 @@ class BasicPlistTweak(Tweak):
 class ReversibleBooleanPlistTweak(BasicPlistTweak):
     """Write both states so disabling a previously applied key takes effect."""
 
+    def __init__(self, file_location, key, *, integer_value=False):
+        super().__init__(file_location, key)
+        self.integer_value = integer_value
+
     def apply_tweak(self, other_tweaks: dict, force_disabled: bool = False) -> dict:
         target = other_tweaks.get(self.file_location)
         if not isinstance(target, dict):
             target = {}
             other_tweaks[self.file_location] = target
-        target[self.key] = False if force_disabled else bool(self.enabled)
+        value = False if force_disabled else bool(self.enabled)
+        target[self.key] = int(value) if self.integer_value else value
         return other_tweaks
+
+class ExperimentalBooleanPlistTweak(ReversibleBooleanPlistTweak):
+    """Leave untouched keys alone; persist explicit off selections for rollback."""
+
+    def __init__(self, location, key, on_value, off_value):
+        super().__init__(location, key)
+        self.on_value = on_value
+        self.off_value = off_value
+        self.value = None
+
+    def set_enabled(self, value: bool):
+        value = bool(value)
+        if self.enabled != value:
+            self.value = self.on_value if value else self.off_value
+        super().set_enabled(value)
+
+    def apply_tweak(self, other_tweaks: dict, force_disabled: bool = False) -> dict:
+        if not self.enabled and self.value is None:
+            return other_tweaks
+        value = self.on_value if self.enabled and not force_disabled else self.off_value
+        other_tweaks.setdefault(self.file_location, {})[self.key] = value
+        return other_tweaks
+
+
+class DynamicIslandBorderWriteTest(ExperimentalBooleanPlistTweak):
+    VALUES = {
+        "keyLineEnabled": False,
+        "activityKeyLineColorEnabled": False,
+        "keyLineAlpha": 0.0,
+        "keyLineThickness": 0.0,
+        "backgroundBlurEnabled": False,
+        "elementShadowEnabled": False,
+        "sensorShadowVisible": False,
+    }
+
+    def __init__(self):
+        super().__init__(FileLocation.springboard, "keyLineEnabled", True, False)
+
+    def apply_tweak(self, other_tweaks: dict, force_disabled: bool = False) -> dict:
+        if not self.enabled and self.value is None:
+            return other_tweaks
+        target = other_tweaks.setdefault(self.file_location, {})
+        if self.enabled and not force_disabled:
+            target.update(self.VALUES)
+        else:
+            for key in self.VALUES:
+                target.pop(key, None)
+        return other_tweaks
+
+
+class ResettableNumericPreferenceTweak(BasicPlistTweak):
+    """Use -1 to remove an optional numeric key from the replacement plist."""
+
+    def apply_tweak(self, other_tweaks: dict) -> dict:
+        if not self.enabled:
+            return other_tweaks
+        target = other_tweaks.setdefault(self.file_location, {})
+        if self.value == -1:
+            target.pop(self.key, None)
+        else:
+            target[self.key] = float(self.value)
+        return other_tweaks
+
+
+class OptionalBundlePreferenceTweak(BasicPlistTweak):
+    """An empty app identifier removes the key from the generated preference file."""
+
+    def apply_tweak(self, other_tweaks: dict) -> dict:
+        if not self.enabled:
+            return other_tweaks
+        target = other_tweaks.setdefault(self.file_location, {})
+        if self.value:
+            target[self.key] = self.value
+        else:
+            target.pop(self.key, None)
+        return other_tweaks
+
     
 class CompanionKeyTweak(BasicPlistTweak):
     """A plist tweak that writes companion keys alongside its main key.
@@ -179,4 +245,21 @@ class AdvancedPlistTweak(BasicPlistTweak):
         if not self.enabled:
             return other_tweaks
         other_tweaks[self.file_location] = self._filter_keys(self.value)
+        return other_tweaks
+
+
+class DaemonPlistTweak(AdvancedPlistTweak):
+    def apply_tweak(self, other_tweaks: dict) -> dict:
+        other_tweaks = super().apply_tweak(other_tweaks)
+        if not self.enabled:
+            return other_tweaks
+        from .daemons_tweak import Daemon
+        values = self._filter_keys(self.value)
+        if not any(key in values for key in Daemon.OTA.value):
+            return other_tweaks
+        target = other_tweaks.setdefault(FileLocation.ota, {})
+        if any(values.get(key) is True for key in Daemon.OTA.value):
+            target["MobileAssetSUAllowOSVersionChange"] = False
+        else:
+            target.pop("MobileAssetSUAllowOSVersionChange", None)
         return other_tweaks

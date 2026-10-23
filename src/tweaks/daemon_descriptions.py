@@ -58,7 +58,4 @@ DAEMON_DESCRIPTIONS = {'OTA': 'Stops background software-update services and add
  'Decisiond': 'The effect of stopping this service is unknown.',
  'Triald': "Stops Apple's feature trials and related background downloads.",
  'Sociald': 'Interrupts social-account features.',
- 'thermalmonitord': 'May cause instability or interfere with temperature-related system behavior.',
- 'ScreenTime': 'Stops Screen Time, Family Controls and Downtime daemons and clears the ScreenTimeAgent configuration.',
- 'BatteryUsage': 'Stops battery usage logging and power statistics collection.',
-}
+ 'thermalmonitord': 'May cause instability or interfere with temperature-related system behavior.'}

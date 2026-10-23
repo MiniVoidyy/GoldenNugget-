@@ -11,6 +11,7 @@ fetches are skipped and no rules are applied.
 
 import json
 import os
+import ssl
 import time
 from typing import Optional
 
@@ -127,8 +128,13 @@ class HotLoad:
             return False
         url = url or RULES_URL
         try:
+            import certifi
+            # Some Python installs (notably on macOS) have no system CA
+            # bundle configured. Add bundled roots while retaining local CAs.
+            context = ssl.create_default_context()
+            context.load_verify_locations(cafile=certifi.where())
             req = urllib.request.Request(url, headers={"User-Agent": "GoldenNugget"})
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=15, context=context) as resp:
                 data = resp.read()
             parsed = json.loads(data.decode("utf-8"))
             if not isinstance(parsed, dict) or "rules" not in parsed:
@@ -222,6 +228,11 @@ class HotLoad:
         hidden = {}
         if not self.is_enabled():
             return hidden
+        if device_version is not None and self._compare(str(device_version), "26.6.1") == 0:
+            hidden["Daemons"] = (
+                "Daemon changes are blocked on iOS 26.6.1 because a reported "
+                "configuration caused the device to freeze at the passcode screen."
+            )
         for rule in self._rules.get("rules", []):
             try:
                 if rule.get("action") != HIDE_ACTION:

@@ -1,8 +1,10 @@
+from src.controllers.settings import Settings
+from src.devicemanagement.device_capabilities import device_os_name
 from PySide6.QtCore import Qt, QCoreApplication, QTimer, QSize
 from PySide6.QtGui import QFont, QFontMetrics
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QHBoxLayout, QLabel,
-    QDialog, QPushButton
+    QDialog, QPushButton, QMessageBox, QInputDialog
 )
 from packaging.version import Version, InvalidVersion
 
@@ -11,10 +13,8 @@ from src.gui.widgets import (
 )
 from src.gui.ios.components import TextInputDialog, NumberInputDialog
 from src.gui.theme import ColorThemeManager, theme_icon, t
-from src.gui.ios.statusbar_preview import StatusBarPreview, preview_state
 from src.tweaks.tweaks import tweaks, TweakID
 from src.tweaks.status_bar.status_setter import StatusBarItem
-
 # iOS 27 dropped the classic statusBarOverrides struct: only the cellular
 # entry survives, through StatusBarOverrides.archive, and that entry carries
 # the carrier name, its service badge and its signal-bar count. Everything
@@ -22,6 +22,15 @@ from src.tweaks.status_bar.status_setter import StatusBarItem
 # representation there, so it is hidden rather than shown as a switch that
 # silently does nothing. See src/tweaks/status_bar/statusbar_archive.py.
 FIRST_ARCHIVE_VERSION = "27.0"
+NETWORK_TYPES = {
+    0: "—", 4: "3G", 5: "4G", 7: "4G (7)", 8: "LTE", 9: "LTE (9)",
+    10: "5G", 11: "5G+", 12: "5G Ultra / UWB", 13: "5G UC",
+}
+
+
+def _network_label(value):
+    return NETWORK_TYPES.get(value, str(value))
+
 
 
 class IOSStatusBarPage(QWidget):
@@ -51,10 +60,6 @@ class IOSStatusBarPage(QWidget):
         # whole page can be re-gated whenever the connected device changes.
         self._rows: list[tuple[QWidget, bool]] = []
 
-        # Live preview of what the device will show; refreshed after every edit.
-        self.preview = StatusBarPreview()
-        self.content_layout.addWidget(self.preview)
-
         # Master enable switch
         self._header(QCoreApplication.translate("Nugget", "Configuration"), survives_ios27=True)
         self.enabled_switch = self._make_switch(
@@ -63,6 +68,7 @@ class IOSStatusBarPage(QWidget):
             self._on_enabled_toggled,
             survives_ios27=True,
         )
+
 
         # Text rows
         self._header(QCoreApplication.translate("Nugget", "Text Overrides"), survives_ios27=True)
@@ -156,14 +162,14 @@ class IOSStatusBarPage(QWidget):
             self.status_manager.is_data_network_type_overridden(),
             self.status_manager.get_data_network_type_override(),
             self.status_manager.set_data_network_type, self.status_manager.unset_data_network_type,
-            0, 30,
+            0, 30, survives_ios27=True, network_type=True,
         )
         self.secondary_network_type_row = self._make_number_row(
             QCoreApplication.translate("Nugget", "Secondary Data Network Type"),
             self.status_manager.is_secondary_data_network_type_overridden(),
             self.status_manager.get_secondary_data_network_type_override(),
             self.status_manager.set_secondary_data_network_type, self.status_manager.unset_secondary_data_network_type,
-            0, 30,
+            0, 30, survives_ios27=True, network_type=True,
         )
 
         # Raw signal strength
@@ -217,12 +223,11 @@ class IOSStatusBarPage(QWidget):
         self._ios27_note = QLabel(QCoreApplication.translate(
             "Nugget",
             "iOS 27 replaced the status bar override file, so only the carrier "
-            "entry can be changed here: its name, service badge and signal bars. "
+            "entry can be changed here: its name, service badge, signal bars and network type. "
             "The badge and bars apply to the carrier name, so set one first. "
-            "The carrier entry is replaced as a whole, so the network-type "
-            "indicator is never overridden and the signal bars stay at the "
-            "value you set (empty by default) rather than following the real "
-            "signal. The other options need iOS 26 or lower."
+            "Signal bars are omitted unless explicitly set. Network type is a fixed "
+            "visual badge, not the actual connection. "
+            "The other options need iOS 26 or lower."
         ))
         self._ios27_note.setWordWrap(True)
         self.content_layout.addWidget(self._ios27_note)
@@ -231,24 +236,12 @@ class IOSStatusBarPage(QWidget):
 
         self._retheme()
         self._sync_controls_enabled()
-        # Every control on this page is an IOSSwitch or an edit dialog; the
-        # switches' own handlers update the tweak first, the preview follows.
-        for switch in self.findChildren(IOSSwitch):
-            switch.toggled.connect(self._schedule_preview_refresh)
-        self._refresh_preview()
 
     def showEvent(self, event):
         super().showEvent(event)
         # The page outlives device changes, so re-gate every time it is shown.
         self._apply_ios27_gating()
         self._sync_controls_enabled()
-        self._refresh_preview()
-
-    def _schedule_preview_refresh(self, *_):
-        QTimer.singleShot(0, self._refresh_preview)
-
-    def _refresh_preview(self):
-        self.preview.set_state(preview_state(self.status_manager, self._is_ios27()))
 
     def _current_version(self) -> str:
         try:
@@ -269,6 +262,8 @@ class IOSStatusBarPage(QWidget):
         is_ios27 = self._is_ios27()
         for widget, survives in self._rows:
             widget.setVisible(not is_ios27 or survives)
+        self._ios27_note.setText(QCoreApplication.translate("Nugget",
+            "{0} 27 replaced the status bar override file, so only the carrier entry can be changed here: its name, service badge, signal bars and network type. The badge and bars apply to the carrier name, so set one first. Signal bars are omitted unless explicitly set. The network type is a fixed visual badge, not the actual connection. Set a carrier name for each SIM you override. Without a network-type selection the badge is hidden. The other options need {0} 26 or lower.").format(device_os_name(self.window.device_manager.get_current_device_model())))
         self._ios27_note.setVisible(is_ios27)
         pages = getattr(self.window, "ios_pages", None)
         if pages is not None and hasattr(self.window, "ios_nav"):
@@ -294,8 +289,6 @@ class IOSStatusBarPage(QWidget):
     def _retheme(self):
         c = ColorThemeManager.instance().colors
         self._scroll.setStyleSheet(f"background-color: {c.bg_primary}; border: none;")
-        if hasattr(self, "preview"):
-            self.preview.update()  # its captions use the theme's muted text colour
         # Transparent background so it does not read as a dark box, muted text
         # because it is a note rather than a value.
         self._ios27_note.setStyleSheet(
@@ -320,11 +313,11 @@ class IOSStatusBarPage(QWidget):
                     if isinstance(w, QLabel):
                         current = w.styleSheet()
                         if "font-size: 15px" in current:
-                            w.setStyleSheet(f"color: {c.text_primary}; font-size: 15px; background-color: transparent;")
+                            w.setStyleSheet(f"color: {c.text_primary}; font-size: 15px;")
                         elif "font-size: 14px" in current:
-                            w.setStyleSheet(f"color: {c.text_secondary}; font-size: 14px; background-color: transparent;")
+                            w.setStyleSheet(f"color: {c.text_secondary}; font-size: 14px;")
                         elif "font-size: 17px" in current:
-                            w.setStyleSheet(f"color: {c.accent}; font-size: 17px; background-color: transparent;")
+                            w.setStyleSheet(f"color: {c.accent}; font-size: 17px;")
             for button in widget.findChildren(QPushButton):
                 if button.objectName() == "statusBarEdit":
                     button.setStyleSheet(t("tweak_info_button"))
@@ -370,7 +363,7 @@ class IOSStatusBarPage(QWidget):
         row.setSpacing(12)
         label = QLabel(title)
         label.setWordWrap(True)
-        label.setStyleSheet(f"color: {c.text_primary}; font-size: 15px; background-color: transparent;")
+        label.setStyleSheet(f"color: {c.text_primary}; font-size: 15px;")
         row.addWidget(label, 1)
         switch = IOSSwitch(checked)
         switch.toggled.connect(on_toggled)
@@ -379,7 +372,9 @@ class IOSStatusBarPage(QWidget):
         self.content_layout.addWidget(card)
         self._rows.append((card, survives_ios27))
         return switch
-    def _make_text_row(self, title: str, overridden: bool, current: str, setter, unsetter, survives_ios27: bool = False):
+
+    def _make_text_row(self, title: str, overridden: bool, current: str, setter, unsetter, survives_ios27: bool = False,
+                       pattern: str = None, placeholder: str = None):
         c = ColorThemeManager.instance().colors
         card = IOSCard()
         row = QHBoxLayout(card)
@@ -388,12 +383,12 @@ class IOSStatusBarPage(QWidget):
 
         label = QLabel(title)
         label.setWordWrap(True)
-        label.setStyleSheet(f"color: {c.text_primary}; font-size: 15px; background-color: transparent;")
+        label.setStyleSheet(f"color: {c.text_primary}; font-size: 15px;")
         row.addWidget(label, 1)
 
         card.setProperty("overrideValue", current)
         value_lbl = QLabel(current if overridden else QCoreApplication.translate("Nugget", "Default"))
-        value_lbl.setStyleSheet(f"color: {c.text_secondary}; font-size: 14px; background-color: transparent;")
+        value_lbl.setStyleSheet(f"color: {c.text_secondary}; font-size: 14px;")
         value_lbl.setMaximumWidth(180)
         value_lbl.setWordWrap(True)
         self._fit_default_value(value_lbl)
@@ -404,7 +399,8 @@ class IOSStatusBarPage(QWidget):
         row.addWidget(switch)
 
         edit_btn = self._make_edit_button(lambda: self._on_text_row_edit(
-            title, card.property("overrideValue"), setter, label, value_lbl))
+            title, card.property("overrideValue"), setter, label, value_lbl,
+            pattern=pattern, placeholder=placeholder))
         row.addWidget(edit_btn)
 
         self.content_layout.addWidget(card)
@@ -428,11 +424,15 @@ class IOSStatusBarPage(QWidget):
             unsetter()
         value_lbl.setText(current if checked else QCoreApplication.translate("Nugget", "Default"))
 
-    def _on_text_row_edit(self, title: str, current: str, setter, label, value_lbl):
-        dialog = TextInputDialog(title, current, self)
+    def _on_text_row_edit(self, title: str, current: str, setter, label, value_lbl, pattern: str = None, placeholder: str = None):
+        dialog = TextInputDialog(title, current, self, pattern=pattern, placeholder=placeholder)
         if dialog.exec() == QDialog.Accepted:
             value = dialog.get_value()
-            setter(value)
+            try:
+                setter(value)
+            except ValueError as exc:
+                QMessageBox.warning(self, title, str(exc))
+                return
             card = value_lbl.parentWidget()
             card.setProperty("overrideValue", value)
             switch = card.findChild(IOSSwitch)
@@ -441,9 +441,8 @@ class IOSStatusBarPage(QWidget):
             switch.blockSignals(False)
             value_lbl.setText(value if value else QCoreApplication.translate("Nugget", "Default"))
             label.setText(title)
-            self._refresh_preview()
 
-    def _make_number_row(self, title: str, overridden: bool, current: int, setter, unsetter, min_val: int, max_val: int, survives_ios27: bool = False):
+    def _make_number_row(self, title: str, overridden: bool, current: int, setter, unsetter, min_val: int, max_val: int, survives_ios27: bool = False, network_type: bool = False):
         c = ColorThemeManager.instance().colors
         card = IOSCard()
         row = QHBoxLayout(card)
@@ -452,28 +451,53 @@ class IOSStatusBarPage(QWidget):
 
         label = QLabel(title)
         label.setWordWrap(True)
-        label.setStyleSheet(f"color: {c.text_primary}; font-size: 15px; background-color: transparent;")
+        label.setStyleSheet(f"color: {c.text_primary}; font-size: 15px;")
         row.addWidget(label, 1)
 
         card.setProperty("overrideValue", current)
-        value_lbl = QLabel(str(current) if overridden else QCoreApplication.translate("Nugget", "Default"))
-        value_lbl.setStyleSheet(f"color: {c.text_secondary}; font-size: 14px; background-color: transparent;")
+        value_lbl = QLabel((_network_label(current) if network_type else str(current)) if overridden else QCoreApplication.translate("Nugget", "Default"))
+        value_lbl.setStyleSheet(f"color: {c.text_secondary}; font-size: 14px;")
         value_lbl.setMaximumWidth(180)
         value_lbl.setWordWrap(True)
         self._fit_default_value(value_lbl)
         row.addWidget(value_lbl)
 
         switch = IOSSwitch(overridden)
-        switch.toggled.connect(lambda checked: self._on_number_row_toggled(checked, setter, unsetter, value_lbl, card.property("overrideValue")))
+        def toggle(checked):
+            self._on_number_row_toggled(checked, setter, unsetter, value_lbl, card.property("overrideValue"))
+            if network_type and checked:
+                value_lbl.setText(_network_label(card.property("overrideValue")))
+        switch.toggled.connect(toggle)
         row.addWidget(switch)
 
-        edit_btn = self._make_edit_button(lambda: self._on_number_row_edit(
-            title, card.property("overrideValue"), setter, value_lbl, min_val, max_val))
+        edit_btn = self._make_edit_button(lambda: (
+            self._on_network_type_edit(title, setter, value_lbl) if network_type else
+            self._on_number_row_edit(title, card.property("overrideValue"), setter, value_lbl, min_val, max_val)))
         row.addWidget(edit_btn)
 
         self.content_layout.addWidget(card)
         self._rows.append((card, survives_ios27))
         return switch
+    def _on_network_type_edit(self, title, setter, value_lbl):
+        card = value_lbl.parentWidget()
+        current = card.property("overrideValue")
+        values = list(NETWORK_TYPES)
+        if current not in values:
+            values.append(current)
+        labels = [_network_label(value) for value in values]
+        selected, accepted = QInputDialog.getItem(
+            self, title, QCoreApplication.translate("Nugget", "Fixed network badge (does not change the connection)"),
+            labels, values.index(current), False)
+        if accepted:
+            value = values[labels.index(selected)]
+            setter(value)
+            card.setProperty("overrideValue", value)
+            switch = card.findChild(IOSSwitch)
+            switch.blockSignals(True)
+            switch.setChecked(True)
+            switch.blockSignals(False)
+            value_lbl.setText(_network_label(value))
+
     def _on_number_row_toggled(self, checked: bool, setter, unsetter, value_lbl, current: int):
         if checked:
             setter(current)
@@ -493,8 +517,30 @@ class IOSStatusBarPage(QWidget):
             switch.setChecked(True)
             switch.blockSignals(False)
             value_lbl.setText(str(value))
-            self._refresh_preview()
+
+
 
     def _on_enabled_toggled(self, checked: bool):
+        settings = Settings("settings")
+        if checked and not settings.value("statusbar/signal_choice_done", False, type=bool):
+            current = (self.status_manager.get_gsm_signal_strength_bars_override()
+                       if self.status_manager.is_gsm_signal_strength_bars_overridden() else 4)
+            dialog = NumberInputDialog(
+                QCoreApplication.translate("Nugget", "Choose cellular signal bars (0–5)"),
+                current, 0, 5, self)
+            if dialog.exec() != QDialog.Accepted:
+                self._sync_controls_enabled()
+                return
+            value = dialog.get_value()
+            self.status_manager.set_gsm_signal_strength_bars(value)
+            card = self.gsm_row.parentWidget()
+            card.setProperty("overrideValue", value)
+            self.gsm_row.blockSignals(True)
+            self.gsm_row.setChecked(True)
+            self.gsm_row.blockSignals(False)
+            for label in card.findChildren(QLabel):
+                if "font-size: 14px" in label.styleSheet():
+                    label.setText(str(value))
+            settings.setValue("statusbar/signal_choice_done", True)
         self.status_manager.set_enabled(checked)
         self._sync_controls_enabled()

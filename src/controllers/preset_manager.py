@@ -245,29 +245,6 @@ class PresetManager:
         out["metadata"]["included"] = sorted(include_names)
         return out
 
-    def _serialize_subset(self, include: Optional[list] = None) -> Optional[dict]:
-        """Serialize the current tweaks filtered to ``include`` (TweakIDs/names)."""
-        if include is None:
-            include = list(tweaks.keys())
-        include_names = set()
-        for item in include:
-            include_names.add(item.name if hasattr(item, "name") else str(item))
-
-        tweak_data = {}
-        for key, tweak in tweaks.items():
-            if key.name not in include_names:
-                continue
-            if key == TweakID.PosterBoard:
-                continue
-            try:
-                tweak_data[key.name] = self._serialize_tweak(tweak)
-            except Exception as e:
-                print(f"Failed to serialize tweak {key}: {e}")
-
-        if not tweak_data:
-            return None
-        return {"tweaks": tweak_data}
-
     def import_preset(self, import_path: str, new_name: str = None) -> tuple[bool, str]:
         """Store JSON or a portable preset without activation; return (ok, name)."""
         if not os.path.isfile(import_path):

@@ -1,7 +1,7 @@
 from .tweaks import tweaks, TweakID
 from .registry import SPECS
 from .basic_plist_locations import FileLocation
-from .tweak_classes import BasicPlistTweak, AdvancedPlistTweak, NullifyFileTweak, EmptyPlistTweak
+from .tweak_classes import BasicPlistTweak, AdvancedPlistTweak, DaemonPlistTweak, NullifyFileTweak
 from .daemons_tweak import DANGEROUS_KEYS, INTERFACE_KEYS
 
 
@@ -29,12 +29,12 @@ def load_daemons():
     # or hidden daemons can never leak into the apply pass or a stored preset.
     defaults = {}
     tweaks.update({
-        TweakID.Daemons: AdvancedPlistTweak(
+        TweakID.Daemons: DaemonPlistTweak(
             FileLocation.disabledDaemons,
             defaults,
             owner=0, group=0,
             never_enable=DANGEROUS_KEYS,
             allowed_keys=INTERFACE_KEYS,
         ),
-        TweakID.ClearScreenTimeAgentPlist: EmptyPlistTweak(FileLocation.screentime),
+        TweakID.ClearScreenTimeAgentPlist: NullifyFileTweak(FileLocation.screentime),
     })

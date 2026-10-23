@@ -23,6 +23,10 @@ class TweakID(Enum):
     HideDICompletely = auto()
     SBShowAuthenticationEngineeringUI = auto()
     UseFloatingTabBar = auto()
+    KeyboardShouldSplitInDefaultContext = auto()
+    KeyboardShouldSplitInSplitPreferringContext = auto()
+    UIKeyboardPersistentSplitProgress = auto()
+    UIKeyboardPersistentSplitLock = auto()
     SBDisableIconParallax = auto()
     SBHideSearchAffordance = auto()
 

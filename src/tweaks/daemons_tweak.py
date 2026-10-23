@@ -144,68 +144,6 @@ class Daemon(Enum):
     Decisiond = ["com.apple.decisiond"]
     Triald = ["com.apple.triald"]
     Sociald = ["com.apple.sociald"]
-    # --- EXTENDED analytics/telemetry/data tracking daemons ---
-    # Additional daemons for comprehensive tracking/analytics disable
-    Aggregated = ["com.apple.aggregated"]
-    Geniusd = ["com.apple.appleseedd"]
-    MobileAssetd = ["com.apple.mobileassetd"]
-    OTAPackd = ["com.apple.otapackd"]
-    CoreCaptured = ["com.apple.corecaptured"]
-    Pcapd = ["com.apple.pcapd"]
-    IMETrafficCollector = ["com.apple.imetrafficcollector"]
-    CoreTelephonyAnalytics = ["com.apple.commcenter.coretelephony"]
-    CoreTelephony = ["com.apple.coretelephony"]
-    Runwayd = ["com.apple.generatord"]
-    Mld = ["com.apple.mld"]
-    AppStoreAnalytics = ["com.apple.appstored"]
-    CommerceAnalytics = ["com.apple.commerced"]
-    SaleAnalytics = ["com.apple.saled"]
-    RepairAnalytics = ["com.apple.repaird"]
-    Recalibration = ["com.apple.recalibrationd"]
-    PrivacyAnalytics = ["com.apple.privacyd"]
-    SafetyAlerts = ["com.apple.safetyalertsd"]
-    CipherMining = ["com.apple.cipherminingd"]
-    LifeScienceAnalytics = ["com.apple.lifescienced"]
-    # Siri/Assistant analytics
-    SiriKnowledge = ["com.apple.siriknowledged"]
-    SiriUnattended = ["com.apple.siriunattended"]
-    SiriService = ["com.apple.SiriService"]
-    SiriCore = ["com.apple.siri"]
-    # Search/FindMy analytics
-    SearchPartyd = ["com.apple.searchpartyd"]
-    Nearbyd = ["com.apple.nearbyd"]
-    NearbyInteraction = ["com.apple.nearbyinteractiond"]
-    FindMyDevice = ["com.apple.findmydeviced"]
-    FindMyLocate = ["com.apple.findmylocate"]
-    # AR/VR/Tracking analytics
-    GazeTracking = ["com.apple.gaze"]
-    Sportskitd = ["com.apple.sportskitd"]
-    Watchlistd = ["com.apple.watchlistd"]
-    ARKitTracking = ["com.apple.arkitd"]
-    FaceTracking = ["com.apple.faced"]
-    MediaTracking = ["com.apple.mediasessiond"]
-    MediaRemoteControl = ["com.apple.mediaremotecontrol"]
-    # Messaging analytics
-    IMessageTracking = ["com.apple.imagent"]
-    IMFoundation = ["com.apple.imfoundation"]
-    IMTranscoding = ["com.apple.imtranscodingagent"]
-    # Continuity/System analytics
-    ContinuityTracking = ["com.apple.continuityd"]
-    Osanalyticsd = ["com.apple.osanalyticsd"]
-    Microstackshots = ["com.apple.microstackshots"]
-    StackshotServer = ["com.apple.stackshot.server"]
-    CrashReporterSupport = ["com.apple.CrashReporterSupportHelper"]
-    AccountAnalytics = ["com.apple.appleaccountd"]
-    SystemLogger = ["com.apple.system.logger"]
-    AppleIDServiced = ["com.apple.appleidservice"]
-    CloudPhotoAnalytics = ["com.apple.cloudphotod"]
-    CloudStorage = ["com.apple.cloudd"]
-    CloudKeychain = ["com.apple.cloudkeychainproxy"]
-    # Additional logging/diagnostics
-    AskPermissions = ["com.apple.askpermissiond"]
-    StatusKit = ["com.apple.statuskit"]
-    Commerce = ["com.apple.commerce"]
-    Automount = ["com.apple.automountd"]
 
 
 # Preserve the old shortcut's scope for recovery of already-applied presets.
@@ -232,24 +170,6 @@ RECOMMENDED_ANALYTICS = [
     Daemon.AudioAnalytics, Daemon.EcosystemAnalytics,
     Daemon.Insight, Daemon.Metrics, Daemon.StatisticalDiagnostic,
     Daemon.WirelessDiagnostics,
-    # Extended analytics/telemetry
-    Daemon.Aggregated, Daemon.Geniusd, Daemon.MobileAssetd, Daemon.OTAPackd,
-    Daemon.CoreCaptured, Daemon.Pcapd, Daemon.IMETrafficCollector,
-    Daemon.CoreTelephonyAnalytics, Daemon.CoreTelephony, Daemon.Runwayd,
-    Daemon.Mld, Daemon.AppStoreAnalytics, Daemon.CommerceAnalytics,
-    Daemon.SaleAnalytics, Daemon.RepairAnalytics, Daemon.Recalibration,
-    Daemon.PrivacyAnalytics, Daemon.SafetyAlerts, Daemon.CipherMining,
-    Daemon.LifeScienceAnalytics, Daemon.SiriKnowledge, Daemon.SiriUnattended,
-    Daemon.SiriService, Daemon.SiriCore, Daemon.SearchPartyd, Daemon.Nearbyd,
-    Daemon.NearbyInteraction, Daemon.FindMyDevice, Daemon.FindMyLocate,
-    Daemon.GazeTracking, Daemon.Sportskitd, Daemon.Watchlistd,
-    Daemon.ARKitTracking, Daemon.FaceTracking, Daemon.MediaTracking,
-    Daemon.MediaRemoteControl, Daemon.IMessageTracking, Daemon.IMFoundation,
-    Daemon.IMTranscoding, Daemon.ContinuityTracking, Daemon.Osanalyticsd,
-    Daemon.Microstackshots, Daemon.StackshotServer, Daemon.CrashReporterSupport,
-    Daemon.AccountAnalytics, Daemon.SystemLogger, Daemon.AppleIDServiced,
-    Daemon.CloudPhotoAnalytics, Daemon.CloudStorage, Daemon.CloudKeychain,
-    Daemon.AskPermissions, Daemon.StatusKit, Daemon.Commerce, Daemon.Automount,
 ]
 
 # Interface-visible daemons: the switches on the Daemons page plus the
@@ -269,31 +189,13 @@ INTERFACE_DAEMONS: frozenset["Daemon"] = frozenset({
     Daemon.Reminders, Daemon.AirPlay, Daemon.GameKitService,
     Daemon.Sidecar, Daemon.SpeechRecognition, Daemon.Translate,
     Daemon.MockLocation, Daemon.DeviceCheck,
-    # analytics / telemetry section (extended)
+    # analytics / telemetry section
     Daemon.CrashReports, Daemon.WifiAnalytics, Daemon.AnalyticsHelper, Daemon.CallAnalytics,
     Daemon.AudioAnalytics, Daemon.EcosystemAnalytics,
     Daemon.CoreDuet, Daemon.Insight, Daemon.Metrics, Daemon.MediaExperience,
     Daemon.Symptomsd, Daemon.StatisticalDiagnostic, Daemon.WirelessDiagnostics,
     Daemon.DuetHeuristic, Daemon.DuetExpert, Daemon.Decisiond, Daemon.Triald,
     Daemon.Sociald,
-    # Extended analytics/telemetry daemons
-    Daemon.Aggregated, Daemon.Geniusd, Daemon.MobileAssetd, Daemon.OTAPackd,
-    Daemon.CoreCaptured, Daemon.Pcapd, Daemon.IMETrafficCollector,
-    Daemon.CoreTelephonyAnalytics, Daemon.CoreTelephony, Daemon.Runwayd,
-    Daemon.Mld, Daemon.AppStoreAnalytics, Daemon.CommerceAnalytics,
-    Daemon.SaleAnalytics, Daemon.RepairAnalytics, Daemon.Recalibration,
-    Daemon.PrivacyAnalytics, Daemon.SafetyAlerts, Daemon.CipherMining,
-    Daemon.LifeScienceAnalytics, Daemon.SiriKnowledge, Daemon.SiriUnattended,
-    Daemon.SiriService, Daemon.SiriCore, Daemon.SearchPartyd, Daemon.Nearbyd,
-    Daemon.NearbyInteraction, Daemon.FindMyDevice, Daemon.FindMyLocate,
-    Daemon.GazeTracking, Daemon.Sportskitd, Daemon.Watchlistd,
-    Daemon.ARKitTracking, Daemon.FaceTracking, Daemon.MediaTracking,
-    Daemon.MediaRemoteControl, Daemon.IMessageTracking, Daemon.IMFoundation,
-    Daemon.IMTranscoding, Daemon.ContinuityTracking, Daemon.Osanalyticsd,
-    Daemon.Microstackshots, Daemon.StackshotServer, Daemon.CrashReporterSupport,
-    Daemon.AccountAnalytics, Daemon.SystemLogger, Daemon.AppleIDServiced,
-    Daemon.CloudPhotoAnalytics, Daemon.CloudStorage, Daemon.CloudKeychain,
-    Daemon.AskPermissions, Daemon.StatusKit, Daemon.Commerce, Daemon.Automount,
 } | set(RECOMMENDED_ANALYTICS) | set(NOTIFICATION_RECOVERY_DAEMONS))
 
 # Interface-visible daemon keys: everything a user can toggle in the UI.

@@ -1,17 +1,19 @@
 from PySide6.QtCore import QCoreApplication, Qt, QSize, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QScrollArea, QDialog, QLabel, QHBoxLayout, QPushButton
+    QWidget, QVBoxLayout, QScrollArea, QDialog, QLabel, QHBoxLayout, QPushButton, QFrame
 )
 
-from src.gui.widgets import (
-    IOSCollapsibleSection, IOSCard, IOSValueRow, IOSSwitch, IOSSearchField, IOSSearchEmpty, IOSSegmentedFilter,
+from src.gui.ios.components import (
+    IOSCollapsibleSection, IOSSectionHeader, IOSCard, IOSValueRow,
+    IOSSwitch, TextInputDialog, NumberInputDialog, decimals_for_step,
+    IOSSearchField, IOSSearchEmpty, IOSSegmentedFilter,
 )
-from src.gui.ios.components import TextInputDialog, NumberInputDialog, decimals_for_step
+from src.gui.ios.tweak_categories import SPRINGBOARD_GROUPS, BOTTOM_TWEAK_CATEGORIES, TWEAK_CATEGORY_ORDER, tweak_category
 from src.gui.ios.compat import device_family, is_tweak_compatible
 from src.gui.theme import ColorThemeManager, t, theme_icon, theme_pixmap
 from src.tweaks.tweaks import tweaks, TweakID
-from src.tweaks.registry import SPECS_BY_SECTION, SECTION_FEATURES, Kind, Section
+from src.tweaks.registry import SPECS_BY_ID, SPECS_BY_SECTION, SECTION_FEATURES, Kind, Section
 from src.tweaks.tweak_loader import load_plist_tweaks
 from src.tweaks.hidden import current_hidden_feature_names
 
@@ -40,29 +42,6 @@ def _hidden_sections() -> set:
     return {s for s, feat in _SECTION_FEATURES.items() if feat in hidden}
 
 
-# Collapsed tweak sections are remembered per section name, so a rebuild (or a
-# restart) comes back exactly as the user left it.
-_COLLAPSED_KEY = "tweaks_collapsed_sections"
-
-
-def _load_collapsed_sections() -> set:
-    """Section names the user collapsed."""
-    from src.controllers.settings import Settings
-    raw = Settings("settings").value(_COLLAPSED_KEY, "", type=str) or ""
-    return {part.strip() for part in str(raw).split(",") if part.strip()}
-
-
-def _save_collapsed_section(name: str, collapsed: bool):
-    from src.controllers.settings import Settings
-    store = Settings("settings")
-    names = _load_collapsed_sections()
-    if collapsed:
-        names.add(name)
-    else:
-        names.discard(name)
-    store.setValue(_COLLAPSED_KEY, ",".join(sorted(names)))
-
-
 class IOSSectionContent(QWidget):
     """iOS-style tweak controls for one or more registry sections.
 
@@ -74,6 +53,7 @@ class IOSSectionContent(QWidget):
         self.window = window
         self.sections = sections
         self._switch_labels = []
+        self._tweak_switches = {}
         self._solarium_visible: bool = None
         from src.controllers.favorites import TweakFavorites
         self._favorites = TweakFavorites.instance()
@@ -100,26 +80,106 @@ class IOSSectionContent(QWidget):
         search_row.addWidget(self.search, 1)
         search_row.addWidget(self.filter_control)
         root.addLayout(search_row)
+        self._description_note = QLabel(self.tr("Descriptions show intended effects. Check ? for compatibility and cautions."), self)
+        self._description_note.setContentsMargins(20, 6, 16, 0)
+        self._description_note.setWordWrap(True)
+        root.addWidget(self._description_note)
+        self._loading_label = QLabel(self.tr("Loading controls…"), self)
+        self._loading_label.setContentsMargins(20, 8, 16, 0)
+        self._loading_label.hide()
+        root.addWidget(self._loading_label)
         self._inner = None
+        self._info_buttons = []
+        self._favorite_buttons = {}
+        self._search_rows = []
+        self._search_sections = []
+        self._category_lines = []
+        self.force_solarium_fallback_card = None
 
-        self.rebuild()
-        self.search.textChanged.connect(self._apply_search)
+        from src.gui.ios.visibility_batch import VisibilityBatch
+        self._visibility_batch = VisibilityBatch(self)
+        from src.gui.ios.viewport_rows import ViewportRows
+        self._viewport_rows = ViewportRows(self)
+        self.search.textChanged.connect(self._visibility_batch.cancel)
+        self.search.connect_filter(self._apply_search)
         self.filter_control.currentIndexChanged.connect(self._apply_search)
         self._favorites.changed.connect(self._refresh_favorites)
         ColorThemeManager.instance().theme_changed.connect(self._refresh_action_icons)
 
+    def showEvent(self, event):
+        if self._inner is None and not getattr(self, "_building", False):
+            self.rebuild()
+        super().showEvent(event)
+        QTimer.singleShot(0, self._offer_untested_tweaks)
+        if not getattr(self, "_building", False):
+            for tweak_id, switch in self._tweak_switches.items():
+                selected = tweaks.get(tweak_id)
+                checked = bool(selected is not None and selected.enabled)
+                if switch.isChecked() != checked:
+                    switch.blockSignals(True)
+                    switch.setChecked(checked)
+                    switch.blockSignals(False)
+            self._apply_search()
+
+    def _offer_untested_tweaks(self):
+        from src.gui.ios.compat import _parse_version
+        from src.devicemanagement.constants import Version
+        from src.gui.dialogs.confirmation import ConfirmationDialog
+        if not self.isVisible():
+            return
+        version = self.window.device_manager.get_current_device_version()
+        try:
+            if not Version("26") <= _parse_version(version) < Version("27"):
+                return
+        except ValueError:
+            return
+        if (self.window.settings.value("enable_incompatible_tweaks", False, type=bool)
+                or self.window.settings.value("incompatible_tweaks_choice_done", False, type=bool)
+                or getattr(self.window, "_untested_tweaks_prompt_shown", False)):
+            return
+        self.window._untested_tweaks_prompt_shown = True
+        dialog = ConfirmationDialog(
+            self.window, self.tr("This is not all tweaks"),
+            self.tr("You can get more but they are untested with your iOS version\n"
+                    "You can always change your mind in settings"),
+            self.tr("Enable incompatible tweaks"))
+        dialog.cancel_btn.setText(self.tr("No"))
+        enabled = dialog.exec() == QDialog.Accepted
+        self.window.settings.setValue("enable_incompatible_tweaks", enabled)
+        self.window.settings.setValue("incompatible_tweaks_choice_done", True)
+        self.window.settings.sync()
+        if enabled:
+            for content in self.window.findChildren(IOSSectionContent):
+                if content._inner is not None:
+                    content.rebuild()
+        dialog.deleteLater()
+
     def rebuild(self):
+        from src.gui.ios.incremental_builder import IncrementalBuilder
+        if not hasattr(self, "_builder"):
+            self._builder = IncrementalBuilder(self)
+        device = self.window.device_manager.data_singleton.current_device
+        self._device_signature = tuple(getattr(device, key, None)
+                                       for key in ("udid", "model", "version", "build"))
+        self._building = True
+        self._loading_label.show()
+        self._builder.start(self._build_rows())
+
+    def _build_rows(self):
         """(Re)build the section controls for the currently selected device.
 
-        Called once in ``__init__`` and again whenever the selected device
-        changes, so per-device compatibility filtering (``min_version`` /
+        Called when first shown and when the selected device changes,
+        so per-device compatibility filtering (``min_version`` /
         ``iphone_only`` / ``ipad_only`` from the registry) and HotLoad-hiding
         are re-evaluated instead of being frozen at startup, when no device is
         known yet (that would wrongly hide e.g. the Dynamic Island tweaks).
         """
+        self._visibility_batch.cancel()
+        self._viewport_rows.clear()
         # Tear down the previous build (widgets + layout) so the section can be
         # re-rendered in place from the single registry definition below.
         if self._inner is not None:
+            self._inner.hide()
             self.layout().removeWidget(self._inner)
             self._inner.deleteLater()
             self._inner = None
@@ -130,14 +190,18 @@ class IOSSectionContent(QWidget):
         inner = QWidget(self)
         inner.setLayout(layout)
         self._inner = inner
+        inner.hide()
+        layout.setEnabled(False)
         self.layout().addWidget(inner)
 
+        self.search._search_index = {}
         self._switch_labels = []
+        self._tweak_switches = {}
         self._info_buttons = []
         self._favorite_buttons = {}
         self._search_rows = []
         self._search_sections = []
-        self._search_expanded = {}
+        self._category_lines = []
         self.force_solarium_fallback_card = None
 
         try:
@@ -152,6 +216,22 @@ class IOSSectionContent(QWidget):
 
         def is_compatible(tweak_id: TweakID) -> bool:
             return is_tweak_compatible(tweak_id, device_ver, is_iphone, model)
+
+        def description_label(description):
+            label = QLabel(description)
+            label.setWordWrap(True)
+            label.setTextFormat(Qt.PlainText)
+            label.setProperty("tweakDescription", True)
+            label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+            self._switch_labels.append(label)
+            label.setStyleSheet(
+                f"color: {ColorThemeManager.instance().colors.text_secondary}; font-size: 13px;")
+            return label
+
+        def add_value_description(row, description):
+            if description:
+                row.layout().itemAt(0).layout().insertWidget(1, description_label(description))
+                row.setAccessibleDescription(description)
 
         # Helper to create a switch row for boolean tweaks
         def make_switch(tweak_id: TweakID, title: str, description: str = "",
@@ -171,11 +251,58 @@ class IOSSectionContent(QWidget):
             c = ColorThemeManager.instance().colors
             label = QLabel(title)
             label.setWordWrap(True)
-            label.setStyleSheet(f"color: {c.text_primary}; font-size: 15px; background-color: transparent;")
+            label.setStyleSheet(f"color: {c.text_primary}; font-size: 15px;")
             self._switch_labels.append(label)
-            row_layout.addWidget(label, 1)
+            text_layout = QVBoxLayout()
+            text_layout.setSpacing(4)
+            text_layout.addWidget(label)
+            if description:
+                text_layout.addWidget(description_label(description))
+            row_layout.addLayout(text_layout, 1)
             switch = IOSSwitch(tweak.enabled)
-            switch.toggled.connect(lambda checked: tweak.set_enabled(checked))
+            spec = SPECS_BY_ID.get(tweak_id)
+            if tweak_id == TweakID.DisableSystemAperture:
+                def select_aperture(checked):
+                    if checked:
+                        from src.gui.dialogs.confirmation import ask_confirmation
+                        if not ask_confirmation(
+                                self, self.tr("Test Dynamic Island availability?"),
+                                self.tr("This may change Dynamic Island, the status bar and Live Activities. "
+                                        "Removing the black background is not confirmed. "
+                                        "Test this with Disable Dynamic Island switched off. "
+                                        "Turn off and apply again to undo."),
+                                self.tr("Enable experiment"), destructive=True):
+                            switch.setChecked(False)
+                            return
+                    tweak.set_enabled(checked)
+                switch.toggled.connect(select_aperture)
+            elif spec is not None and spec.experimental:
+                def select_experiment(checked):
+                    if checked and spec.warning:
+                        from src.gui.dialogs.confirmation import ask_confirmation
+                        if not ask_confirmation(
+                                self, title, QCoreApplication.translate("Nugget", spec.warning),
+                                self.tr("Enable experiment"), destructive=True):
+                            switch.setChecked(False)
+                            return
+                    tweak.set_enabled(checked)
+                    if checked and spec.exclusive_with is not None:
+                        peer = tweaks.get(spec.exclusive_with)
+                        if peer is not None:
+                            peer.set_enabled(False)
+                        peer_switch = self._tweak_switches.get(spec.exclusive_with)
+                        if peer_switch is not None:
+                            peer_switch.setChecked(False)
+                switch.toggled.connect(select_experiment)
+            else:
+                switch.toggled.connect(lambda checked: tweak.set_enabled(checked))
+            if spec is not None and spec.unavailable_reason:
+                switch.setEnabled(tweak.enabled)
+                switch.toggled.connect(lambda checked, control=switch: control.setEnabled(checked))
+                switch.setToolTip(spec.unavailable_reason)
+            self._tweak_switches[tweak_id] = switch
+            from src.gui.ios.feature_news import add_new_badge
+            add_new_badge(row_layout, "tweak:" + tweak_id.name, card)
             row_layout.addWidget(switch)
             row_layout.addWidget(self._make_favorite_button(tweak_id, title))
             row_layout.addWidget(self._make_info_button(tweak_id, title))
@@ -201,13 +328,19 @@ class IOSSectionContent(QWidget):
             card_layout.setContentsMargins(14, 8, 14, 8)
             card_layout.setSpacing(10)
             row = IOSValueRow(title)
+            add_value_description(row, description)
             if description:
                 row.setToolTip(description)
             current = ""
             if getattr(tweak, 'value', None) is not None:
                 current = str(tweak.value)
-                row.set_display_value(current if current else QCoreApplication.translate("Nugget", "Empty"))
+                spec = SPECS_BY_ID.get(tweak_id)
+                empty_label = "No app override" if spec is not None and spec.bundle_identifier else "Empty"
+                row.set_display_value(current if current else QCoreApplication.translate("Nugget", empty_label))
             row.clicked.connect(lambda: self._show_text_input_dialog(tweak_id, title, current, row))
+            from src.gui.ios.feature_news import add_new_badge
+            add_new_badge(row.layout(), "tweak:" + tweak_id.name, row,
+                          index=row.layout().count() - 1)
             card_layout.addWidget(row, 1)
             card_layout.addWidget(self._make_favorite_button(tweak_id, title))
             card_layout.addWidget(self._make_info_button(tweak_id, title))
@@ -228,6 +361,7 @@ class IOSSectionContent(QWidget):
             card_layout.setContentsMargins(14, 8, 14, 8)
             card_layout.setSpacing(10)
             row = IOSValueRow(title)
+            add_value_description(row, description)
             if description:
                 row.setToolTip(f"{description}\n\n"
                                + QCoreApplication.translate("Nugget", "Range: {0} – {1}")
@@ -237,8 +371,19 @@ class IOSSectionContent(QWidget):
             if getattr(tweak, 'value', None) is not None:
                 current = int(tweak.value) if decimals == 0 else float(tweak.value)
                 row.set_display_value(_fmt_number(current))
-            row.clicked.connect(lambda: self._show_number_input_dialog(
-                tweak_id, title, current, row, min_val, max_val, step))
+            spec = SPECS_BY_ID.get(tweak_id)
+            if spec is not None and spec.reset_value is not None and current == spec.reset_value:
+                row.set_display_value(self.tr("Remove override"))
+            if spec is not None and spec.unavailable_reason:
+                row.set_display_value(self.tr("Unavailable — needs verification"))
+                row.setAccessibleDescription(spec.unavailable_reason)
+                row.setEnabled(False)
+            else:
+                row.clicked.connect(lambda: self._show_number_input_dialog(
+                    tweak_id, title, current, row, min_val, max_val, step))
+            from src.gui.ios.feature_news import add_new_badge
+            add_new_badge(row.layout(), "tweak:" + tweak_id.name, row,
+                          index=row.layout().count() - 1)
             card_layout.addWidget(row, 1)
             card_layout.addWidget(self._make_favorite_button(tweak_id, title))
             card_layout.addWidget(self._make_info_button(tweak_id, title))
@@ -249,7 +394,8 @@ class IOSSectionContent(QWidget):
         # are stored as QT_TRANSLATE_NOOP markers and translated here, at
         # render time.
         def tr_title(spec) -> str:
-            return QCoreApplication.translate("Nugget", spec.title)
+            from src.gui.ios.feature_news import control_title
+            return control_title(QCoreApplication.translate("Nugget", spec.title))
 
         def tr_description(spec) -> str:
             if not spec.description:
@@ -268,28 +414,64 @@ class IOSSectionContent(QWidget):
 
         sections_to_render = self.sections if self.sections is not None else list(Section)
         hidden_sections = _hidden_sections()
-        collapsed_sections = _load_collapsed_sections()
+        category_groups = []
         for section in sections_to_render:
             if section in hidden_sections:
                 continue
-            collapsible = IOSCollapsibleSection(
-                QCoreApplication.translate("Nugget", section.value),
-                expanded=section.value not in collapsed_sections)
-            collapsible.toggled.connect(
-                lambda expanded, name=section.value: _save_collapsed_section(
-                    name, not expanded))
-            layout.addWidget(collapsible)
-            start = len(self._search_rows)
+            categories = {}
             for spec in SPECS_BY_SECTION[section]:
-                renderers[spec.kind](spec, collapsible.body_layout)
+                categories.setdefault(tweak_category(spec), []).append(spec)
+            if section == Section.SPRINGBOARD:
+                ordered = {name: categories[name] for name in SPRINGBOARD_GROUPS if name in categories}
+                ordered.update({name: rows for name, rows in categories.items() if name not in ordered})
+                categories = ordered
+            if "Risky Experiments" in categories:
+                categories["Risky Experiments"] = categories.pop("Risky Experiments")
+            category_groups.extend(categories.items())
+        combined = {}
+        for category, specs in category_groups:
+            combined.setdefault(category, []).extend(specs)
+        ordered_groups = [(name, combined.pop(name)) for name in TWEAK_CATEGORY_ORDER if name in combined]
+        remaining = list(combined.items())
+        normal = [group for group in ordered_groups if group[0] not in BOTTOM_TWEAK_CATEGORIES]
+        bottom = [group for group in ordered_groups if group[0] in BOTTOM_TWEAK_CATEGORIES]
+        ordered_groups = normal + remaining + bottom
+        for category, specs in ordered_groups:
+            if category == "Camera & Buttons":
+                specs.sort(key=lambda spec: spec.id != TweakID.SBCoverSheetUseDefaultsValuesForCameraPrewarm)
+            group = QWidget(inner)
+            body = QVBoxLayout(group)
+            body.setContentsMargins(0, 16, 0, 0)
+            body.setSpacing(10)
+            title = QCoreApplication.translate("Nugget", category)
+            header = IOSSectionHeader(title)
+            header.setProperty("navigationTitle", title)
+            group.setProperty("categoryTitle", title)
+            body.addWidget(header)
+            line = QFrame(group)
+            line.setFixedHeight(1)
+            body.addWidget(line)
+            self._category_lines.append(line)
+            layout.addWidget(group)
+            start = len(self._search_rows)
+            for spec in specs:
+                before = len(self._search_rows)
+                renderers[spec.kind](spec, body)
+                for index in range(before, len(self._search_rows)):
+                    card, *metadata = self._search_rows[index]
+                    body.removeWidget(card)
+                    row = self._viewport_rows.wrap(card)
+                    body.addWidget(row)
+                    self._search_rows[index] = (row, *metadata)
+                yield
             section_rows = self._search_rows[start:]
-            enabled_count = sum(
-                bool(getattr(tweaks.get(row[1]), "enabled", False))
-                for row in section_rows)
-            collapsible.set_title_suffix(
-                QCoreApplication.translate("Nugget", "  ·  {0}/{1} enabled")
-                .format(enabled_count, len(section_rows)))
-            self._search_sections.append((collapsible, section_rows))
+            for card, *_ in section_rows:
+                card.setProperty("categoryTitle", title)
+            self._search_sections.append((group, section_rows))
+        self._building = False
+        self._loading_label.hide()
+        self.refresh_section_counts()
+        self._retheme()
 
         self.search_empty = IOSSearchEmpty(self)
         layout.addWidget(self.search_empty)
@@ -299,6 +481,9 @@ class IOSSectionContent(QWidget):
         if self._solarium_visible is not None and self.force_solarium_fallback_card is not None:
             self.force_solarium_fallback_card.setVisible(self._solarium_visible)
         self._apply_search()
+        layout.setEnabled(True)
+        inner.show()
+        self._viewport_rows.request()
         pages = getattr(self.window, "ios_pages", None)
         if pages is not None and hasattr(self.window, "ios_nav"):
             if pages.currentWidget().isAncestorOf(self):
@@ -306,11 +491,17 @@ class IOSSectionContent(QWidget):
                     pages.currentIndex()))
 
     def _apply_search(self, *_args):
+        if self._inner is None or getattr(self, "_building", False):
+            return
+        self._filter_rows()
+
+    def _filter_rows(self):
         searching = bool(self.search.text().strip())
         filter_mode = self.filter_control.currentData()
-        filtering = searching or filter_mode != "all"
         favorites = self._favorites.names()
         matches = 0
+        operations = []
+        visibility = {}
         for card, tid, title, description, compatible in self._search_rows:
             enabled = bool(getattr(tweaks.get(tid), "enabled", False))
             available = compatible and not (
@@ -319,22 +510,15 @@ class IOSSectionContent(QWidget):
                 available = False
             if filter_mode == "favorites" and tid.name not in favorites:
                 available = False
-            visible = available and self.search.matches(title, description, tid.name)
-            card.setVisible(visible)
+            visible = available and self.search.matches(
+                title, description, tid.name, card.property("categoryTitle"))
+            operations.append((card, visible))
+            visibility[card] = visible
             matches += visible
         for section, rows in self._search_sections:
-            section.setVisible(any(not row[0].isHidden() for row in rows))
-            if filtering and section not in self._search_expanded:
-                self._search_expanded[section] = section.expanded
-            # Temporary expansion must not overwrite the user's saved collapse state.
-            section.blockSignals(True)
-            if filtering:
-                section.set_expanded(True)
-            elif section in self._search_expanded:
-                section.set_expanded(self._search_expanded.pop(section))
-            section.blockSignals(False)
-            section.header.setEnabled(not filtering)
-        self.search_empty.setVisible((searching or filter_mode != "all") and matches == 0)
+            operations.append((section, any(visibility.get(row[0], False) for row in rows)))
+        operations.append((self.search_empty, (searching or filter_mode != "all") and matches == 0))
+        self._visibility_batch.apply(self._inner, operations)
 
     def refresh_section_counts(self):
         """Update enabled counts after a switch changes without rebuilding."""
@@ -342,9 +526,11 @@ class IOSSectionContent(QWidget):
             enabled_count = sum(
                 bool(getattr(tweaks.get(row[1]), "enabled", False))
                 for row in rows)
-            section.set_title_suffix(
-                QCoreApplication.translate("Nugget", "  ·  {0}/{1} enabled")
-                .format(enabled_count, len(rows)))
+            title = section.property("categoryTitle")
+            header = section.findChild(IOSSectionHeader)
+            header.setText(title)
+            header.setToolTip(QCoreApplication.translate("Nugget", "{0} of {1} enabled")
+                              .format(enabled_count, len(rows)))
 
     def set_force_solarium_fallback_visible(self, visible: bool):
         # remember the intended state so a rebuild re-applies it (the card
@@ -427,9 +613,15 @@ class IOSSectionContent(QWidget):
 
     def _retheme(self):
         c = ColorThemeManager.instance().colors
+        self._description_note.setStyleSheet(f"color: {c.text_secondary}; font-size: 12px;")
         self.filter_control._retheme()
         for lbl in self._switch_labels:
-            lbl.setStyleSheet(f"color: {c.text_primary}; font-size: 15px; background-color: transparent;")
+            secondary = bool(lbl.property("tweakDescription"))
+            color = c.text_secondary if secondary else c.text_primary
+            size = 13 if secondary else 15
+            lbl.setStyleSheet(f"color: {color}; font-size: {size}px;")
+        for line in self._category_lines:
+            line.setStyleSheet(f"background-color: {c.border}; border: none;")
         for button in self._info_buttons:
             button.setStyleSheet(t("tweak_info_button"))
         for button in self._favorite_buttons.values():
@@ -438,21 +630,41 @@ class IOSSectionContent(QWidget):
     def _show_text_input_dialog(self, tweak_id: TweakID, title: str, current: str, row: IOSValueRow):
         saved = tweaks[tweak_id].value
         current = "" if saved is None else str(saved)
-        dialog = TextInputDialog(title, current, self)
+        spec = SPECS_BY_ID.get(tweak_id)
+        is_bundle = bool(spec is not None and spec.bundle_identifier)
+        dialog = TextInputDialog(title, current, self, bundle_identifier=is_bundle)
         if dialog.exec() == QDialog.Accepted:
             value = dialog.get_value()
+            if value and spec is not None and spec.warning:
+                from src.gui.dialogs.confirmation import ask_confirmation
+                if not ask_confirmation(
+                        self, title, QCoreApplication.translate("Nugget", spec.warning),
+                        self.tr("Save experimental value"), destructive=True):
+                    return
             tweaks[tweak_id].set_value(value, toggle_enabled=True)
-            display = value if value else QCoreApplication.translate("Nugget", "Empty")
+            empty_label = "No app override" if is_bundle else "Empty"
+            display = value if value else QCoreApplication.translate("Nugget", empty_label)
             row.set_display_value(display)
 
     def _show_number_input_dialog(self, tweak_id: TweakID, title: str, current, row: IOSValueRow, min_val, max_val, step: float = 1.0):
+        spec = SPECS_BY_ID.get(tweak_id)
+        if spec is not None and spec.unavailable_reason:
+            return
         saved = tweaks[tweak_id].value
         current = 0 if saved is None else saved
         dialog = NumberInputDialog(title, current, min_val, max_val, self, step=step)
         if dialog.exec() == QDialog.Accepted:
             value = dialog.get_value()
+            spec = SPECS_BY_ID.get(tweak_id)
+            if spec is not None and spec.warning:
+                from src.gui.dialogs.confirmation import ask_confirmation
+                if not ask_confirmation(
+                        self, title, QCoreApplication.translate("Nugget", spec.warning),
+                        self.tr("Save experimental value"), destructive=True):
+                    return
             tweaks[tweak_id].set_value(value, toggle_enabled=True)
-            row.set_display_value(_fmt_number(value))
+            display = self.tr("Remove override") if spec is not None and spec.reset_value is not None and value == spec.reset_value else _fmt_number(value)
+            row.set_display_value(display)
 
 
 class IOSTweaksPage(QWidget):

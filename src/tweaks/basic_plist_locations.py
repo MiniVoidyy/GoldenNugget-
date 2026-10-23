@@ -5,7 +5,7 @@ class FileLocation(Enum):
     featureflags = "/var/preferences/FeatureFlags/Global.plist"
 
     ota = "/var/Managed Preferences/mobile/com.apple.MobileAsset.plist"
-
+    
     # SpringBoard Options
     springboard = "/var/Managed Preferences/mobile/com.apple.springboard.plist"
     footnote = "/var/containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/SharedDeviceConfiguration.plist"
@@ -22,7 +22,7 @@ class FileLocation(Enum):
     statusBarOverridesArchive = "/var/mobile/Library/SpringBoard/StatusBarOverrides.archive"
 
     accessibility = "/var/Managed Preferences/mobile/com.apple.Accessibility.plist"
-
+    
     # Internal Options
     siriAIOverrides = "/var/containers/Data/SystemGroup/com.apple.eligibilityd/Library/Caches/NeverRestore/eligibility_overrides.data"
     globalPreferences = "/var/Managed Preferences/mobile/.GlobalPreferences.plist"
@@ -43,5 +43,3 @@ class FileLocation(Enum):
     # Accessibility
     # Managed so the single key is merged on top of the user's own AX prefs
     # instead of replacing com.apple.Accessibility wholesale.
-    # SpringBoard prefs (non-managed mobile domain) as fallback for SBNoIconShimmer
-    springboardPrefs = "/var/mobile/Library/Preferences/com.apple.springboard.plist"

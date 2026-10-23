@@ -76,6 +76,7 @@ class CatalogEntry:
     ios_max: str = ""
     tags: list = field(default_factory=list)
     tweak_count: int = 0
+    untested: bool = False           # the author has not tried it on an iPhone
 
     def supports(self, ios_version) -> bool:
         """True when no iOS range is given or ``ios_version`` is inside it.
@@ -112,7 +113,8 @@ class CatalogEntry:
     def to_file(self) -> dict:
         data = {"format": FORMAT_VERSION, "name": self.name, "author": self.author,
                 "description": self.description, "ios_min": self.ios_min,
-                "ios_max": self.ios_max, "tags": list(self.tags), "code": self.code}
+                "ios_max": self.ios_max, "tags": list(self.tags), "untested": self.untested,
+                "code": self.code}
         return {key: value for key, value in data.items() if value or key in ("format", "code")}
 
 
@@ -135,7 +137,7 @@ class TemplateEntry(CatalogEntry):
     def to_row(self) -> dict:
         row = {"id": self.id, "name": self.name, "author": self.author, "description": self.description,
                "ios_min": self.ios_min, "ios_max": self.ios_max, "tags": list(self.tags),
-               "size": self.size, "sha256": self.sha256, "domain": self.domain,
+               "untested": self.untested, "size": self.size, "sha256": self.sha256, "domain": self.domain,
                "tweaks": [{"label": label, "writes": list(paths)} for label, paths in self.writes]}
         return {key: value for key, value in row.items() if value or key in ("id", "size", "sha256")}
 
@@ -159,6 +161,13 @@ def _version(raw, key):
     return value
 
 
+def _untested(raw) -> bool:
+    value = raw.get("untested", False)
+    if not isinstance(value, bool):
+        raise CatalogError(QT_TRANSLATE_NOOP("PresetCatalog", "untested must be true or false."))
+    return value
+
+
 def validate_entry(raw, entry_id: str, validate=None) -> CatalogEntry:
     """Check one catalog file (or index row) and decode its share code.
 
@@ -179,7 +188,7 @@ def validate_entry(raw, entry_id: str, validate=None) -> CatalogEntry:
         id=entry_id, name=_text(raw, "name", True), author=_text(raw, "author", True),
         description=_text(raw, "description"), code=code.strip(),
         ios_min=_version(raw, "ios_min"), ios_max=_version(raw, "ios_max"),
-        tags=[tag.strip().lower() for tag in tags])
+        tags=[tag.strip().lower() for tag in tags], untested=_untested(raw))
     if entry.ios_min and entry.ios_max and version_tuple(entry.ios_min) > version_tuple(entry.ios_max):
         raise CatalogError(QT_TRANSLATE_NOOP("PresetCatalog", "The minimum iOS version is above the maximum."))
     if not entry.code.startswith(share_code.PREFIX) or share_code.extract(entry.code) != entry.code:
@@ -223,7 +232,8 @@ def validate_template_row(raw) -> TemplateEntry:
         id=entry_id, name=_text(raw, "name", True), author=_text(raw, "author", True),
         description=_text(raw, "description"), code="",
         ios_min=_version(raw, "ios_min"), ios_max=_version(raw, "ios_max"),
-        tags=[tag.strip().lower() for tag in tags], size=size, sha256=digest, domain=domain, writes=writes)
+        tags=[tag.strip().lower() for tag in tags], size=size, sha256=digest, domain=domain, writes=writes,
+        untested=_untested(raw))
     entry.tweak_count = len(writes)
     return entry
 
@@ -306,7 +316,8 @@ def template_entry(path, entry_id: str, data: bytes = None) -> TemplateEntry:
             config = json.loads(archive.read(template.json_path))
         raw = {"name": template.name or "", "author": template.author or "",
                "description": template.description or "", "ios_min": template.min_version or "",
-               "ios_max": template.max_version or "", "tags": config.get("tags", [])}
+               "ios_max": template.max_version or "", "tags": config.get("tags", []),
+               "untested": config.get("untested", False)}
         for key in ("name", "author", "description", "ios_min", "ios_max"):
             if not isinstance(raw[key], str):
                 raw[key] = ""
@@ -426,10 +437,11 @@ def slugify(name: str) -> str:
     return slug if ID_PATTERN.match(slug) else "preset-" + time.strftime("%Y%m%d%H%M%S")
 
 
-def submission(name, author, code, description="", ios_min="", ios_max="", tags=(), validate=None):
+def submission(name, author, code, description="", ios_min="", ios_max="", tags=(), validate=None,
+               untested=False):
     """Validated (file name, file text) for a new catalog entry."""
     raw = {"format": FORMAT_VERSION, "name": name, "author": author, "description": description,
-           "ios_min": ios_min, "ios_max": ios_max, "code": code,
+           "ios_min": ios_min, "ios_max": ios_max, "code": code, "untested": bool(untested),
            "tags": [tag.strip() for tag in tags if tag.strip()]}
     entry = validate_entry(raw, slugify(name), validate)
     text = json.dumps(entry.to_file(), ensure_ascii=False, indent=2) + "\n"

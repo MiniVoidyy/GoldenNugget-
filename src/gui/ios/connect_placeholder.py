@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QCoreApplication
+from PySide6.QtCore import Qt, QCoreApplication, QRect
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QScrollArea, QHBoxLayout
 
 from src.gui.widgets import (
@@ -20,6 +20,7 @@ class ConnectDevicePlaceholder(QWidget):
     def __init__(self, window, parent=None):
         super().__init__(parent)
         self.window = window
+        self._connection_action = None
         self.setObjectName("iosContainer")
 
         root = QVBoxLayout(self)
@@ -134,6 +135,23 @@ class ConnectDevicePlaceholder(QWidget):
         except Exception as error:
             self.set_scan_status(str(error), busy=False)
 
+    def set_connection_action(self, action):
+        self._connection_action = action
+        if action == "unlock":
+            self._title.setText(self.tr("Unlock your iPhone or iPad"))
+            self._message.setText(self.tr("Enter the passcode on your device to connect."))
+        elif action == "trust":
+            self._title.setText(self.tr("Trust this computer"))
+            self._message.setText(self.tr("Confirm Trust on your device and enter its passcode if requested."))
+        elif action == "denied":
+            self._title.setText(self.tr("Trust is required"))
+            self._message.setText(self.tr("Reconnect your device and confirm Trust to continue."))
+        else:
+            self._title.setText(self.tr("No device connected"))
+            self._message.setText(self.tr("Connect an Apple device with iOS 26.2+"))
+        self._steps.setVisible(action is None)
+        self._retheme()
+
     def set_scan_status(self, text, busy=False):
         self._scan_status.setText(text)
         self._fit_help_labels()
@@ -142,17 +160,21 @@ class ConnectDevicePlaceholder(QWidget):
         self.refresh_dependency_hint(scan_failed=bool(text))
 
     def _fit_help_labels(self):
-        # QLabel's default minimum hint may allow wrapped text to be clipped
-        # instead of making the scroll content taller.
         for label in (self._steps, self._help_detail, self._scan_status):
-            label.setMinimumHeight(max(0, label.heightForWidth(650)) + 4)
+            margins = label.contentsMargins()
+            width = max(1, label.width() - margins.left() - margins.right())
+            bounds = label.fontMetrics().boundingRect(
+                QRect(0, 0, width, 16777215), Qt.TextWordWrap, label.text())
+            height = bounds.height() + margins.top() + margins.bottom() + 4 if label.text() else 0
+            label.setMinimumHeight(height)
 
     def _retheme(self):
         c = ColorThemeManager.instance().colors
         self.setStyleSheet(t("page_bg"))
         self._scroll.setStyleSheet(t("scroll_area"))
         self._icon_lbl.setPixmap(theme_pixmap(
-            ":/icon/phone.svg", c.text_secondary, self.ICON_PX,
+            ":/icon/lock.svg" if self._connection_action else ":/icon/phone.svg",
+            c.warning if self._connection_action else c.text_secondary, self.ICON_PX,
             self.devicePixelRatioF()))
         self._title.setStyleSheet(t("home_title"))
         self._message.setStyleSheet(t("home_subtitle"))

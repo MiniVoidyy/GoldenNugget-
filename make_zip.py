@@ -3,7 +3,7 @@ import zipfile
 import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(os.path.dirname(ROOT), "GoldenNugget-v2.5.zip")
+OUT = os.path.join(os.path.dirname(ROOT), "GoldenNugget-v3.0.zip")
 
 EXCLUDE_DIRS = {'.git', '__pycache__', 'build', 'dist', 'i18n'}
 EXCLUDE_FILES = {'.DS_Store'}

@@ -48,6 +48,10 @@ _LEVEL_LABELS = {
 
 # Tweak name -> (level, why). Only what can actually hurt belongs here.
 TWEAK_RISKS = {
+    "SiriAI": (RiskLevel.MEDIUM, QT_TRANSLATE_NOOP(
+        "RiskAssessment", "Replaces all eligibility overrides. Only verified on iPhone 16 Pro, iOS 27.0 build 24A437; Siri requires English (US).")),
+    "ResetSiriAIOverrides": (RiskLevel.MEDIUM, QT_TRANSLATE_NOOP(
+        "RiskAssessment", "Clears all eligibility overrides, including those installed by other tools. Previous overrides cannot be recovered by this reset.")),
     "WatchOSCompatibility": (RiskLevel.MEDIUM, QT_TRANSLATE_NOOP(
         "RiskAssessment", "Rewrites Apple Watch pairing data. If the watch stops pairing, reset this tweak.")),
     "RTL": (RiskLevel.MEDIUM, QT_TRANSLATE_NOOP(

@@ -1,13 +1,13 @@
 """Shared feature artwork for home cards and page headers."""
 
 FEATURE_ICONS = {
-    "Tweaks": ":/icon/toggles.svg",
-    "PosterBoard": ":/icon/wallpaper.svg",
-    "Daemons": ":/icon/hdd.svg",
-    "Status Bar": ":/icon/app-indicator.svg",
-    "Icon Themes": ":/icon/brush.svg",
-    "Passcode Theme": ":/icon/features/passcode-theme.svg",
-    "Community Catalog": ":/icon/globe.svg",
+    "Tweaks": ":/icon/features/tweaks.png",
+    "PosterBoard": ":/icon/features/posterboard.png",
+    "Daemons": ":/icon/features/daemons.png",
+    "Status Bar": ":/icon/features/status-bar.png",
+    "Icon Themes": ":/icon/features/icon-themes.png",
+    "Passcode Theme": ":/icon/features/passcode-theme.png",
+    "Community Catalog": ":/icon/features/community-catalog.png",
 }
 
 FEATURE_PAGE_ICONS = {

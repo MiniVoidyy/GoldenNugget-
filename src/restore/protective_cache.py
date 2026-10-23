@@ -30,6 +30,7 @@ from src.restore.storage import cache_base as _cache_base
 _logger = logging.getLogger("GoldenNugget.cache")
 
 
+
 def peek_cache_info(udid: str) -> Optional[dict]:
     """Read the cache info JSON for a UDID without a device session.
 
