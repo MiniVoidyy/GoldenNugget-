@@ -10,5 +10,8 @@ class NuggetException(Exception):
         return self.message
 
 
+class BackupStorageError(NuggetException):
+    """The backup storage location is unavailable or invalid."""
+
 class BackupDiskSpaceError(NuggetException):
     """The computer's backup destination cannot satisfy a backup space check."""

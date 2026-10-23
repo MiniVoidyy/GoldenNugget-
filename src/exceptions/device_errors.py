@@ -84,3 +84,23 @@ def is_transient_restore_error(error) -> bool:
     if "parse_plist invalid data" in msg:
         return True
     return "start" in msg.lower() and "service" in msg.lower()
+
+
+def is_restore_mode_error(exc: Exception) -> bool:
+    """True when the device booted into a restore/recovery/activation state.
+
+    This happens when the device shows the "connect to iTunes" screen or
+    is stuck in a restore mode that prevents normal restore operations.
+    """
+    msg = str(exc).lower()
+    return any(keyword in msg for keyword in (
+        "restore mode",
+        "recovery mode",
+        "activation required",
+        "connect to itunes",
+        "connect to finder",
+        "update required",
+        "setup.app",
+        "enter recovery",
+        "exit recovery",
+    ))
